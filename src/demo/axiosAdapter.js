@@ -969,7 +969,16 @@ function buildResponse(config, { status = 200, data, headers = {} }) {
 }
 
 function installAxiosAdapter() {
-  if (String(process.env.DEMO_MODE).toLowerCase() !== "true") return;
+  // Must use the SAME mode resolution as everything else. This previously read
+  // process.env.DEMO_MODE directly and required an exact "true", while
+  // src/demo/mode.js treats demo as the default and only opts out on an
+  // explicit "false". Any disagreement — DEMO_MODE unset, a stray space, odd
+  // casing — turned demo mode on everywhere except here, so the nine services
+  // that call vendors with raw axios sailed past the adapter and straight into
+  // the outbound network guard. That surfaced as "blocked outbound https
+  // request to api.servicetitan.io" on Install Tracker, Backflow and Reviews.
+  // One source of truth, no divergence.
+  if (!require("./mode").IS_DEMO) return;
   if (axios.defaults.adapter && axios.defaults.adapter.__isDemoAdapter) return;
 
   const filled = applyDemoEnvDefaults();
