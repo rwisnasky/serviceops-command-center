@@ -160,6 +160,14 @@ function isPublic(req) {
   // then resolves it to a gated page, slipping past the login wall.
   if (req.path.includes("..")) return false;
   if (req.path === "/health") return true;
+
+  // Demo mode only: the login page reads /api/demo/status to render the shared
+  // credentials, so it has to be reachable before sign-in. It exposes nothing
+  // beyond the mode flag, world row counts, and the credentials that are
+  // printed on the page anyway. Note this is GET status only — /api/demo/reset
+  // stays behind the auth wall.
+  if (demo.isDemo() && req.method === "GET" && req.path === "/api/demo/status") return true;
+
   if (PUBLIC_HTML_PATHS.has(req.path)) return true;
   for (const p of PUBLIC_PREFIXES) {
     if (req.path.startsWith(p)) return true;

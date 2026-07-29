@@ -110,6 +110,60 @@
       color: var(--muted);
       font-size: 11px;
     }
+
+    /* ── Demo credentials panel ─────────────────────────────────────────────
+       Only rendered when /api/demo/status confirms demo mode, so the real
+       deployment never shows it. */
+    .demo-banner {
+      margin: 18px 0 4px;
+      padding: 14px 16px;
+      border: 1px solid #2f6f4f;
+      border-radius: 8px;
+      background: rgba(47, 111, 79, 0.12);
+      text-align: left;
+    }
+    .demo-banner-title {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: #7fd4a6;
+      margin-bottom: 10px;
+    }
+    .demo-creds {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .demo-creds code {
+      display: block;
+      padding: 7px 10px;
+      border-radius: 5px;
+      background: rgba(0, 0, 0, 0.35);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      color: #e8f5ee;
+      user-select: all;
+    }
+    .demo-fill {
+      width: 100%;
+      padding: 9px 12px;
+      border: 0;
+      border-radius: 6px;
+      background: #2f6f4f;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .demo-fill:hover { background: #38835d; }
+    .demo-note {
+      margin-top: 10px;
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: #9bb3a6;
+    }
   </style>
 </head>
 <body>
@@ -122,6 +176,20 @@
 
       <div class="login-title">Sign in</div>
       <div class="login-hint">Use your Grounded Home Services email and password.</div>
+
+      <!-- Populated only when the server reports demo mode. Hidden otherwise. -->
+      <div class="demo-banner" id="demo-banner" hidden>
+        <div class="demo-banner-title">Portfolio demo — sign in with:</div>
+        <div class="demo-creds">
+          <code id="demo-email"></code>
+          <code id="demo-password"></code>
+        </div>
+        <button type="button" class="demo-fill" id="demo-fill">Fill and sign in</button>
+        <div class="demo-note">
+          Every customer, job and call is generated. Nothing here is real, and
+          nothing you do leaves this server.
+        </div>
+      </div>
 
       <label for="email">Email</label>
       <input id="email" name="email" type="email" autocomplete="username" required autofocus />
@@ -148,6 +216,32 @@
       errEl.textContent = '';
       errEl.classList.remove('show');
     }
+
+    // ── Demo credentials ──────────────────────────────────────────────────
+    // /api/demo/status is mounted only when DEMO_MODE is on, so a real
+    // deployment 404s here and the panel stays hidden. The credentials come
+    // from the server rather than being hardcoded, so overriding
+    // DEMO_USER_EMAIL / DEMO_USER_PASSWORD keeps this page correct.
+    (async () => {
+      try {
+        const res = await fetch('/api/demo/status');
+        if (!res.ok) return;
+        const d = await res.json();
+        if (!d.demoMode || !d.account) return;
+
+        document.getElementById('demo-email').textContent = d.account.email;
+        document.getElementById('demo-password').textContent = d.account.password;
+        document.getElementById('demo-banner').hidden = false;
+
+        document.getElementById('demo-fill').addEventListener('click', () => {
+          document.getElementById('email').value = d.account.email;
+          document.getElementById('password').value = d.account.password;
+          form.requestSubmit();
+        });
+      } catch {
+        /* not in demo mode, or offline — leave the panel hidden */
+      }
+    })();
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();

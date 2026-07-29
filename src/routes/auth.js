@@ -145,6 +145,28 @@ router.post("/api/auth/change-password", express.json(), async (req, res) => {
 
   try {
     const user = userRepo.findById(req.session.userId);
+
+    // The public demo runs on one shared account whose credentials are printed
+    // on the login page. If a visitor changed that password, every subsequent
+    // visitor would be locked out until the next deploy. The account is
+    // deliberately immutable.
+    const { IS_DEMO, DEMO_USER } = (() => {
+      try {
+        const d = require("../demo/runtime");
+        return { IS_DEMO: d.isDemo(), DEMO_USER: d.DEMO_USER };
+      } catch {
+        return { IS_DEMO: false, DEMO_USER: null };
+      }
+    })();
+    if (IS_DEMO && DEMO_USER && user.email === DEMO_USER.email) {
+      return jsonError(
+        res,
+        403,
+        "This is the shared demo account — its password can't be changed. " +
+          "Everything else on the site is fully editable."
+      );
+    }
+
     const ok = await userRepo.verifyLogin(user.email, currentPassword);
     if (!ok) return jsonError(res, 401, "current password is incorrect");
 
