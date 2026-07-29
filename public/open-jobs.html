@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Open Jobs — ServiceOps Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/styles.css" />
+<style>
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:24px; }
+  .kpi-card { background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg); padding: 18px; }
+  .kpi-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+  .kpi-card .value { font-family: var(--font-display); font-size: 28px; font-weight: 700; color: var(--text); }
+  .kpi-card .value.accent { color: var(--accent); }
+  .kpi-card .value.info   { color: var(--accent3); }
+  .kpi-card .value.ok     { color: var(--ok); }
+  .kpi-card .value.warn   { color: var(--accent2); }
+  .kpi-card .sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  .filters { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .filters .label-strip { font-size:11px; text-transform:uppercase; color:var(--muted); }
+  .filters .pill {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 8px 14px; font-size: 12px; cursor: pointer; user-select: none;
+  }
+  .filters .pill.active { border-color: var(--accent); color: var(--accent); background: var(--accent-tint); }
+  .filters .pill .pill-count { font-size: 10px; color: var(--muted); margin-left: 4px; }
+  .filters input {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 8px 12px; font-size: 12px; min-width: 240px;
+  }
+  .filters .toolbar-btn {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 8px 14px; font-size: 12px; cursor: pointer;
+  }
+  .filters .toolbar-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  table.oj-table { width:100%; border-collapse: collapse; background: var(--surface); border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--border); }
+  table.oj-table th { text-align: left; padding: 11px 14px; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; cursor: pointer; }
+  table.oj-table th:hover { color: var(--text); }
+  table.oj-table th.sorted::after { content: ' ▼'; color: var(--accent); }
+  table.oj-table th.sorted.asc::after { content: ' ▲'; }
+  table.oj-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); vertical-align: top; }
+  table.oj-table tr:last-child td { border-bottom: 0; }
+  table.oj-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.oj-table td.muted { color: var(--muted); }
+  table.oj-table tr:hover td { background: var(--surface2); }
+  table.oj-table tr.row-escalated td { background: rgba(196,18,48,0.07); }
+  table.oj-table tr.row-escalated:hover td { background: rgba(196,18,48,0.12); }
+  table.oj-table tr.row-reviewed td { opacity: 0.78; }
+  table.oj-table tr.row-resolved td { opacity: 0.55; text-decoration: line-through; }
+  table.oj-table tr.row-resolved td .status-pill { text-decoration: none; }
+
+  .status-pill {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .status-pill.in-progress { background: rgba(232,168,56,0.18); color: var(--accent2); }
+  .status-pill.scheduled   { background: rgba(91,140,201,0.18); color: var(--accent3); }
+  .status-pill.completed   { background: rgba(196,18,48,0.15); color: var(--accent); }
+  .status-pill.hold        { background: rgba(196,18,48,0.18); color: var(--accent); }
+
+  .review-pill {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    margin-left: 4px;
+  }
+  .review-pill.reviewed  { background: rgba(91,140,201,0.18); color: var(--accent3); }
+  .review-pill.escalated { background: rgba(196,18,48,0.22); color: var(--accent); }
+  .review-pill.resolved  { background: rgba(63,174,106,0.18); color: var(--ok); }
+
+  .age-pill { font-size: 11px; padding: 2px 6px; border-radius: 4px; font-variant-numeric: tabular-nums; }
+  .age-pill.fresh   { background: rgba(63,174,106,0.15); color: var(--ok); }
+  .age-pill.warm    { background: rgba(232,168,56,0.15); color: var(--accent2); }
+  .age-pill.aged    { background: rgba(196,18,48,0.15); color: var(--accent); font-weight: 600; }
+
+  .actions-cell { white-space: nowrap; }
+  .action-btn {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 4px; padding: 3px 8px; font-size: 10px; cursor: pointer; margin-right: 3px;
+    text-transform: uppercase; letter-spacing: 0.03em; font-weight: 600;
+  }
+  .action-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .action-btn.active.reviewed  { background: rgba(91,140,201,0.25); border-color: var(--accent3); color: var(--accent3); }
+  .action-btn.active.escalated { background: rgba(196,18,48,0.25); border-color: var(--accent); color: var(--accent); }
+  .action-btn.active.resolved  { background: rgba(63,174,106,0.25); border-color: var(--ok); color: var(--ok); }
+
+  .notes-line {
+    font-size: 11px; color: var(--muted); margin-top: 3px;
+    max-width: 480px; white-space: normal; line-height: 1.4;
+  }
+  .notes-line b { color: var(--text); font-weight: 600; }
+
+  /* Notes modal */
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+    z-index: 999; align-items: center; justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: 22px; width: 90%; max-width: 520px; box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+  }
+  .modal h3 { margin: 0 0 6px; color: var(--text); font-family: var(--font-display); }
+  .modal .modal-sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  .modal label { display: block; font-size: 11px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .modal textarea {
+    width: 100%; min-height: 110px; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: var(--r-md); padding: 10px; font: inherit; font-size: 13px; resize: vertical;
+  }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  .modal-actions button {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 8px 14px; font-size: 12px; cursor: pointer;
+  }
+  .modal-actions button.primary { background: var(--accent); border-color: var(--accent); color: white; }
+
+  .summary-line { font-size:12px; color:var(--muted); margin-bottom:14px; }
+  .empty { text-align:center; padding: 40px; color: var(--muted); }
+  .summary-row { font-size: 11px; color: var(--muted); padding: 8px 14px; }
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; background: var(--surface2);
+    color: var(--text); padding: 10px 16px; border-radius: var(--r-md);
+    border: 1px solid var(--border); font-size: 12px; z-index: 1000;
+    opacity: 0; transition: opacity 0.2s ease; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  .toast.ok { border-color: var(--ok); }
+  .toast.err { border-color: var(--accent); color: var(--accent); }
+
+  /* Print styles — mirror Monthly Review's clean light-on-white layout */
+  @media print {
+    @page { size: letter landscape; margin: 0.4in; }
+    body { background: #fff !important; color: #111 !important; }
+    body::before { display: none; }
+    .nav-bar, .filters, .status-bar, .modal-backdrop, .toast,
+    .action-btn, .no-print { display: none !important; }
+    .kpi-card, table.oj-table, table.oj-table th, table.oj-table td,
+    [style*="background: var(--surface)"], [style*="background:var(--surface)"],
+    [style*="background: var(--surface2)"], [style*="background:var(--surface2)"] {
+      background: #fff !important; color: #111 !important; border-color: #888 !important;
+      box-shadow: none !important;
+    }
+    table.oj-table th { background: #e8e8e8 !important; color: #111 !important; }
+    table.oj-table tr:nth-child(even) td { background: #f8f8f8 !important; }
+    table.oj-table tr.row-escalated td { background: #fdecec !important; }
+    table.oj-table tr.row-resolved td { background: #f1f1f1 !important; opacity: 1; text-decoration: line-through; color: #888 !important; }
+    table.oj-table tr.row-reviewed td { background: #f8f8f8 !important; opacity: 1; }
+    h1, h2, h3 { color: #111 !important; }
+    .accent { color: #c41230 !important; }
+    .value, .value.accent, .value.info, .value.ok, .value.warn { color: #111 !important; }
+    .label, .sub, .muted, td.muted { color: #555 !important; }
+    .age-pill, .status-pill, .review-pill { border: 1px solid #888 !important; }
+    .app { padding: 0 !important; }
+    .page-header h1 { font-size: 22px !important; }
+    .kpi-card .value { font-size: 18px !important; }
+    /* Hide the actions column in print — paper handouts don't need buttons */
+    .col-actions { display: none !important; }
+    .print-header { display: block !important; }
+    .notes-line { color: #444 !important; }
+    table.oj-table { page-break-inside: auto; }
+    table.oj-table tr { page-break-inside: avoid; }
+  }
+  .print-header { display: none; }
+</style>
+</head>
+<body>
+<nav class="nav-bar">
+  <div class="nav-container">
+    <a href="/" class="nav-logo"><div><div><span class="nav-logo-service">SERVICE</span><span class="nav-logo-ops">OPS</span></div><div class="nav-logo-sub">Command Center</div></div></a>
+    <div class="nav-tabs">
+      <a href="/" class="nav-tab">Dashboard</a>
+      <a href="/monthly-review" class="nav-tab">Monthly Review</a>
+      <a href="/fy-review" class="nav-tab">FY Review</a>
+      <a href="/open-jobs" class="nav-tab active">Open Jobs</a>
+      <a href="/resolved-jobs" class="nav-tab">Resolved</a>
+    </div>
+  </div>
+</nav>
+
+<div class="app">
+  <div class="page-header">
+    <div>
+      <h1>Open <span class="accent">Jobs</span></h1>
+      <p>Jobs that haven't been billed and closed out — aging WIP, missed invoice opportunities, and scheduled work in flight. Mark off jobs you've researched or escalate ones that need a deeper dive.</p>
+    </div>
+    <div class="status-bar"><span class="status-dot"></span> <span id="oj-source">Loading…</span></div>
+  </div>
+
+  <!-- Print-only header banner -->
+  <div class="print-header" style="border-bottom:2px solid #c41230; padding-bottom:8px; margin-bottom:16px;">
+    <div style="font-size:18px; font-weight:700; color:#1f3a5f;">Open Jobs Report</div>
+    <div style="font-size:11px; color:#555;">Grounded Home Services · Generated <span id="print-date"></span> · Source: ServiceTitan + cached monthly data</div>
+  </div>
+
+  <div id="kpi-row"></div>
+
+  <div class="filters">
+    <span class="label-strip">Bucket:</span>
+    <span class="pill active" data-bucket="all">All Open</span>
+    <span class="pill" data-bucket="agingWIP">Aging WIP</span>
+    <span class="pill" data-bucket="missedInvoices">Truly Missed</span>
+    <span class="pill" data-bucket="missedInvoicesLikelyExplained">Likely Explained</span>
+    <span class="pill" data-bucket="scheduled">Scheduled</span>
+    <span class="pill" data-bucket="missedZeroCost">$0/$0 Closed</span>
+  </div>
+
+  <div class="filters">
+    <span class="label-strip">Review:</span>
+    <span class="pill active" data-review="all">All <span class="pill-count" id="cnt-all"></span></span>
+    <span class="pill" data-review="open">Needs Review <span class="pill-count" id="cnt-open"></span></span>
+    <span class="pill" data-review="escalated">Escalated <span class="pill-count" id="cnt-escalated"></span></span>
+    <span class="pill" data-review="reviewed">Reviewed <span class="pill-count" id="cnt-reviewed"></span></span>
+    <span class="pill" data-review="resolved">Resolved <span class="pill-count" id="cnt-resolved"></span></span>
+    <input id="oj-search" type="search" placeholder="Search job #, customer, tech…" />
+    <button class="toolbar-btn" id="refresh-btn" title="Pull current + previous month from ServiceTitan and rebuild the report">🔄 Refresh from ServiceTitan</button>
+    <span id="refresh-state" style="font-size:11px; color:var(--muted);"></span>
+    <button class="toolbar-btn" id="print-btn" title="Print or save as PDF — hides controls and uses a paper-friendly layout">🖨 Print / Save as PDF</button>
+    <button class="toolbar-btn" id="csv-btn" title="Download the current filtered view as CSV for Excel">📄 Export CSV</button>
+  </div>
+
+  <div class="summary-line" id="summary-line"></div>
+  <div id="oj-table-wrap"></div>
+</div>
+
+<!-- Notes / Escalation modal -->
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <h3 id="modal-title">Notes</h3>
+    <div class="modal-sub" id="modal-sub"></div>
+    <label for="modal-notes">Notes</label>
+    <textarea id="modal-notes" placeholder="What did you find? Why are you flagging this? Who should follow up?"></textarea>
+
+    <!-- Corrections — non-destructive overrides that get pushed to ST when
+         this job is resolved + pushed from the Resolved tab. Leave blank
+         to make no change. -->
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px;">
+      <div>
+        <label for="modal-corrected-status">Corrected ST status</label>
+        <select id="modal-corrected-status" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius: var(--r-md); padding:8px 10px; font-size:13px;">
+          <option value="">— No change —</option>
+          <option value="Scheduled">Scheduled</option>
+          <option value="Dispatched">Dispatched</option>
+          <option value="InProgress">In Progress</option>
+          <option value="Hold">Hold</option>
+          <option value="Completed">Completed</option>
+          <option value="Canceled">Canceled</option>
+        </select>
+      </div>
+      <div>
+        <label for="modal-corrected-job-type">Corrected job type</label>
+        <input id="modal-corrected-job-type" type="text" placeholder="(leave blank for no change)" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius: var(--r-md); padding:8px 10px; font-size:13px;" />
+      </div>
+    </div>
+
+    <label style="display:flex; align-items:center; gap:8px; margin-top:12px; text-transform:none; letter-spacing:0; font-size:12px; color:var(--text); cursor:pointer;">
+      <input type="checkbox" id="modal-push-st" checked />
+      <span>Also post this note to the ServiceTitan job <span style="color:var(--muted);">(so accounting sees it in ST)</span></span>
+    </label>
+    <div id="modal-st-state" style="font-size:11px; color:var(--muted); margin-top:6px; min-height:14px;"></div>
+    <div class="modal-actions">
+      <button id="modal-cancel">Cancel</button>
+      <button id="modal-clear" title="Move this job back to Needs Review and clear the status">Clear Status</button>
+      <button id="modal-save" class="primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+const fmt$ = n => "$" + Math.round(Number(n) || 0).toLocaleString();
+const fmtN = (n, d=0) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d });
+const escapeHtml = s => String(s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+let state = {
+  data: null,
+  bucket: "all",
+  review: "all",
+  search: "",
+  sortKey: "exposure",
+  sortAsc: false,
+  modalJob: null,        // job number whose modal is open
+  modalAction: null,     // 'reviewed' | 'escalated' | 'resolved' | 'notes'
+  employees: [],         // office/CSR team for the escalation dropdown
+  employeesLoaded: false,
+  lastAssignedById: {},  // jobNumber → employeeId — remembers last pick per row
+};
+
+async function loadEmployees() {
+  try {
+    const r = await fetch("/api/monthly-review/employees");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const body = await r.json();
+    state.employees = body.employees || [];
+    state.employeesLoaded = true;
+  } catch (e) {
+    console.warn("[open-jobs] failed to load employees:", e.message);
+    state.employees = [];
+    state.employeesLoaded = true; // still flag loaded so the dropdown shows an error hint
+  }
+}
+
+async function load() {
+  const r = await fetch("/api/monthly-review/open-jobs");
+  if (!r.ok) {
+    document.getElementById("oj-table-wrap").innerHTML = `<div class="empty">Failed to load.</div>`;
+    return;
+  }
+  state.data = await r.json();
+  document.getElementById("oj-source").textContent =
+    `${state.data.summary.cachedMonths} months cached · as of ${state.data.summary.asOf}`;
+  document.getElementById("print-date").textContent = new Date().toLocaleString();
+  renderKPIs();
+  renderStatusCounts();
+  renderTable();
+}
+
+function renderKPIs() {
+  const s = state.data.summary;
+  let html = `<div class="kpi-grid">
+    <div class="kpi-card"><div class="label">Total Open Jobs</div><div class="value">${s.counts.total}</div><div class="sub">across ${s.cachedMonths} cached months</div></div>
+    <div class="kpi-card"><div class="label">Aging WIP</div><div class="value warn">${s.counts.agingWIP}</div><div class="sub">${fmt$(s.exposure.agingWIP)} of cost incurred, unbilled</div></div>
+    <div class="kpi-card"><div class="label">Truly Missed Invoices</div><div class="value accent">${s.counts.missedInvoices}</div><div class="sub">completed, $0 billed, no same-customer follow-up: ${fmt$(s.exposure.missedInvoices)}</div></div>
+    <div class="kpi-card"><div class="label">Likely Explained</div><div class="value ok">${s.counts.missedInvoicesLikelyExplained || 0}</div><div class="sub">linked to billed job within ${s.linkDayWindow || 60} days</div></div>
+    <div class="kpi-card"><div class="label">Total Exposure</div><div class="value accent">${fmt$(s.exposure.total)}</div><div class="sub">all open + unbilled cost</div></div>
+  </div>`;
+  // Show a small advisory line when the maintenance filter is hiding rows so
+  // the count isn't invisible. Title carries the full rule for tooltip detail.
+  const sup = s.suppressed;
+  if (sup && sup.maintenanceMisc > 0) {
+    html += `<div style="font-size:11px; color:var(--muted); margin: -10px 0 16px;" title="${escapeHtml(sup.maintenanceRule || '')}">
+      🔕 Hiding <b style="color:var(--text);">${sup.maintenanceMisc}</b> short Misc HVAC visits
+      (${fmt$(sup.maintenanceMiscCost || 0)} combined) likely mis-coded PSM/Ground Club maintenance.
+    </div>`;
+  }
+  if (sup && sup.membership > 0) {
+    html += `<div style="font-size:11px; color:var(--muted); margin: -10px 0 16px;" title="${escapeHtml(sup.membershipRule || '')}">
+      🔕 Hiding <b style="color:var(--text);">${sup.membership}</b> membership-visit jobs
+      (${fmt$(sup.membershipCost || 0)} combined) — covered by dues, not real missed invoices.
+    </div>`;
+  }
+  document.getElementById("kpi-row").innerHTML = html;
+}
+
+function renderStatusCounts() {
+  const sc = state.data.statusCounts || { open: 0, reviewed: 0, escalated: 0, resolved: 0 };
+  const total = (sc.open || 0) + (sc.reviewed || 0) + (sc.escalated || 0) + (sc.resolved || 0);
+  document.getElementById("cnt-all").textContent       = `(${total})`;
+  document.getElementById("cnt-open").textContent      = `(${sc.open || 0})`;
+  document.getElementById("cnt-reviewed").textContent  = `(${sc.reviewed || 0})`;
+  document.getElementById("cnt-escalated").textContent = `(${sc.escalated || 0})`;
+  document.getElementById("cnt-resolved").textContent  = `(${sc.resolved || 0})`;
+}
+
+function ageBucket(days) {
+  if (days == null) return "fresh";
+  if (days < 30)  return "fresh";
+  if (days < 90)  return "warm";
+  return "aged";
+}
+
+function getRowsForBucket() {
+  if (!state.data) return [];
+  switch (state.bucket) {
+    case "agingWIP":                      return state.data.buckets.agingWIP;
+    case "missedInvoices":                return state.data.buckets.missedInvoices;
+    case "missedInvoicesLikelyExplained": return state.data.buckets.missedInvoicesLikelyExplained;
+    case "scheduled":                     return state.data.buckets.scheduled;
+    case "missedZeroCost":                return state.data.buckets.missedZeroCost;
+    default:                              return state.data.allOpen;
+  }
+}
+
+function applyReviewFilter(rows) {
+  if (state.review === "all") return rows;
+  return rows.filter(r => (r.reviewStatus || "open") === state.review);
+}
+
+function applyFilter(rows) {
+  const q = state.search.trim().toLowerCase();
+  if (!q) return rows;
+  return rows.filter(r =>
+    (r.jobNumber || "").toLowerCase().includes(q) ||
+    (r.customerName || "").toLowerCase().includes(q) ||
+    String(r.customerId || "").toLowerCase().includes(q) ||
+    (r.technicians || "").toLowerCase().includes(q) ||
+    (r.jobType || "").toLowerCase().includes(q) ||
+    (r.reviewNotes || "").toLowerCase().includes(q)
+  );
+}
+
+function applySort(rows) {
+  const k = state.sortKey;
+  const asc = state.sortAsc ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    let va = a[k], vb = b[k];
+    if (typeof va === "string" || typeof vb === "string") {
+      va = String(va || "").toLowerCase();
+      vb = String(vb || "").toLowerCase();
+      return va < vb ? -asc : va > vb ? asc : 0;
+    }
+    return (Number(va || 0) - Number(vb || 0)) * asc;
+  });
+}
+
+function renderTable() {
+  const rows = applySort(applyReviewFilter(applyFilter(getRowsForBucket())));
+  const wrap = document.getElementById("oj-table-wrap");
+  const sumLine = document.getElementById("summary-line");
+  if (rows.length === 0) {
+    wrap.innerHTML = `<div class="empty">No jobs match the current filter.</div>`;
+    sumLine.textContent = "";
+    return;
+  }
+  const totalExposure = rows.reduce((s, r) => s + (r.exposure || 0), 0);
+  sumLine.innerHTML = `Showing <b>${rows.length}</b> jobs · combined exposure <b>${fmt$(totalExposure)}</b>`;
+
+  const arrow = k => state.sortKey === k ? (state.sortAsc ? " asc" : "") : "";
+  const ths = [
+    ["jobNumber",   "Job #"],
+    ["jobType",     "Type"],
+    ["status",      "Status"],
+    ["customerName","Customer"],
+    ["technicians", "Tech"],
+    ["daysOpen",    "Days Open"],
+    ["hours",       "Hrs"],
+    ["material",    "Materials"],
+    ["labor",       "Labor"],
+    ["billed",      "Billed"],
+    ["exposure",    "Exposure"],
+  ];
+  let html = `<table class="oj-table"><thead><tr>` +
+    ths.map(([k, label]) => {
+      const sortedClass = state.sortKey === k ? "sorted" + arrow(k) : "";
+      const align = ["daysOpen","hours","material","labor","billed","exposure"].includes(k) ? "num" : "";
+      return `<th class="${sortedClass} ${align}" data-sort="${k}">${escapeHtml(label)}</th>`;
+    }).join("") +
+    `<th class="col-actions">Actions</th>` +
+    `</tr></thead><tbody>`;
+
+  for (const r of rows) {
+    const ageCls = ageBucket(r.daysOpen);
+    const statusCls = (r.status || "").toLowerCase().replace(/\s+/g, "-");
+    const rs = r.reviewStatus || "open";
+    const rowCls = rs === "escalated" ? "row-escalated"
+                 : rs === "reviewed"  ? "row-reviewed"
+                 : rs === "resolved"  ? "row-resolved"
+                 : "";
+    const reviewPill = rs !== "open" ? `<span class="review-pill ${rs}">${rs}</span>` : "";
+
+    // First cell shows job # + (if present) the review pill and the note
+    let notesHtml = "";
+    if (r.reviewNotes || r.reviewedBy) {
+      const by  = r.reviewedBy ? ` — <b>${escapeHtml(r.reviewedBy)}</b>` : "";
+      const when = r.reviewedAt ? `, ${new Date(r.reviewedAt).toLocaleDateString()}` : "";
+      const note = r.reviewNotes ? `“${escapeHtml(r.reviewNotes)}”` : "";
+      let stBadge = "";
+      if (r.stNoteError) {
+        stBadge = ` <span title="Last ST push failed: ${escapeHtml(r.stNoteError)}" style="color:var(--accent); font-weight:600;">⚠ ST sync failed</span>`;
+      } else if (r.stNoteSyncedAt) {
+        stBadge = ` <span title="Posted to ServiceTitan job notes on ${new Date(r.stNoteSyncedAt).toLocaleString()}" style="color:var(--ok); font-weight:600;">✓ in ST</span>`;
+      }
+      notesHtml = `<div class="notes-line">${note}${by}${when}${stBadge}</div>`;
+    }
+
+    html += `<tr class="${rowCls}" data-job="${escapeHtml(r.jobNumber)}">
+      <td><b>${escapeHtml(r.jobNumber)}</b>${reviewPill}${notesHtml}</td>
+      <td>${escapeHtml(r.jobType)}</td>
+      <td><span class="status-pill ${statusCls}">${escapeHtml(r.status)}</span></td>
+      <td>${escapeHtml(r.customerName || ("Cust #" + (r.customerId || '?')))}</td>
+      <td class="muted">${escapeHtml(r.technicians)}</td>
+      <td class="num">${r.daysOpen != null ? `<span class="age-pill ${ageCls}">${r.daysOpen}</span>` : "—"}</td>
+      <td class="num">${fmtN(r.hours, 1)}</td>
+      <td class="num">${fmt$(r.material)}</td>
+      <td class="num">${fmt$(r.labor)}</td>
+      <td class="num">${r.billed > 0 ? fmt$(r.billed) : '<span class="muted">—</span>'}</td>
+      <td class="num"><b>${fmt$(r.exposure)}</b></td>
+      <td class="col-actions actions-cell">
+        <button class="action-btn ${rs === 'reviewed'  ? 'active reviewed'  : ''}" data-act="reviewed"  title="Mark as reviewed — looked at, nothing to fix">✓</button>
+        <button class="action-btn ${rs === 'escalated' ? 'active escalated' : ''}" data-act="escalated" title="Escalate — needs a deeper dive">!</button>
+        <button class="action-btn ${rs === 'resolved'  ? 'active resolved'  : ''}" data-act="resolved"  title="${rs === 'resolved' ? 'Already resolved — open to clear the status' : 'Resolved — action taken (invoice corrected, etc.)'}">✕</button>
+        ${rs === 'resolved' ? '' : `<button class="action-btn" data-act="notes" title="Add or edit notes">📝</button>`}
+      </td>
+    </tr>`;
+
+    // Escalation → ST task assignment row. Only renders for jobs the user
+    // has escalated. Shows an employee dropdown + Assign button so the
+    // escalation turns into a real task in someone's ST inbox.
+    if (rs === 'escalated') {
+      const empOptions = state.employeesLoaded && state.employees.length > 0
+        ? state.employees.map(e =>
+            `<option value="${e.id}" data-name="${escapeHtml(e.name)}">${escapeHtml(e.name)}</option>`
+          ).join("")
+        : "";
+      const lastPick = state.lastAssignedById[r.jobNumber] || "";
+      const dropdownHtml = state.employeesLoaded && state.employees.length > 0
+        ? `<select class="assign-employee" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:4px; padding:4px 8px; font-size:11px;">
+             <option value="">— Pick employee —</option>
+             ${empOptions}
+           </select>`
+        : `<span style="color:var(--muted); font-size:11px;">${state.employeesLoaded ? "No office employees configured" : "Loading employees…"}</span>`;
+      html += `<tr style="background:rgba(196,18,48,0.05);">
+        <td colspan="12" style="padding-left:32px; padding-top:6px; padding-bottom:10px; font-size:11.5px; color:var(--muted); border-bottom:1px solid var(--border);">
+          <span style="color:var(--accent); font-weight:600;">↳ Assign in ServiceTitan:</span>
+          ${dropdownHtml}
+          <button class="action-btn assign-st-btn" data-job="${escapeHtml(r.jobNumber)}"
+                  ${state.employeesLoaded && state.employees.length > 0 ? "" : "disabled"}
+                  style="margin-left:6px;">Assign in ST</button>
+          <select class="assign-priority" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:4px; padding:4px 8px; font-size:11px; margin-left:6px;">
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+            <option value="low">Low</option>
+          </select>
+          <span class="assign-due" style="margin-left:6px;">
+            <label style="font-size:11px; color:var(--muted);">Due in
+              <input type="number" class="assign-due-days" value="7" min="1" max="60" style="width:48px; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:4px; padding:2px 6px; font-size:11px;" /> days
+            </label>
+          </span>
+          <span class="assign-state" style="margin-left:8px; font-size:11px;"></span>
+        </td>
+      </tr>`;
+    }
+
+    // Linked-job hint (Likely Explained bucket)
+    if (r.linkedJob) {
+      const lj = r.linkedJob;
+      const matNote = lj.materialCost === 0 ? '<b style="color:var(--accent);">no materials</b> (consistent with materials being on the candidate)'
+                    : `${fmt$(lj.materialCost)} materials`;
+      html += `<tr style="background:rgba(63,174,106,0.04);">
+        <td colspan="12" style="padding-left:32px; padding-top:0; padding-bottom:10px; font-size:11.5px; color:var(--muted); border-bottom:1px solid var(--border);">
+          <span style="color:var(--ok); font-weight:600;">↳ likely paired with</span>
+          <b style="color:var(--text);">Job ${escapeHtml(lj.jobNumber)}</b>
+          (${escapeHtml(lj.jobType || '?')}) —
+          billed <b style="color:var(--ok);">${fmt$(lj.billed)}</b>,
+          ${matNote},
+          ${lj.daysApart} day${lj.daysApart === 1 ? '' : 's'} apart.
+          The materials on this job likely got billed via that one.
+        </td>
+      </tr>`;
+    }
+  }
+  html += `<tr class="summary-row"><td colspan="10" class="muted">Total exposure across ${rows.length} jobs</td><td class="num"><b>${fmt$(totalExposure)}</b></td><td class="col-actions"></td></tr>`;
+  html += `</tbody></table>`;
+  wrap.innerHTML = html;
+
+  // Wire header sort handlers
+  wrap.querySelectorAll("th[data-sort]").forEach(th => {
+    th.addEventListener("click", () => {
+      const k = th.getAttribute("data-sort");
+      if (state.sortKey === k) state.sortAsc = !state.sortAsc;
+      else { state.sortKey = k; state.sortAsc = false; }
+      renderTable();
+    });
+  });
+
+  // Wire action buttons (reviewed/escalated/resolved/notes)
+  wrap.querySelectorAll("button.action-btn:not(.assign-st-btn)").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const tr = btn.closest("tr[data-job]");
+      const jobNumber = tr?.getAttribute("data-job");
+      const act = btn.getAttribute("data-act");
+      if (!jobNumber || !act) return;
+      openModal(jobNumber, act);
+    });
+  });
+
+  // Wire "Assign in ST" buttons on escalated rows.
+  wrap.querySelectorAll("button.assign-st-btn").forEach(btn => {
+    btn.addEventListener("click", async e => {
+      e.stopPropagation();
+      const jobNumber = btn.getAttribute("data-job");
+      const escalationTr = btn.closest("tr");
+      const dropdown    = escalationTr.querySelector("select.assign-employee");
+      const priority    = escalationTr.querySelector("select.assign-priority")?.value || "normal";
+      const dueDays     = Number(escalationTr.querySelector("input.assign-due-days")?.value) || 7;
+      const stateEl     = escalationTr.querySelector(".assign-state");
+
+      const empId   = dropdown?.value;
+      const empName = dropdown?.selectedOptions?.[0]?.getAttribute("data-name") || "";
+      if (!empId) {
+        stateEl.textContent = "Pick an employee first.";
+        stateEl.style.color = "var(--accent2)";
+        return;
+      }
+      btn.disabled = true;
+      const originalLabel = btn.textContent;
+      btn.textContent = "Assigning…";
+      stateEl.textContent = "";
+
+      try {
+        const r = await fetch(`/api/monthly-review/job-review-status/${encodeURIComponent(jobNumber)}/create-st-task`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assignedToId:   Number(empId),
+            assignedToName: empName,
+            priority,
+            dueInDays:      dueDays,
+          }),
+        });
+        const body = await r.json();
+        if (!r.ok || !body.ok) {
+          const msg = body.error || `HTTP ${r.status}`;
+          const stMsg = body.stData?.message ? ` (ST: ${body.stData.message})` : "";
+          throw new Error(msg + stMsg);
+        }
+        state.lastAssignedById[jobNumber] = empId;
+        stateEl.innerHTML = `<span style="color:var(--ok); font-weight:600;">✓ ST task #${body.taskId || "?"} assigned to ${escapeHtml(empName)}</span>`;
+        toast(`ST task created for ${empName}`, "ok");
+        // Reload the report so the new note appears under the job row
+        setTimeout(() => load(), 800);
+      } catch (err) {
+        stateEl.innerHTML = `<span style="color:var(--accent);">⚠ ${escapeHtml(err.message)}</span>`;
+        toast(`Assign failed: ${err.message}`, "err");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
+    });
+  });
+}
+
+// ── Modal handling ────────────────────────────────────────────────────────────
+
+function findJobInData(jobNumber) {
+  return (state.data.allOpen || []).find(j => j.jobNumber === jobNumber);
+}
+
+function openModal(jobNumber, action) {
+  state.modalJob = jobNumber;
+  state.modalAction = action;
+  const job = findJobInData(jobNumber);
+  const currentStatus = job?.reviewStatus || "open";
+  const titleMap = {
+    reviewed:  "Mark as Reviewed",
+    escalated: "Escalate — Needs Deeper Investigation",
+    resolved:  "Mark as Resolved",
+    notes:     "Edit Notes",
+  };
+  document.getElementById("modal-title").textContent = titleMap[action] || "Notes";
+  const subBits = [
+    `Job ${jobNumber}`,
+    job?.customerName ? `${job.customerName}` : "",
+    job?.jobType || "",
+    job?.exposure ? `exposure ${fmt$(job.exposure)}` : "",
+  ].filter(Boolean);
+  document.getElementById("modal-sub").textContent = subBits.join(" · ");
+  document.getElementById("modal-notes").value = job?.reviewNotes || "";
+  // Pre-fill corrections from what's already been recorded for this job
+  // (so re-opening the modal shows the current override, not a blank).
+  document.getElementById("modal-corrected-status").value     = job?.correctedStatus  || "";
+  document.getElementById("modal-corrected-job-type").value   = job?.correctedJobType || "";
+  document.getElementById("modal-clear").style.display = currentStatus === "open" ? "none" : "";
+
+  // ── Lock down resolved jobs ──────────────────────────────────────────────
+  // A "resolved" job is considered closed for further commentary — we don't
+  // want someone tacking new notes onto an already-resolved record (and
+  // double-pushing more lines into the ServiceTitan job-note feed). The user
+  // must explicitly Clear Status first if they want to make changes.
+  const isLocked = currentStatus === "resolved" && action === "resolved";
+  const notesEl  = document.getElementById("modal-notes");
+  const pushBox  = document.getElementById("modal-push-st");
+  const saveBtn  = document.getElementById("modal-save");
+  const stState  = document.getElementById("modal-st-state");
+
+  notesEl.readOnly = isLocked;
+  notesEl.style.opacity = isLocked ? "0.6" : "";
+  pushBox.disabled = isLocked;
+  pushBox.parentElement.style.opacity = isLocked ? "0.5" : "";
+  saveBtn.style.display = isLocked ? "none" : "";
+
+  if (isLocked) {
+    stState.innerHTML = `<span style="color:var(--accent2);">🔒 This job is resolved. Clear the status first to add or edit notes.</span>`;
+  } else if (job?.stNoteError) {
+    stState.innerHTML = `<span style="color:var(--accent);">⚠ Last ST push failed: ${escapeHtml(job.stNoteError)} — saving again will retry.</span>`;
+  } else if (job?.stNoteSyncedAt) {
+    stState.innerHTML = `<span style="color:var(--ok);">✓ Synced to ServiceTitan on ${new Date(job.stNoteSyncedAt).toLocaleString()}</span>`;
+  } else {
+    stState.textContent = "";
+  }
+
+  // Default the checkbox on for new escalations, off after a successful sync
+  // (so a re-save just to fix dashboard notes doesn't re-push to ST).
+  if (!isLocked) {
+    pushBox.checked = !job?.stNoteSyncedAt || !!job?.stNoteError || action === "escalated";
+  }
+
+  document.getElementById("modal").classList.add("open");
+  if (!isLocked) setTimeout(() => notesEl.focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById("modal").classList.remove("open");
+  state.modalJob = null;
+  state.modalAction = null;
+}
+
+async function saveModal() {
+  const jobNumber = state.modalJob;
+  const action = state.modalAction;
+  if (!jobNumber || !action) return;
+  const notes = document.getElementById("modal-notes").value.trim();
+  const pushToServiceTitan = document.getElementById("modal-push-st").checked;
+  // Empty strings = clear the override; non-empty = set the override.
+  // Sending the field at all signals "I touched this" to the server, so
+  // we only include it when the user actually picked something or wants
+  // to clear an existing correction.
+  const correctedStatus  = document.getElementById("modal-corrected-status").value;
+  const correctedJobType = document.getElementById("modal-corrected-job-type").value.trim();
+
+  // For the dedicated "notes" action we keep whatever status the job already has.
+  let targetStatus = action;
+  if (action === "notes") {
+    const job = findJobInData(jobNumber);
+    targetStatus = job?.reviewStatus && job.reviewStatus !== "open" ? job.reviewStatus : "reviewed";
+  }
+
+  // Build the body. Corrections are included only when changed or when the
+  // user explicitly wants to clear them (sending null).
+  const job = findJobInData(jobNumber);
+  const body = { status: targetStatus, notes, pushToServiceTitan };
+  if (correctedStatus !== (job?.correctedStatus || "")) {
+    body.correctedStatus = correctedStatus === "" ? null : correctedStatus;
+  }
+  if (correctedJobType !== (job?.correctedJobType || "")) {
+    body.correctedJobType = correctedJobType === "" ? null : correctedJobType;
+  }
+
+  try {
+    const r = await fetch(`/api/monthly-review/job-review-status/${encodeURIComponent(jobNumber)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const result = await r.json();
+
+    // Compose a user-facing message that calls out whether ST got the note.
+    let msg = `Job ${jobNumber} → ${targetStatus}`;
+    let kind = "ok";
+    if (pushToServiceTitan) {
+      if (result.stSync?.ok)          msg += " · posted to ServiceTitan";
+      else if (result.stSync?.skipped) msg += " · ST note unchanged (skipped)";
+      else if (result.stSync?.error)   { msg += ` · ST push failed: ${result.stSync.error}`; kind = "err"; }
+    }
+    toast(msg, kind);
+    closeModal();
+    await load();
+  } catch (e) {
+    toast(`Failed to save: ${e.message}`, "err");
+  }
+}
+
+async function clearStatus() {
+  const jobNumber = state.modalJob;
+  if (!jobNumber) return;
+  try {
+    const r = await fetch(`/api/monthly-review/job-review-status/${encodeURIComponent(jobNumber)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "open" }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    toast(`Job ${jobNumber} cleared`, "ok");
+    closeModal();
+    await load();
+  } catch (e) {
+    toast(`Failed to clear: ${e.message}`, "err");
+  }
+}
+
+function toast(msg, kind = "ok") {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = `toast show ${kind}`;
+  setTimeout(() => { t.className = "toast"; }, 2200);
+}
+
+// ── CSV export of the currently filtered view ────────────────────────────────
+function exportCSV() {
+  const rows = applySort(applyReviewFilter(applyFilter(getRowsForBucket())));
+  const headers = ["Job #","Type","Status","Review Status","Customer","Customer ID","Tech",
+                   "Days Open","Hours","Materials","Labor","Billed","Exposure",
+                   "Linked Job","Linked Billed","Notes","Reviewed By","Reviewed At"];
+  const esc = v => {
+    const s = String(v == null ? "" : v).replace(/"/g, '""');
+    return /[",\n]/.test(s) ? `"${s}"` : s;
+  };
+  const lines = [headers.join(",")];
+  for (const r of rows) {
+    lines.push([
+      r.jobNumber, r.jobType, r.status, r.reviewStatus || "open",
+      r.customerName, r.customerId, r.technicians,
+      r.daysOpen ?? "", r.hours ?? "", r.material ?? "", r.labor ?? "",
+      r.billed ?? "", r.exposure ?? "",
+      r.linkedJob?.jobNumber || "", r.linkedJob?.billed || "",
+      r.reviewNotes || "", r.reviewedBy || "", r.reviewedAt || "",
+    ].map(esc).join(","));
+  }
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `open-jobs-${state.bucket}-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── Wire filter pills, search, print, CSV, modal ──────────────────────────────
+
+document.querySelectorAll(".filters .pill[data-bucket]").forEach(p => {
+  p.addEventListener("click", () => {
+    document.querySelectorAll(".filters .pill[data-bucket]").forEach(x => x.classList.remove("active"));
+    p.classList.add("active");
+    state.bucket = p.getAttribute("data-bucket");
+    renderTable();
+  });
+});
+document.querySelectorAll(".filters .pill[data-review]").forEach(p => {
+  p.addEventListener("click", () => {
+    document.querySelectorAll(".filters .pill[data-review]").forEach(x => x.classList.remove("active"));
+    p.classList.add("active");
+    state.review = p.getAttribute("data-review");
+    renderTable();
+  });
+});
+document.getElementById("oj-search").addEventListener("input", e => {
+  state.search = e.target.value;
+  renderTable();
+});
+document.getElementById("print-btn").addEventListener("click", () => {
+  document.getElementById("print-date").textContent = new Date().toLocaleString();
+  setTimeout(() => window.print(), 80);
+});
+document.getElementById("csv-btn").addEventListener("click", exportCSV);
+
+// "Refresh from ServiceTitan" — pulls current + previous month into the
+// monthly cache, then re-runs the report so the page reflects today's state.
+// We refresh BOTH months because in-flight jobs from last month may have
+// since closed/been invoiced, and we want those to fall out of the report.
+document.getElementById("refresh-btn").addEventListener("click", async () => {
+  const btn   = document.getElementById("refresh-btn");
+  const state = document.getElementById("refresh-state");
+  if (btn.disabled) return;
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "⏳ Refreshing…";
+  state.textContent = "Pulling jobs from ServiceTitan — this can take 30–60 seconds.";
+  state.style.color = "var(--muted)";
+  try {
+    const r = await fetch("/api/monthly-review/refresh-jobs-recent", { method: "POST" });
+    const body = await r.json();
+    if (!r.ok || !body.ok) throw new Error(body.error || `HTTP ${r.status}`);
+    const counts = (body.refreshed || []).map(m => `${m.year}-${String(m.month).padStart(2,"0")}: ${m.jobsCount}`).join(" · ");
+    state.textContent = `Last refreshed ${new Date(body.importedAt).toLocaleTimeString()} (${counts})`;
+    state.style.color = "var(--ok)";
+    toast("ServiceTitan refresh complete — reloading report.", "ok");
+    await load();
+  } catch (e) {
+    state.textContent = `Refresh failed: ${e.message}`;
+    state.style.color = "var(--accent)";
+    toast(`Refresh failed: ${e.message}`, "err");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+});
+
+document.getElementById("modal-cancel").addEventListener("click", closeModal);
+document.getElementById("modal-save").addEventListener("click", saveModal);
+document.getElementById("modal-clear").addEventListener("click", clearStatus);
+document.getElementById("modal").addEventListener("click", e => {
+  if (e.target.id === "modal") closeModal();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && document.getElementById("modal").classList.contains("open")) closeModal();
+});
+
+// Fire both in parallel — employees only needed once the table renders with
+// escalated rows, but they should be ready by then.
+loadEmployees();
+load();
+</script>
+</body>
+</html>

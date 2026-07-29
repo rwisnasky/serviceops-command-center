@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calls - ServiceOps Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+
+<!-- ── Navigation Bar ───────────────────────────────────────────────── -->
+<!-- Nav: built by /js/shared.js — do not hand-edit, it gets wiped on load. -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+
+  <div class="page-header">
+    <div>
+      <h1>Call <span class="accent">Recaps</span></h1>
+      <p>AI-transcribed ServiceTitan calls with one-click posting to jobs, sentiment, and sync to GHL.</p>
+    </div>
+  </div>
+
+  <div class="section-label">Call Queue</div>
+
+  <!-- Toolbar: stats summary + action buttons -->
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+    <div id="ci-stats-bar" style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;color:var(--muted);">Loading…</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="btn" style="font-size:11px;padding:6px 12px;" onclick="ciRefresh()">↺ Refresh</button>
+      <button class="btn" style="font-size:11px;padding:6px 12px;" onclick="ciPollNow(this)">🔃 Poll ST</button>
+      <button class="btn" style="font-size:11px;padding:6px 12px;background:rgba(91,140,201,0.12);border-color:var(--accent3);color:var(--accent3);" onclick="ciOpenUploadModal()">⬆️ Upload Recording</button>
+      <button class="btn" style="font-size:11px;padding:6px 12px;" onclick="ciOpenAiModal()" title="Edit the instructions the AI uses to summarize and categorize your calls">⚙️ AI Instructions</button>
+    </div>
+  </div>
+
+  <!-- Status filter -->
+  <div id="ci-filter-bar" style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+    <span style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-right:2px;">Show</span>
+    <button class="btn ci-filter" data-filter="" style="font-size:11px;padding:5px 12px;background:rgba(91,140,201,0.18);border-color:var(--accent3);color:var(--accent3);" onclick="ciSetFilter('', this)">All</button>
+    <button class="btn ci-filter" data-filter="completed" style="font-size:11px;padding:5px 12px;" onclick="ciSetFilter('completed', this)">✓ Reviewed</button>
+    <button class="btn ci-filter" data-filter="posted" style="font-size:11px;padding:5px 12px;" onclick="ciSetFilter('posted', this)">📤 Posted to ST</button>
+    <button class="btn ci-filter" data-filter="pending" style="font-size:11px;padding:5px 12px;" onclick="ciSetFilter('pending', this)">Waiting</button>
+    <button class="btn ci-filter" data-filter="failed" style="font-size:11px;padding:5px 12px;" onclick="ciSetFilter('failed', this)">Failed</button>
+  </div>
+
+  <!-- Recap list -->
+  <div class="panel" id="ci-call-list" style="min-height:80px;">
+    <div style="color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;">Loading calls…</div>
+  </div>
+
+</div>
+
+<!-- ── Upload modal ─────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="upload-modal" onclick="if(event.target===this) ciCloseUploadModal()">
+  <div class="modal-card">
+    <h3>Upload a Call Recording</h3>
+    <div class="modal-sub">We'll transcribe it, generate a recap, and match it to a customer if a phone number is provided.</div>
+
+    <div class="dropzone" id="dropzone" onclick="document.getElementById('upload-file').click()">
+      <div id="dz-empty">
+        <div style="font-size:28px;margin-bottom:6px;">⬆️</div>
+        <strong>Drop an audio file here</strong><br/>
+        <span>or click to browse — mp3, m4a, wav, ogg · up to 25 MB</span>
+      </div>
+      <div id="dz-filled" style="display:none;">
+        <strong>Ready to analyze:</strong><br/>
+        <span class="dz-file" id="dz-filename">—</span><br/>
+        <span id="dz-filesize" style="font-size:10px;">—</span>
+      </div>
+    </div>
+    <input type="file" id="upload-file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.webm,.aac,.flac" style="display:none;" onchange="ciOnFileChosen(event)" />
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <label style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:10px;color:var(--muted);">Caller phone (optional)</label>
+        <input id="upload-phone" class="search-input" placeholder="(614) 555-0142" style="font-size:11px;padding:6px 10px;" />
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <label style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:10px;color:var(--muted);">Caller name (optional)</label>
+        <input id="upload-name" class="search-input" placeholder="Jane Smith" style="font-size:11px;padding:6px 10px;" />
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:4px;margin-top:10px;">
+      <label style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:10px;color:var(--muted);">Context note (optional) — gives the AI extra context</label>
+      <input id="upload-context" class="search-input" placeholder="e.g. tech's warranty callback about the water heater PRV" style="font-size:11px;padding:6px 10px;" />
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;">
+      <button class="btn" style="font-size:11px;padding:7px 14px;color:var(--muted);border-color:var(--border);" onclick="ciCloseUploadModal()">Cancel</button>
+      <button class="btn" style="font-size:11px;padding:7px 14px;background:rgba(196,18,48,0.12);border-color:var(--accent);color:var(--accent);" id="upload-submit" onclick="ciSubmitUpload(this)" disabled>🎙️ Analyze Recording</button>
+    </div>
+    <div id="upload-status" style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;color:var(--muted);margin-top:10px;min-height:14px;"></div>
+  </div>
+</div>
+
+<!-- ── AI Instructions modal ────────────────────────────────────────── -->
+<div class="modal-backdrop" id="ai-modal" onclick="if(event.target===this) ciCloseAiModal()">
+  <div class="modal-card" style="max-width:800px;width:94vw;max-height:92vh;overflow-y:auto;">
+    <h3>⚙️ AI Instructions</h3>
+    <div class="modal-sub">Tune how the AI reads your calls. Changes save to the server and take effect on the next call — no redeploy needed. The required output format is locked behind the scenes, so edits here can't break call processing.</div>
+
+    <!-- Classification instructions -->
+    <div style="display:flex;flex-direction:column;gap:5px;margin-top:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <label style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;color:var(--accent3);font-weight:600;">Call classification instructions</label>
+        <span id="ai-cls-meta" style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:10px;color:var(--muted);"></span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);">Controls how calls are categorized, the recap bullets, sentiment, and who the AI treats as the customer.</div>
+      <textarea id="ai-cls" spellcheck="false" style="width:100%;box-sizing:border-box;min-height:230px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;line-height:1.55;padding:10px 12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;resize:vertical;"></textarea>
+      <div style="display:flex;justify-content:flex-end;">
+        <button class="btn" style="font-size:10px;padding:4px 10px;color:var(--muted);border-color:var(--border);" onclick="ciResetAi('classification')">↩ Reset to default</button>
+      </div>
+    </div>
+
+    <!-- Transcription vocabulary hint -->
+    <div style="display:flex;flex-direction:column;gap:5px;margin-top:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <label style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;color:var(--accent3);font-weight:600;">Transcription vocabulary hint</label>
+        <span id="ai-tr-meta" style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:10px;color:var(--muted);"></span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);">Helps the transcriber spell proper nouns — company name, technician names, product/brand names. A short plain sentence works best.</div>
+      <textarea id="ai-tr" spellcheck="false" style="width:100%;box-sizing:border-box;min-height:90px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;line-height:1.55;padding:10px 12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;resize:vertical;"></textarea>
+      <div style="display:flex;justify-content:flex-end;">
+        <button class="btn" style="font-size:10px;padding:4px 10px;color:var(--muted);border-color:var(--border);" onclick="ciResetAi('transcription')">↩ Reset to default</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;">
+      <button class="btn" style="font-size:11px;padding:7px 14px;color:var(--muted);border-color:var(--border);" onclick="ciCloseAiModal()">Cancel</button>
+      <button class="btn" id="ai-save" style="font-size:11px;padding:7px 14px;background:rgba(196,18,48,0.12);border-color:var(--accent);color:var(--accent);" onclick="ciSaveAi(this)">💾 Save instructions</button>
+    </div>
+    <div id="ai-status" style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;color:var(--muted);margin-top:10px;min-height:14px;"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+  // ── Constants ─────────────────────────────────────────────────────
+  const SENTIMENT = {
+    positive: { label: 'Happy',   emoji: '😊', cls: 'sentiment-badge--happy'   },
+    neutral:  { label: 'Neutral', emoji: '😐', cls: 'sentiment-badge--neutral' },
+    negative: { label: 'Unhappy', emoji: '😟', cls: 'sentiment-badge--unhappy' },
+  };
+  const CATEGORY_LABEL = s => s ? s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—';
+  const FMT_PHONE = p => { const d = String(p||'').replace(/\D/g,''); return d.length===10?`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`:p||'—'; };
+  const FMT_CONF  = c => c != null ? Math.round(c * 100) + '%' : '—';
+  // escHtml is defined in /js/shared.js — do NOT redeclare here or the whole script dies with SyntaxError.
+
+  const ST_CALL_REASONS = [
+    'Billing Question','Customer called to cancel','Customer Concern Workmanship of Job',
+    "Don't Provide Service Needed",'Employee Called In','Follow up call','Hang up','Other',
+    'Out of service area','SPAM','Vendor/marketing',
+  ];
+
+  const ST_CALL_TYPES = [
+    { value: 'Booked',    label: 'Job was booked'                  },
+    { value: 'NotLead',   label: 'Related to existing job'         },
+    { value: 'Unbooked',  label: 'Service request, not booked'     },
+    { value: 'Excused',   label: 'Not a service request'           },
+    { value: 'Abandoned', label: 'Abandoned / hang-up'             },
+  ];
+
+  const CATEGORY_CALL_TYPE = {
+    job_callback:'NotLead', unbooked_call:'Unbooked', scheduling_request:'Unbooked',
+    new_service_request:'Unbooked', emergency_request:'Unbooked', estimate_followup:'Unbooked',
+    warranty_concern:'NotLead', membership_question:'NotLead', payment_billing:'NotLead',
+    complaint:'NotLead', compliment:'NotLead', spam_robocall:'Excused',
+    wrong_number:'Excused', internal_call:'Excused', recruiting_call:'Excused', other:'Excused',
+  };
+
+  const ALL_CATEGORIES = [
+    'job_callback','unbooked_call','scheduling_request','new_service_request',
+    'emergency_request','estimate_followup','warranty_concern','membership_question',
+    'payment_billing','complaint','compliment','spam_robocall',
+    'wrong_number','internal_call','recruiting_call','other'
+  ];
+
+  // ── Card rendering ────────────────────────────────────────────────
+
+  function renderBullets(call) {
+    let bullets = Array.isArray(call.summaryBullets) ? call.summaryBullets.filter(Boolean) : [];
+    if (bullets.length === 0 && call.summary) {
+      // Legacy record with prose summary — split into sentences.
+      bullets = call.summary
+        .split(/(?<=[.!?])\s+|\s•\s|\n+/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .slice(0, 4);
+    }
+    if (bullets.length === 0) return '';
+    return `<ul class="recap-bullets">${bullets.map(b => `<li>${escHtml(b)}</li>`).join('')}</ul>`;
+  }
+
+  function sentimentBadgeHtml(sentiment) {
+    const s = SENTIMENT[sentiment] || SENTIMENT.neutral;
+    return `<span class="sentiment-badge ${s.cls}"><span class="sb-emoji">${s.emoji}</span>${s.label}</span>`;
+  }
+
+  function renderCiCallCard(call) {
+    const lc = call.rawWebhookPayload?.leadCall || {};
+    const duration = lc.duration ? lc.duration.replace(/^00:/,'') : null;
+    const callDate = call.timestamp
+      ? new Date(call.timestamp).toLocaleString('en-US',{dateStyle:'short',timeStyle:'short'})
+      : '—';
+
+    const isReviewed   = call.status === 'completed';
+    const isProcessing = call.status === 'processing';
+    const hasFailed    = call.status === 'failed';
+    const notesApplied = !!call.notesAppliedAt;
+    const isSpam       = !!call.isSpam;
+    const effectiveCat = call.manualCategory || call.category;
+    const isUpload     = call.source === 'upload' || String(call.serviceTitanCallId||'').startsWith('upload-');
+    const hasRecording = isUpload || !!duration;
+    const canPost      = isReviewed && !notesApplied && !isSpam;
+
+    const statusColors = { completed:'var(--ok)', failed:'var(--danger)', pending:'var(--muted)', processing:'var(--accent3)' };
+    const statusColor = statusColors[call.status] || 'var(--muted)';
+
+    // ── Header: caller + match + meta ────────────────────────────────
+    const callerLine = FMT_PHONE(call.callerPhoneNumber) || 'Unknown Caller';
+
+    // Internal employee badge — shown when the caller's number matches the
+    // employee_phones roster. Takes precedence over customer match display
+    // because the call is from one of our own, not a lead/customer.
+    const emp = call.internalEmployee;
+    const employeeBadge = emp
+      ? `<div style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-family:'JetBrains Mono','DM Mono',monospace;margin-top:4px;padding:3px 9px;background:rgba(66,153,225,0.12);border:1px solid rgba(66,153,225,0.35);border-radius:999px;color:#4299e1;">
+           🏢 <strong>${escHtml(emp.name || 'Employee')}</strong>
+           ${emp.trade ? `<span style="color:var(--muted);">· ${escHtml(emp.trade)}</span>` : ''}
+           ${emp.truckNumber ? `<span style="color:var(--muted);">· Truck #${escHtml(emp.truckNumber)}</span>` : ''}
+           ${emp.extension ? `<span style="color:var(--muted);">· x${escHtml(emp.extension)}</span>` : ''}
+         </div>`
+      : '';
+
+    // Known-caller badge — a configured supply-house/vendor number that gets
+    // auto-labeled (call type + reason + agent) by the backend rule. Explains
+    // why this call skips the normal AI classification for ST metrics.
+    const kc = call.knownCaller;
+    const knownCallerBadge = kc
+      ? `<div style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-family:'JetBrains Mono','DM Mono',monospace;margin-top:4px;padding:3px 9px;background:rgba(159,122,234,0.12);border:1px solid rgba(159,122,234,0.4);border-radius:999px;color:#9f7aea;">
+           🏷️ <strong>Auto-labeled</strong>
+           <span style="color:var(--muted);">${escHtml(kc.label)} · ${escHtml(kc.callType)}${kc.reason ? ' · ' + escHtml(kc.reason) : ''}${kc.agentName ? ' · ' + escHtml(kc.agentName) : ''}</span>
+         </div>`
+      : '';
+
+    const matchLine = call.matchedCustomerName
+      ? (call.matchMethod === 'webhook_payload'
+          ? `<span style="color:var(--ok);">✓ ${escHtml(call.matchedCustomerName)}${call.matchedJobNumber ? ' · Job #'+escHtml(call.matchedJobNumber) : ''}</span>`
+          : `<span style="color:var(--muted);">~ possible: ${escHtml(call.matchedCustomerName)}</span>`)
+      : '';
+
+    const metaLine = `${callDate}${duration?' · '+duration:''}${isUpload?' · 📎 uploaded':''} · ID ${escHtml(String(call.serviceTitanCallId))}`;
+
+    // ── Out-of-window candidate jobs ────────────────────────────────
+    // Customer was matched, but none of their jobs fall within ±14 days of today.
+    // Surface the candidates so the dispatcher can pick the right one manually,
+    // rather than auto-assigning to a stale / far-future job.
+    const candidateJobs = Array.isArray(call.candidateJobs) ? call.candidateJobs : [];
+    const showCandidates =
+      candidateJobs.length > 0 && !call.matchedJobId && !notesApplied;
+    let candidatesHtml = '';
+    if (showCandidates) {
+      const rows = candidateJobs.slice(0, 5).map(cj => {
+        const when = cj.relevanceDate
+          ? new Date(cj.relevanceDate).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+          : '—';
+        const ageLabel = (typeof cj.ageDays === 'number')
+          ? (cj.ageDays > 0 ? `${cj.ageDays}d ago` : `in ${Math.abs(cj.ageDays)}d`)
+          : '';
+        const status = cj.status ? `<span style="color:var(--muted);">· ${escHtml(cj.status)}</span>` : '';
+        return `<button class="btn"
+                  style="font-size:11px;padding:5px 10px;justify-content:flex-start;text-align:left;background:transparent;border-color:var(--border);color:var(--text);"
+                  onclick="ciUseCandidateJob('${call.serviceTitanCallId}', '${escHtml(cj.jobNumber || '')}')">
+                  <span style="font-family:'JetBrains Mono','DM Mono',monospace;">#${escHtml(cj.jobNumber || '?')}</span>
+                  <span style="color:var(--muted);margin-left:6px;">${escHtml(when)}</span>
+                  ${ageLabel ? `<span style="color:var(--muted);margin-left:6px;">(${escHtml(ageLabel)})</span>` : ''}
+                  ${status}
+                </button>`;
+      }).join('');
+      candidatesHtml = `<div style="margin:8px 0 10px 0;padding:9px 11px;border:1px dashed var(--border);border-radius:8px;background:rgba(237,137,54,0.05);">
+        <div style="font-size:11px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--accent3);margin-bottom:6px;">
+          ⚠ No job within ±2 weeks — review ${candidateJobs.length} other job${candidateJobs.length===1?'':'s'} for this customer
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">${rows}</div>
+      </div>`;
+    }
+
+    // ── Body parts ──────────────────────────────────────────────────
+    const bulletsHtml = isReviewed ? renderBullets(call) : '';
+    const actionHtml  = isReviewed && call.recommendedAction
+      ? `<div class="recap-action">→ ${escHtml(call.recommendedAction)}</div>` : '';
+
+    let statusHtml = '';
+    if (isProcessing) {
+      statusHtml = `<div id="processing-${call.serviceTitanCallId}" style="display:flex;align-items:center;gap:8px;font-size:12px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--accent3);margin-bottom:10px;"><div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> Transcribing &amp; generating recap…</div>`;
+    } else if (hasFailed) {
+      statusHtml = `<div style="font-size:11px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--danger);padding:7px 11px;background:rgba(229,62,62,0.08);border-radius:6px;margin-bottom:10px;">✗ ${escHtml(call.errorMessage || 'Processing failed')}</div>`;
+    } else if (!hasRecording) {
+      statusHtml = `<div style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;padding:6px 0;margin-bottom:6px;">⚠ No recording available for this call</div>`;
+    }
+
+    // ── Primary action ──────────────────────────────────────────────
+    let primaryAction = '';
+    if (isProcessing) {
+      // Spinner already shown; no action button
+    } else if (hasFailed || (!isReviewed && hasRecording)) {
+      primaryAction = `<button class="btn" style="font-size:12px;padding:7px 16px;" id="review-btn-${call.serviceTitanCallId}" onclick="ciReviewCall('${call.serviceTitanCallId}')">🎙️ Generate Recap</button>`;
+    } else if (canPost) {
+      // One-click: Post to ST. If no job/customer match, the handler will open the Advanced drawer.
+      primaryAction = `<button class="btn" style="font-size:12px;padding:8px 18px;background:rgba(196,18,48,0.15);border-color:var(--accent);color:var(--accent);font-weight:600;" id="apply-btn-${call.serviceTitanCallId}" onclick="ciApplyNotes('${call.serviceTitanCallId}')">📝 Post to ServiceTitan</button>`;
+    } else if (notesApplied) {
+      // Show exactly where the note landed: Job # if we wrote to a job,
+      // else the customer name, else a generic confirmation.
+      let target = '';
+      if (call.appliedJobNumber) {
+        target = ` → Job #${escHtml(call.appliedJobNumber)}`;
+      } else if (call.appliedJobId) {
+        target = ` → Job ID ${escHtml(String(call.appliedJobId))}`;
+      } else if (call.matchedCustomerName) {
+        target = ` → ${escHtml(call.matchedCustomerName)}`;
+      } else if (call.appliedCustomerId) {
+        target = ` → Customer ${escHtml(String(call.appliedCustomerId))}`;
+      }
+      primaryAction = `<span style="font-size:12px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--ok);padding:7px 0;">✓ Posted to ServiceTitan${target}</span>`;
+    }
+
+    // ── Advanced drawer ────────────────────────────────────────────
+    const stExistingReason = lc.reason?.name || null;
+    const stExistingType   = lc.callType || null;
+    const activeReason     = call.callReason || stExistingReason || '';
+    const activeCallType   = call.callType || stExistingType || CATEGORY_CALL_TYPE[effectiveCat] || '';
+
+    const catOpts = ALL_CATEGORIES.map(c => `<option value="${c}"${c === effectiveCat ? ' selected' : ''}>${CATEGORY_LABEL(c)}</option>`).join('');
+    const typeOpts = ST_CALL_TYPES.map(t => `<option value="${t.value}"${t.value === activeCallType ? ' selected' : ''}>${t.label}</option>`).join('');
+    const reasonOpts = ST_CALL_REASONS.map(r => `<option value="${r}"${r === activeReason ? ' selected' : ''}>${escHtml(r)}</option>`).join('');
+
+    const advancedHtml = `<details class="recap-advanced" id="adv-${call.serviceTitanCallId}">
+      <summary>Advanced — call type, job match, transcript</summary>
+      <div class="adv-grid">
+        <div class="adv-row">
+          <label>Category ${call.manualCategory ? '<span style="color:var(--accent3);">(overridden)</span>' : ''}</label>
+          <select onchange="ciSetCategory('${call.serviceTitanCallId}', this.value)">
+            <option value="">— Select Category —</option>
+            ${catOpts}
+          </select>
+        </div>
+        <div class="adv-row">
+          <label>ST Call Type</label>
+          <select onchange="ciSetCallType('${call.serviceTitanCallId}', this.value)">
+            <option value="">— Inherit from AI —</option>
+            ${typeOpts}
+          </select>
+        </div>
+        <div class="adv-row" style="grid-column:1/-1;">
+          <label>ST Call Reason</label>
+          <select onchange="ciSetCallReason('${call.serviceTitanCallId}', this.value)">
+            <option value="">— Select Reason —</option>
+            ${reasonOpts}
+          </select>
+        </div>
+        <div class="adv-row" style="grid-column:1/-1;">
+          <label>Job # override (enter if no auto-match)</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input id="job-input-${call.serviceTitanCallId}" class="adv-input"
+              placeholder="e.g. 2602739"
+              style="flex:1;min-width:180px;"
+              value="${escHtml(call.matchedJobNumber || '')}"
+              onkeydown="if(event.key==='Enter') ciApplyNotes('${call.serviceTitanCallId}')" />
+            <button class="btn" style="font-size:11px;padding:5px 10px;color:var(--accent3);border-color:var(--accent3);" onclick="ciFindJob('${call.serviceTitanCallId}')">🔍 Find Job</button>
+          </div>
+          <div id="jobpicker-${call.serviceTitanCallId}" style="display:none;margin-top:8px;"></div>
+        </div>
+        <div class="adv-row" style="grid-column:1/-1;">
+          <label>Customer ID override (post to customer when no job is set)</label>
+          <input id="cust-input-${call.serviceTitanCallId}" class="adv-input"
+            placeholder="ServiceTitan customer ID, e.g. 12345"
+            value="${escHtml(call.matchedCustomerId ? String(call.matchedCustomerId) : '')}"
+            onkeydown="if(event.key==='Enter') ciApplyNotes('${call.serviceTitanCallId}')" />
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono','DM Mono',monospace;">
+            Leave blank to use auto-matched customer${call.matchedCustomerName ? ' (' + escHtml(call.matchedCustomerName) + ')' : ''}.
+            If a job # is also set, the job wins.
+          </div>
+        </div>
+        ${isReviewed ? `<div class="adv-row" style="grid-column:1/-1;color:var(--muted);">
+          Confidence: ${FMT_CONF(call.confidence)} · Model: ${escHtml(call.classificationModel || '—')} · Match: ${escHtml(call.matchMethod || 'none')}
+        </div>` : ''}
+        ${call.transcript ? `<div class="adv-row" style="grid-column:1/-1;">
+          <details><summary style="cursor:pointer;color:var(--muted);">View / edit transcript${call.transcriptMetadata && call.transcriptMetadata.manuallyEdited ? ' <span style="color:var(--accent3);">(edited)</span>' : ''}</summary>
+            <textarea id="transcript-ta-${call.serviceTitanCallId}" class="adv-input"
+              style="margin-top:8px;width:100%;box-sizing:border-box;min-height:200px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:10px;color:var(--text);white-space:pre-wrap;font-family:'JetBrains Mono','DM Mono',monospace;resize:vertical;">${escHtml(call.transcript)}</textarea>
+            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center;">
+              <button class="btn" style="font-size:11px;padding:5px 10px;" onclick="ciSaveTranscript('${call.serviceTitanCallId}')">💾 Save transcript</button>
+              <button class="btn" style="font-size:11px;padding:5px 10px;color:var(--accent3);border-color:var(--accent3);" onclick="ciReclassify('${call.serviceTitanCallId}')">🤖 Re-classify now</button>
+              <span id="transcript-status-${call.serviceTitanCallId}" style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;"></span>
+            </div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono','DM Mono',monospace;">Editing the text only saves it. The AI recap/category refresh when you click “Re-classify now”.</div>
+          </details>
+        </div>` : ''}
+      </div>
+    </details>`;
+
+    // ── Assemble ───────────────────────────────────────────────────
+    return `<div id="card-${call.serviceTitanCallId}" style="border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:10px;background:var(--surface2);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+        <div>
+          <div style="font-size:15px;font-weight:700;">${escHtml(callerLine)}</div>
+          ${employeeBadge}
+          ${knownCallerBadge}
+          ${matchLine ? `<div style="font-size:12px;font-family:'JetBrains Mono','DM Mono',monospace;margin-top:3px;">${matchLine}</div>` : ''}
+          <div style="font-size:10.5px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-top:3px;">${metaLine}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          ${isReviewed ? sentimentBadgeHtml(call.sentiment) : `<span style="font-size:10px;color:${statusColor};font-family:'JetBrains Mono','DM Mono',monospace;text-transform:uppercase;letter-spacing:0.5px;">${call.status}</span>`}
+        </div>
+      </div>
+
+      ${statusHtml}
+      ${candidatesHtml}
+      ${bulletsHtml}
+      ${actionHtml}
+      ${isReviewed && effectiveCat ? `<div style="font-size:10.5px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--muted);margin-bottom:12px;">Category: <span style="color:var(--text);">${CATEGORY_LABEL(effectiveCat)}</span>${call.manualCategory ? ' <span style="color:var(--accent3);">(overridden)</span>' : ''}${isSpam ? ' · <span style="color:var(--danger);">⚠ spam</span>' : ''}${call.classificationSyncedType ? ` · <span style="color:var(--ok);" title="Auto-synced to ServiceTitan on ${escHtml(call.classificationSyncedAt || '')}">✓ ST: ${escHtml(call.classificationSyncedType)}</span>` : ''}</div>` : ''}
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        ${primaryAction}
+        ${isReviewed ? `<button class="btn" style="font-size:11px;padding:6px 12px;color:var(--accent3);border-color:var(--accent3);${primaryAction ? '' : 'margin-left:auto;'}" onclick="ciCopyRecap('${call.serviceTitanCallId}')" title="Copy recap to clipboard for emailing">📋 Copy</button>` : ''}
+        ${!call.dismissedAt && !isProcessing ? `<button class="btn" style="font-size:11px;padding:6px 12px;color:var(--muted);border-color:var(--border);margin-left:auto;" onclick="ciDismiss('${call.serviceTitanCallId}')" title="Remove from the queue without generating a recap">✕ Dismiss</button>` : ''}
+        ${call.dismissedAt ? `<button class="btn" style="font-size:11px;padding:6px 12px;color:var(--accent3);border-color:var(--accent3);margin-left:auto;" onclick="ciDismiss('${call.serviceTitanCallId}', true)" title="Put this call back in the review queue">↩ Restore</button>` : ''}
+      </div>
+
+      ${advancedHtml}
+    </div>`;
+  }
+
+  // ── Data loading ──────────────────────────────────────────────────
+
+  // Parse a call's duration into seconds. Supports two shapes:
+  //  - ST polled calls:  rawWebhookPayload.leadCall.duration  -> "HH:MM:SS" or "MM:SS"
+  //  - Uploaded recordings: transcriptMetadata.duration       -> number of seconds
+  // Returns null if no duration is known (e.g. pending call with no payload data yet).
+  function callDurationSeconds(call) {
+    const d = call.transcriptMetadata?.duration;
+    if (typeof d === 'number' && !isNaN(d)) return d;
+
+    const raw = call.rawWebhookPayload?.leadCall?.duration;
+    if (typeof raw === 'string' && raw.includes(':')) {
+      const parts = raw.split(':').map(n => parseInt(n, 10) || 0);
+      if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+      if (parts.length === 2) return parts[0] * 60 + parts[1];
+    }
+    return null;
+  }
+
+  const MIN_DURATION_SECONDS = 30;
+
+  function safeRenderCard(call) {
+    try {
+      return renderCiCallCard(call);
+    } catch (err) {
+      console.error('renderCiCallCard failed for call', call?.serviceTitanCallId, err);
+      return `<div style="border:1px solid var(--danger);border-radius:10px;padding:14px;margin-bottom:10px;background:rgba(229,62,62,0.06);">
+        <div style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;color:var(--danger);">
+          ✗ Could not render call <strong>${escHtml(String(call?.serviceTitanCallId || 'unknown'))}</strong>: ${escHtml(err.message)}
+        </div>
+      </div>`;
+    }
+  }
+
+  async function ciLoadCalls() {
+    const list = document.getElementById('ci-call-list');
+    list.innerHTML = '<div style="color:var(--muted);font-family:\'JetBrains Mono\',\'DM Mono\',monospace;font-size:12px;padding:8px 0;">Loading…</div>';
+    try {
+      const params = new URLSearchParams({ limit: '50' });
+      if (_statusFilter === 'posted') params.set('posted', 'true');
+      else if (_statusFilter) params.set('status', _statusFilter);
+      if (_showDismissed) params.set('includeDismissed', 'true');
+      const url = '/api/calls?' + params.toString();
+      const res = await fetch(url);
+
+      let data = null;
+      try { data = await res.json(); } catch (_) { data = null; }
+
+      if (!res.ok) {
+        const msg = (data && data.error) || `HTTP ${res.status} ${res.statusText}`;
+        console.error('GET /api/calls returned error:', msg, data);
+        list.innerHTML = `<div style="color:var(--danger);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;padding:10px 12px;background:rgba(229,62,62,0.08);border:1px solid var(--danger);border-radius:8px;">
+          ✗ Server error loading calls: ${escHtml(msg)}<br/>
+          <span style="color:var(--muted);font-size:11px;">Check your server logs. The server may need to be restarted if the schema was recently updated.</span>
+        </div>`;
+        return;
+      }
+
+      const rawCalls = Array.isArray(data?.calls) ? data.calls : [];
+
+      // Hide anything with a known duration ≤ MIN_DURATION_SECONDS (hang-ups, misdials).
+      // Unknown-duration calls (no payload data yet) stay so the user can still process them.
+      const calls = rawCalls.filter(c => {
+        const secs = callDurationSeconds(c);
+        return secs == null || secs > MIN_DURATION_SECONDS;
+      });
+
+      // Cache the raw call objects by ID so handlers like ciCopyRecap can
+      // build a plain-text email body without re-fetching.
+      window._ciCallCache = window._ciCallCache || {};
+      for (const c of rawCalls) window._ciCallCache[c.serviceTitanCallId] = c;
+      const filteredOut = rawCalls.length - calls.length;
+      console.log(`[calls] loaded ${rawCalls.length} call(s) from /api/calls; ${filteredOut} hidden under ${MIN_DURATION_SECONDS}s`);
+
+      if (calls.length === 0) {
+        const filterLabel = { completed: 'reviewed', posted: 'posted', pending: 'waiting', failed: 'failed' }[_statusFilter];
+        const emptyMsg = rawCalls.length === 0
+          ? (filterLabel
+              ? `No ${filterLabel} calls yet.`
+              : 'No calls detected yet. Poll ServiceTitan above or upload a recording to get started.')
+          : `All ${rawCalls.length} recent calls are under ${MIN_DURATION_SECONDS}s (hang-ups / misdials). Nothing to review.`;
+        list.innerHTML = `<div style="color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;font-size:13px;">${emptyMsg}</div>`;
+      } else {
+        const banner = filteredOut > 0
+          ? `<div style="color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;margin:0 0 10px 2px;">↳ hiding ${filteredOut} call${filteredOut === 1 ? '' : 's'} under ${MIN_DURATION_SECONDS}s (hang-ups / misdials)</div>`
+          : '';
+        list.innerHTML = banner + calls.map(safeRenderCard).join('');
+        calls.filter(c => c.status === 'processing').forEach(c => ciPollUntilDone(c.serviceTitanCallId));
+      }
+      ciUpdateStats();
+    } catch(err) {
+      console.error('ciLoadCalls failed:', err);
+      list.innerHTML = `<div style="color:var(--danger);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;padding:10px 12px;background:rgba(229,62,62,0.08);border:1px solid var(--danger);border-radius:8px;">
+        ✗ Failed to load calls: ${escHtml(err.message)}<br/>
+        <span style="color:var(--muted);font-size:11px;">Open DevTools → Console / Network for details.</span>
+      </div>`;
+    }
+  }
+
+  let _showDismissed = false;
+  let _statusFilter = ''; // '' = all | 'completed' | 'posted' | 'pending' | 'failed'
+
+  // Filter the call list by review state. 'posted' maps to the API's
+  // notes-applied flag; the rest map to the call status column.
+  function ciSetFilter(filter, btn) {
+    _statusFilter = filter || '';
+    document.querySelectorAll('#ci-filter-bar .ci-filter').forEach(b => {
+      b.style.background = '';
+      b.style.borderColor = '';
+      b.style.color = '';
+    });
+    if (btn) {
+      btn.style.background = 'rgba(91,140,201,0.18)';
+      btn.style.borderColor = 'var(--accent3)';
+      btn.style.color = 'var(--accent3)';
+    }
+    ciLoadCalls();
+  }
+
+  async function ciUpdateStats() {
+    try {
+      const res = await fetch('/api/calls/stats');
+      const data = await res.json();
+      const t = data.totals || {};
+      const dismissedCount = t.dismissed || 0;
+      document.getElementById('ci-stats-bar').innerHTML =
+        `<span style="color:var(--text);">${t.total||0}</span> calls &nbsp;·&nbsp; ` +
+        `<span style="color:var(--ok);">${t.completed||0}</span> reviewed &nbsp;·&nbsp; ` +
+        `<span style="color:var(--muted);">${t.pending||0}</span> waiting &nbsp;·&nbsp; ` +
+        `<span style="color:var(--danger);">${t.failed||0}</span> failed` +
+        (dismissedCount ? ` &nbsp;·&nbsp; <button onclick="ciToggleDismissed()" style="background:none;border:none;cursor:pointer;font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;color:var(--muted);padding:0;text-decoration:underline;">${_showDismissed ? 'Hide' : 'Show'} dismissed (${dismissedCount})</button>` : '');
+    } catch(_) {}
+  }
+
+  async function ciToggleDismissed() {
+    _showDismissed = !_showDismissed;
+    await ciLoadCalls();
+  }
+
+  function ciRefresh() { ciLoadCalls(); }
+
+  async function ciPollNow(btn) {
+    btn.disabled = true;
+    btn.textContent = '…polling';
+    try {
+      await fetch('/api/calls/poll', { method:'POST' });
+      showToast('🔃 Poll triggered — refreshing in 8s');
+      setTimeout(() => { ciLoadCalls(); btn.disabled=false; btn.textContent='🔃 Poll ST'; }, 8000);
+    } catch(err) {
+      showToast('✗ Poll failed: ' + err.message);
+      btn.disabled=false; btn.textContent='🔃 Poll ST';
+    }
+  }
+
+  // ── Review & processing ──────────────────────────────────────────
+
+  async function ciReviewCall(callId) {
+    const btn = document.getElementById(`review-btn-${callId}`);
+    if (btn) { btn.disabled = true; btn.textContent = '…queuing'; }
+
+    try {
+      await fetch(`/api/calls/${callId}/process`, { method:'POST', headers:{'Content-Type':'application/json'} });
+      showToast(`🎙️ Generating recap — takes ~15–20s`);
+      if (btn) btn.textContent = '…processing';
+      ciPollUntilDone(callId);
+    } catch(err) {
+      if (btn) { btn.disabled=false; btn.textContent='🎙️ Generate Recap'; }
+      showToast('✗ Could not start: ' + err.message);
+    }
+  }
+
+  function ciPollUntilDone(callId, attempts = 0) {
+    if (attempts > 30) return;
+    setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/calls/${callId}`);
+        if (!res.ok) { ciPollUntilDone(callId, attempts+1); return; }
+        const call = await res.json();
+        if (call.status === 'completed' || call.status === 'failed') {
+          window._ciCallCache = window._ciCallCache || {};
+          window._ciCallCache[call.serviceTitanCallId] = call;
+          const card = document.getElementById(`card-${callId}`);
+          if (card) card.outerHTML = renderCiCallCard(call);
+          else ciLoadCalls();
+          ciUpdateStats();
+          if (call.status === 'completed') showToast(`✓ Recap ready — ${CATEGORY_LABEL(call.category)}`);
+          else showToast(`✗ Recap failed for call ${callId}`);
+        } else {
+          ciPollUntilDone(callId, attempts+1);
+        }
+      } catch(_) { ciPollUntilDone(callId, attempts+1); }
+    }, 3000);
+  }
+
+  // ── Advanced drawer setters ──────────────────────────────────────
+
+  async function ciSetCallType(callId, callType) {
+    try {
+      await fetch(`/api/calls/${callId}/call-type`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callType: callType || null })
+      });
+    } catch(e) { console.warn('ciSetCallType failed', e); }
+  }
+
+  async function ciSetCallReason(callId, reason) {
+    try {
+      await fetch(`/api/calls/${callId}/reason`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason || null })
+      });
+    } catch(err) { showToast('✗ Could not save reason: ' + err.message); }
+  }
+
+  async function ciSetCategory(callId, category) {
+    try {
+      await fetch(`/api/calls/${callId}/category`, {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ category: category || null })
+      });
+    } catch(err) { showToast('✗ Could not save category: ' + err.message); }
+  }
+
+  // ── Transcript edit + re-classify ────────────────────────────────
+
+  async function ciSaveTranscript(callId) {
+    const ta = document.getElementById(`transcript-ta-${callId}`);
+    const status = document.getElementById(`transcript-status-${callId}`);
+    if (!ta) return false;
+    const transcript = ta.value;
+    if (!transcript || !transcript.trim()) { showToast('✗ Transcript cannot be empty'); return false; }
+    if (status) status.textContent = 'Saving…';
+    try {
+      const res = await fetch(`/api/calls/${callId}/transcript`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'save failed');
+      if (window._ciCallCache && window._ciCallCache[callId]) {
+        window._ciCallCache[callId].transcript = data.transcript;
+        window._ciCallCache[callId].transcriptMetadata = Object.assign(
+          {}, window._ciCallCache[callId].transcriptMetadata || {},
+          { manuallyEdited: true, editedAt: data.editedAt }
+        );
+      }
+      if (status) status.textContent = 'Saved ✓ — click “Re-classify now” to refresh the recap.';
+      showToast('💾 Transcript saved');
+      return true;
+    } catch (err) {
+      if (status) status.textContent = '';
+      showToast('✗ Could not save transcript: ' + err.message);
+      return false;
+    }
+  }
+
+  async function ciReclassify(callId) {
+    const status = document.getElementById(`transcript-status-${callId}`);
+    // Persist any pending edits first so the AI runs on the latest text.
+    const saved = await ciSaveTranscript(callId);
+    if (!saved) return;
+    if (status) status.textContent = 'Re-classifying… (~10–15s)';
+    try {
+      const res = await fetch(`/api/calls/${callId}/reclassify`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'reclassify failed');
+
+      // Pull the refreshed record and re-render the card in place.
+      const r2 = await fetch(`/api/calls/${callId}`);
+      if (r2.ok) {
+        const call = await r2.json();
+        window._ciCallCache = window._ciCallCache || {};
+        window._ciCallCache[call.serviceTitanCallId] = call;
+        const card = document.getElementById(`card-${callId}`);
+        if (card) card.outerHTML = renderCiCallCard(call);
+        ciUpdateStats();
+      }
+      showToast(`✓ Recap refreshed — ${CATEGORY_LABEL(data.classification.category)}`);
+    } catch (err) {
+      if (status) status.textContent = '';
+      showToast('✗ Could not re-classify: ' + err.message);
+    }
+  }
+
+  // ── Find Job helper (inside Advanced drawer) ─────────────────────
+
+  async function ciFindJob(callId) {
+    const picker = document.getElementById(`jobpicker-${callId}`);
+    if (!picker) return;
+    picker.style.display = 'block';
+    picker.innerHTML = '<div style="font-size:11px;color:var(--muted);font-family:\'JetBrains Mono\',\'DM Mono\',monospace;">Searching ServiceTitan…</div>';
+
+    try {
+      const res = await fetch(`/api/calls/${callId}/related-jobs`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      if (!data.jobs.length) {
+        picker.innerHTML = '<div style="font-size:11px;color:var(--muted);font-family:\'JetBrains Mono\',\'DM Mono\',monospace;">No related jobs found. Enter the job number manually.</div>';
+      } else {
+        const rows = data.jobs.map(j => {
+          const date = j.createdOn ? new Date(j.createdOn).toLocaleDateString('en-US', { dateStyle: 'short' }) : '';
+          const badge = j.isPayloadJob ? '<span style="font-size:9px;background:rgba(196,18,48,0.15);color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:1px 5px;margin-left:4px;">call job</span>' : '';
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;margin-bottom:4px;border-radius:8px;background:var(--surface);border:1px solid var(--border);cursor:pointer;"
+            onclick="ciSelectJob('${callId}','${escHtml(j.jobNumber)}')"
+            onmouseover="this.style.borderColor='var(--accent3)'" onmouseout="this.style.borderColor='var(--border)'">
+            <div>
+              <span style="font-size:12px;font-weight:700;">Job #${escHtml(j.jobNumber)}</span>${badge}
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;">${escHtml(j.summary)}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;margin-left:12px;">
+              <div style="font-size:10px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--muted);">${escHtml(j.status)}</div>
+              <div style="font-size:10px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--muted);">${date}</div>
+            </div>
+          </div>`;
+        }).join('');
+        picker.innerHTML = `<div style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:8px;">Click a job to use it:</div>${rows}`;
+      }
+    } catch(err) {
+      picker.innerHTML = `<div style="font-size:11px;color:var(--danger);font-family:'JetBrains Mono','DM Mono',monospace;">✗ ${escHtml(err.message)}</div>`;
+    }
+  }
+
+  function ciSelectJob(callId, jobNumber) {
+    const input = document.getElementById(`job-input-${callId}`);
+    const picker = document.getElementById(`jobpicker-${callId}`);
+    if (input) input.value = jobNumber;
+    if (picker) picker.style.display = 'none';
+    showToast(`Job #${jobNumber} selected`);
+  }
+
+  // Used by the "out-of-window candidate jobs" buttons rendered on the card.
+  // Expands the Advanced drawer, fills the job# input, and scrolls it into view
+  // so the dispatcher can confirm and click Post to ServiceTitan.
+  function ciUseCandidateJob(callId, jobNumber) {
+    if (!jobNumber) return;
+    const adv = document.getElementById(`adv-${callId}`);
+    if (adv && !adv.open) adv.open = true;
+    const input = document.getElementById(`job-input-${callId}`);
+    if (input) {
+      input.value = jobNumber;
+      input.focus();
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    showToast(`Job #${jobNumber} staged — click Post to ServiceTitan to apply`);
+  }
+
+  // ── Copy Recap (for pasting into email) ─────────────────────────
+  //
+  // Builds a clean plain-text version of the call card and writes it to the
+  // clipboard. Falls back to a textarea+execCommand approach for browsers
+  // that don't expose navigator.clipboard (e.g. non-HTTPS local testing).
+  function buildRecapText(call) {
+    if (!call) return '';
+    const lines = [];
+    const lc = call.rawWebhookPayload?.leadCall || {};
+    const duration = lc.duration ? lc.duration.replace(/^00:/, '') : null;
+    const callDate = call.timestamp
+      ? new Date(call.timestamp).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+      : null;
+
+    // Header
+    lines.push(`Call Recap${callDate ? ' — ' + callDate : ''}`);
+    lines.push('');
+
+    // Caller + customer + job
+    const phone = FMT_PHONE(call.callerPhoneNumber) || 'Unknown';
+    lines.push(`Caller: ${phone}`);
+    if (call.internalEmployee) {
+      const emp = call.internalEmployee;
+      const empBits = [emp.name];
+      if (emp.trade) empBits.push(emp.trade);
+      if (emp.truckNumber) empBits.push(`Truck #${emp.truckNumber}`);
+      if (emp.extension) empBits.push(`x${emp.extension}`);
+      lines.push(`Employee call: ${empBits.join(' · ')}`);
+    }
+    if (call.matchedCustomerName) lines.push(`Customer: ${call.matchedCustomerName}`);
+    if (call.matchedJobNumber || call.appliedJobNumber) {
+      lines.push(`Job: #${call.appliedJobNumber || call.matchedJobNumber}`);
+    }
+
+    // Meta row
+    const cat = call.manualCategory || call.category;
+    const metaBits = [];
+    if (cat) metaBits.push('Category: ' + CATEGORY_LABEL(cat));
+    if (call.sentiment) {
+      const s = { positive: 'Positive', neutral: 'Neutral', negative: 'Negative' }[call.sentiment] || call.sentiment;
+      metaBits.push('Sentiment: ' + s);
+    }
+    if (duration) metaBits.push('Duration: ' + duration);
+    if (metaBits.length) {
+      lines.push('');
+      lines.push(metaBits.join(' · '));
+    }
+
+    // Bullets
+    const bullets = Array.isArray(call.summaryBullets) ? call.summaryBullets.filter(Boolean) : [];
+    if (bullets.length) {
+      lines.push('');
+      lines.push('Summary:');
+      bullets.forEach(b => lines.push('• ' + b));
+    } else if (call.summary) {
+      lines.push('');
+      lines.push('Summary:');
+      lines.push(call.summary);
+    }
+
+    if (call.recommendedAction) {
+      lines.push('');
+      lines.push('Recommended action: ' + call.recommendedAction);
+    }
+
+    // Full transcript — included so the recipient can read the caller's exact
+    // wording rather than relying on the AI summary alone.
+    if (call.transcript && String(call.transcript).trim()) {
+      lines.push('');
+      lines.push('—');
+      lines.push('Transcript:');
+      lines.push(String(call.transcript).trim());
+    }
+
+    lines.push('');
+    lines.push('—');
+    lines.push('Call ID: ' + call.serviceTitanCallId);
+
+    return lines.join('\n');
+  }
+
+  async function ciCopyRecap(callId) {
+    const call = (window._ciCallCache || {})[callId];
+    if (!call) {
+      // Cache miss — pull fresh and cache
+      try {
+        const res = await fetch(`/api/calls/${callId}`);
+        if (res.ok) {
+          const fresh = await res.json();
+          window._ciCallCache = window._ciCallCache || {};
+          window._ciCallCache[callId] = fresh;
+          return ciCopyRecap(callId); // retry with cached copy
+        }
+      } catch (_) {}
+      showToast('✗ Could not find call data to copy');
+      return;
+    }
+
+    const text = buildRecapText(call);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Legacy fallback
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      showToast('✓ Recap copied — paste into your email');
+    } catch (err) {
+      showToast('✗ Copy failed: ' + err.message);
+    }
+  }
+
+  // ── Dismiss ──────────────────────────────────────────────────────
+
+  // Dismiss removes a call from the default queue without generating a recap.
+  // Pass undismiss=true to put it back. When the "show dismissed" toggle is on
+  // we reload instead of collapsing the card, so the row stays visible in its
+  // new state rather than vanishing.
+  async function ciDismiss(callId, undismiss = false) {
+    try {
+      const res = await fetch(`/api/calls/${callId}/dismiss`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(undismiss ? { undismiss: true } : {})
+      });
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try { const d = await res.json(); if (d && d.error) msg = d.error; } catch (_) {}
+        throw new Error(msg);
+      }
+
+      if (window._ciCallCache && window._ciCallCache[callId]) {
+        window._ciCallCache[callId].dismissedAt = undismiss ? null : new Date().toISOString();
+      }
+
+      if (_showDismissed) {
+        await ciLoadCalls();
+        showToast(undismiss ? '↩ Restored to queue' : '✓ Dismissed');
+        return;
+      }
+
+      const card = document.getElementById(`card-${callId}`);
+      if (card) {
+        card.style.transition = 'opacity 0.3s, max-height 0.4s';
+        card.style.opacity = '0';
+        card.style.overflow = 'hidden';
+        card.style.maxHeight = card.offsetHeight + 'px';
+        setTimeout(() => { card.style.maxHeight = '0'; card.style.margin = '0'; card.style.padding = '0'; card.style.border = 'none'; }, 300);
+        setTimeout(() => card.remove(), 700);
+      }
+      showToast(undismiss ? '↩ Restored to queue' : '✓ Dismissed');
+      ciUpdateStats();
+    } catch(err) {
+      showToast(`✗ ${undismiss ? 'Restore' : 'Dismiss'} failed: ` + err.message);
+    }
+  }
+
+  // ── Post to ST (one-click, with Advanced-drawer fallback) ────────
+
+  async function ciApplyNotes(callId) {
+    const btn = document.getElementById(`apply-btn-${callId}`);
+    const jobInput = document.getElementById(`job-input-${callId}`);
+    const custInput = document.getElementById(`cust-input-${callId}`);
+    const advDrawer = document.getElementById(`adv-${callId}`);
+    const jobIdOverride = jobInput && jobInput.value.trim() ? jobInput.value.trim() : null;
+    const rawCust = custInput && custInput.value.trim() ? custInput.value.trim() : null;
+    // Only treat the customer field as an override if the user actually changed
+    // it from the auto-matched ID. Otherwise leave it null so the backend uses
+    // the existing matched customer (no extra getCustomer round-trip).
+    const call = window._ciCallCache && window._ciCallCache[callId];
+    const autoMatchedId = call?.matchedCustomerId ? String(call.matchedCustomerId) : null;
+    const customerIdOverride = rawCust && rawCust !== autoMatchedId ? rawCust : null;
+
+    if (btn) { btn.disabled = true; btn.textContent = '…posting'; }
+
+    try {
+      const body = {};
+      if (jobIdOverride) body.jobId = jobIdOverride;
+      if (customerIdOverride) body.customerId = customerIdOverride;
+
+      const res = await fetch(`/api/calls/${callId}/apply-note`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        // Customer ID typo / not found — highlight the customer field
+        if (data.isCustomerNotFound) {
+          if (advDrawer) advDrawer.open = true;
+          if (custInput) {
+            custInput.style.borderColor = 'var(--danger)';
+            custInput.focus();
+            custInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          if (btn) { btn.disabled = false; btn.textContent = '📝 Post to ServiceTitan'; }
+          showToast('⚠ Customer ID not found in ServiceTitan');
+          return;
+        }
+        // No auto-matched job/customer, or ST rejected the job ID.
+        // Open the Advanced drawer so the user can enter a job number or customer ID.
+        if (data.isJobNotFound || /no job or customer matched/i.test(data.error || '')) {
+          if (advDrawer) advDrawer.open = true;
+          if (jobInput) {
+            jobInput.style.borderColor = 'var(--danger)';
+            jobInput.focus();
+            jobInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          if (btn) { btn.disabled = false; btn.textContent = '📝 Post to ServiceTitan'; }
+          showToast(data.isJobNotFound
+            ? '⚠ Job ID not found — enter the correct job number or a customer ID below'
+            : '⚠ No customer/job match — enter a job # or customer ID below to post');
+          return;
+        }
+        throw new Error(data.error || 'Unknown error');
+      }
+
+      showToast(`✓ Posted to ST → ${data.noteTarget}`);
+      // Auto-dismiss the card so the user's queue keeps moving
+      await fetch(`/api/calls/${callId}/dismiss`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const card = document.getElementById(`card-${callId}`);
+      if (card) {
+        card.style.transition = 'opacity 0.4s, max-height 0.5s';
+        card.style.opacity = '0';
+        card.style.overflow = 'hidden';
+        card.style.maxHeight = card.offsetHeight + 'px';
+        setTimeout(() => { card.style.maxHeight = '0'; card.style.margin = '0'; card.style.padding = '0'; card.style.border = 'none'; }, 400);
+        setTimeout(() => card.remove(), 900);
+      }
+      ciUpdateStats();
+    } catch(err) {
+      if (btn) { btn.disabled = false; btn.textContent = '📝 Post to ServiceTitan'; }
+      showToast('✗ Post failed: ' + err.message);
+    }
+  }
+
+  // ── AI Instructions modal ────────────────────────────────────────
+
+  // Defaults returned by the server, kept so "Reset to default" can repopulate
+  // the textareas locally. Saving text equal to the default clears the override.
+  let _aiDefaults = { classification: '', transcription: '' };
+
+  function ciOpenAiModal() {
+    document.getElementById('ai-modal').classList.add('open');
+    ciLoadAi();
+  }
+
+  function ciCloseAiModal() {
+    document.getElementById('ai-modal').classList.remove('open');
+  }
+
+  function _aiMetaLabel(block) {
+    if (!block || !block.isCustom) return 'Using default';
+    let when = '';
+    if (block.meta && block.meta.updatedAt) {
+      const d = new Date((block.meta.updatedAt + 'Z').replace(' ', 'T'));
+      when = isNaN(d) ? '' : ' · ' + d.toLocaleDateString();
+    }
+    const who = block.meta && block.meta.updatedBy ? ' by ' + block.meta.updatedBy : '';
+    return 'Customized' + when + who;
+  }
+
+  async function ciLoadAi() {
+    const clsEl = document.getElementById('ai-cls');
+    const trEl = document.getElementById('ai-tr');
+    const status = document.getElementById('ai-status');
+    clsEl.value = 'Loading…'; trEl.value = 'Loading…';
+    status.textContent = '';
+    try {
+      const res = await fetch('/api/calls/ai-instructions');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load');
+      _aiDefaults.classification = data.classification.default || '';
+      _aiDefaults.transcription = data.transcription.default || '';
+      clsEl.value = data.classification.current || '';
+      trEl.value = data.transcription.current || '';
+      document.getElementById('ai-cls-meta').textContent = _aiMetaLabel(data.classification);
+      document.getElementById('ai-tr-meta').textContent = _aiMetaLabel(data.transcription);
+    } catch (err) {
+      clsEl.value = ''; trEl.value = '';
+      status.textContent = '✗ Could not load instructions: ' + err.message;
+    }
+  }
+
+  function ciResetAi(which) {
+    if (which === 'classification') {
+      document.getElementById('ai-cls').value = _aiDefaults.classification;
+      document.getElementById('ai-cls-meta').textContent = 'Default restored — Save to apply';
+    } else {
+      document.getElementById('ai-tr').value = _aiDefaults.transcription;
+      document.getElementById('ai-tr-meta').textContent = 'Default restored — Save to apply';
+    }
+  }
+
+  async function ciSaveAi(btn) {
+    const status = document.getElementById('ai-status');
+    const clsVal = document.getElementById('ai-cls').value.trim();
+    const trVal = document.getElementById('ai-tr').value.trim();
+
+    // Text equal to the default clears the override (stores null) so the meta
+    // label reads "Using default" instead of a redundant customization.
+    const body = {
+      classificationInstructions: clsVal === (_aiDefaults.classification || '').trim() ? null : clsVal,
+      transcriptionPrompt: trVal === (_aiDefaults.transcription || '').trim() ? null : trVal,
+    };
+
+    btn.disabled = true;
+    const orig = btn.textContent;
+    btn.textContent = 'Saving…';
+    status.textContent = '';
+    try {
+      const res = await fetch('/api/calls/ai-instructions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Save failed');
+      document.getElementById('ai-cls-meta').textContent = _aiMetaLabel(data.classification);
+      document.getElementById('ai-tr-meta').textContent = _aiMetaLabel(data.transcription);
+      showToast('✓ AI instructions saved — applies to the next call');
+      setTimeout(ciCloseAiModal, 600);
+    } catch (err) {
+      status.textContent = '✗ ' + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
+  }
+
+  // ── Upload modal ─────────────────────────────────────────────────
+
+  let _uploadFile = null;
+
+  function ciOpenUploadModal() {
+    document.getElementById('upload-modal').classList.add('open');
+    ciResetUploadForm();
+  }
+
+  function ciCloseUploadModal() {
+    document.getElementById('upload-modal').classList.remove('open');
+    ciResetUploadForm();
+  }
+
+  function ciResetUploadForm() {
+    _uploadFile = null;
+    document.getElementById('upload-file').value = '';
+    document.getElementById('dz-empty').style.display = '';
+    document.getElementById('dz-filled').style.display = 'none';
+    document.getElementById('upload-phone').value = '';
+    document.getElementById('upload-name').value = '';
+    document.getElementById('upload-context').value = '';
+    document.getElementById('upload-status').textContent = '';
+    const submit = document.getElementById('upload-submit');
+    submit.disabled = true;
+    submit.textContent = '🎙️ Analyze Recording';
+  }
+
+  function ciOnFileChosen(ev) {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    if (f.size > 25 * 1024 * 1024) {
+      showToast('✗ File must be under 25 MB');
+      return;
+    }
+    _uploadFile = f;
+    document.getElementById('dz-empty').style.display = 'none';
+    document.getElementById('dz-filled').style.display = '';
+    document.getElementById('dz-filename').textContent = f.name;
+    document.getElementById('dz-filesize').textContent = (f.size / 1024 / 1024).toFixed(2) + ' MB';
+    document.getElementById('upload-submit').disabled = false;
+  }
+
+  // Drag-and-drop handlers on the dropzone
+  (function () {
+    const dz = document.getElementById('dropzone');
+    if (!dz) return;
+    ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); }));
+    dz.addEventListener('drop', e => {
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!f) return;
+      document.getElementById('upload-file').files = e.dataTransfer.files;
+      ciOnFileChosen({ target: { files: [f] } });
+    });
+  })();
+
+  async function ciSubmitUpload(btn) {
+    if (!_uploadFile) return;
+    btn.disabled = true;
+    btn.textContent = '…analyzing';
+    const status = document.getElementById('upload-status');
+    status.textContent = 'Uploading & transcribing — this usually takes 20–40 seconds…';
+
+    const fd = new FormData();
+    fd.append('recording', _uploadFile);
+    const phone = document.getElementById('upload-phone').value.trim();
+    const name  = document.getElementById('upload-name').value.trim();
+    const ctx   = document.getElementById('upload-context').value.trim();
+    if (phone) fd.append('callerPhone', phone);
+    if (name)  fd.append('callerName', name);
+    if (ctx)   fd.append('contextNote', ctx);
+
+    try {
+      const res = await fetch('/api/calls/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+      showToast('✓ Recap ready');
+      ciCloseUploadModal();
+
+      // Prepend the new card to the list immediately
+      const list = document.getElementById('ci-call-list');
+      const card = document.createElement('div');
+      card.innerHTML = renderCiCallCard(data.call);
+      if (list.firstElementChild && list.firstElementChild.tagName === 'DIV' && list.firstElementChild.textContent.includes('No calls detected')) {
+        list.innerHTML = '';
+      }
+      list.insertBefore(card.firstElementChild, list.firstChild);
+      ciUpdateStats();
+    } catch(err) {
+      status.textContent = '✗ ' + err.message;
+      btn.disabled = false;
+      btn.textContent = '🎙️ Analyze Recording';
+    }
+  }
+
+  // ── Boot ─────────────────────────────────────────────────────────
+  ciLoadCalls();
+</script>
+
+<script>
+  // ── Stamp-on-visit: opening the queue marks the team caught up ──────────────
+  // Advances the shared "calls_last_reviewed_at" watermark so the dashboard's
+  // "new since the team last reviewed" count resets after someone looks here.
+  fetch('/api/calls/mark-reviewed', { method: 'POST' }).catch(() => {});
+</script>
+
+</body>
+</html>

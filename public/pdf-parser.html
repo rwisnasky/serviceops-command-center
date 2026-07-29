@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Parser - ServiceOps Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+
+<!-- ── Navigation Bar ───────────────────────────────────────────────── -->
+<!-- Nav: built by /js/shared.js — do not hand-edit, it gets wiped on load. -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+
+  <div class="page-header">
+    <div>
+      <h1>PDF <span class="accent">Parser</span></h1>
+      <p>Drop a client's scanned ticket PDF — we'll read the text and split out every page as a JPG, ready to attach to the ServiceTitan job. No more print &amp; re-scan.</p>
+    </div>
+    <div class="status-bar"><span class="status-dot"></span> Reader ready</div>
+  </div>
+
+  <!-- ── Step 1: Upload ───────────────────────────────────────────── -->
+  <div class="section-label">Scanned Ticket → Text + Photos</div>
+  <div class="panel">
+    <div style="color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;margin-bottom:14px;line-height:1.6;">
+      Drop a scanned job-ticket <strong style="color:var(--text);">PDF</strong>. We'll OCR the printed text and save
+      each page (plus any embedded photos) as a <strong style="color:var(--text);">JPG you can upload straight to the ST job</strong>.
+      Everything stays on this page — nothing is sent to ServiceTitan automatically.
+    </div>
+    <div id="jt-drop-zone"
+         style="border:2px dashed var(--border);border-radius:12px;padding:32px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;"
+         onclick="document.getElementById('jt-file-input').click()">
+      <div id="jt-drop-label" style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--muted);pointer-events:none;">
+        Drag &amp; drop a ticket (.pdf), or <span style="color:var(--accent);text-decoration:underline;">click to browse</span>
+      </div>
+      <input type="file" id="jt-file-input" accept=".pdf,application/pdf" style="display:none;" onchange="handleJtFileSelect(this)" />
+    </div>
+    <div class="search-row" style="margin-top:12px;">
+      <button class="btn" id="jt-parse-btn" onclick="parseTicket()" disabled>Read Ticket</button>
+    </div>
+    <div id="jt-status" style="margin-top:8px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--muted);min-height:18px;"></div>
+  </div>
+
+  <!-- ── Step 2: Results ──────────────────────────────────────────── -->
+  <div id="jt-results-wrap" style="display:none;">
+
+    <!-- Shared ServiceTitan job number (used by both ST actions below) -->
+    <div class="panel" style="margin-top:24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--text);font-weight:600;">ServiceTitan Job #</span>
+      <input class="search-input" id="jt-job-number" placeholder="e.g. 12345" style="max-width:170px;" />
+      <span style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;color:var(--muted);">the buttons below act on this job</span>
+    </div>
+
+    <!-- Special Installation Instructions (only shown when found in the PDF) -->
+    <div id="jt-si-wrap" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:28px;gap:12px;flex-wrap:wrap;">
+        <div class="section-label" style="margin:0;">Special Installation Instructions</div>
+        <span id="jt-si-engine" style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:10px;color:var(--muted);"></span>
+      </div>
+      <div class="panel" style="margin-top:12px;">
+        <div style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.6;">
+          Cleaned into bullets from the PDF. <strong style="color:var(--text);">Edit freely</strong> — one bullet per line — then add it to the job summary. It's appended under a dated, attributed header (your name + today's date); existing summary text is preserved.
+        </div>
+        <textarea id="jt-si-text" spellcheck="false"
+          style="width:100%;min-height:180px;resize:vertical;background:var(--surface2,#0d0f14);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:14px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;line-height:1.7;"></textarea>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px;">
+          <button class="btn" id="jt-si-btn" onclick="addToJobSummary()" style="padding:7px 16px;font-size:12px;">Add to Job Summary</button>
+          <span id="jt-si-status" style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--muted);"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Photos / pages -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:28px;gap:12px;flex-wrap:wrap;">
+      <div class="section-label" style="margin:0;" id="jt-images-label">Pages</div>
+      <a class="btn" id="jt-zip-btn" href="#" style="padding:6px 14px;font-size:11px;text-decoration:none;">⬇ Download all (.zip)</a>
+    </div>
+    <div class="panel" id="jt-images-panel" style="margin-top:12px;">
+      <!-- Attach-to-ServiceTitan bar (uses the shared job # above) -->
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);">
+        <span style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;color:var(--muted);">Attach the checked images to the job above:</span>
+        <button class="btn" id="jt-attach-btn" onclick="attachToJob()" style="padding:6px 14px;font-size:11px;">Attach to ST Job</button>
+        <span id="jt-attach-status" style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--muted);"></span>
+      </div>
+      <div id="jt-images-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;"></div>
+    </div>
+
+    <!-- OCR text -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:28px;gap:12px;flex-wrap:wrap;">
+      <div class="section-label" style="margin:0;">Ticket Text (OCR)</div>
+      <button class="btn" id="jt-copy-btn" style="background:var(--surface2);color:var(--text);padding:6px 14px;font-size:11px;" onclick="copyOcrText()">Copy text</button>
+    </div>
+    <div class="panel" style="margin-top:12px;">
+      <textarea id="jt-ocr-text" readonly spellcheck="false"
+        style="width:100%;min-height:280px;resize:vertical;background:var(--surface2,#0d0f14);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:14px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;line-height:1.6;"></textarea>
+    </div>
+
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+  let selectedTicketFile = null;
+  let currentResult = null;
+
+  // ── Drop zone ──────────────────────────────────────────────────────────────
+  (function initDropZone() {
+    const zone = document.getElementById('jt-drop-zone');
+    if (!zone) return;
+    zone.addEventListener('dragover', e => {
+      e.preventDefault();
+      zone.style.borderColor = 'var(--accent)';
+      zone.style.background = 'rgba(196,18,48,0.06)';
+    });
+    zone.addEventListener('dragleave', e => {
+      e.preventDefault();
+      zone.style.borderColor = 'var(--border)';
+      zone.style.background = '';
+    });
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.style.borderColor = 'var(--border)';
+      zone.style.background = '';
+      const file = e.dataTransfer.files[0];
+      if (file) setTicketFile(file);
+    });
+  })();
+
+  function handleJtFileSelect(input) {
+    if (input.files[0]) setTicketFile(input.files[0]);
+  }
+
+  function setTicketFile(file) {
+    if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+      showToast('Please choose a PDF file.', { type: 'error' });
+      return;
+    }
+    selectedTicketFile = file;
+    const label = document.getElementById('jt-drop-label');
+    const sizeKB = (file.size / 1024).toFixed(0);
+    label.innerHTML = `<span style="color:var(--accent);">✓ ${escHtml(file.name)}</span> <span style="color:var(--muted);">(${sizeKB} KB)</span><br><span style="color:var(--muted);font-size:11px;">Click or drop again to change</span>`;
+    document.getElementById('jt-parse-btn').disabled = false;
+  }
+
+  // ── Parse ──────────────────────────────────────────────────────────────────
+  async function parseTicket() {
+    if (!selectedTicketFile) {
+      showToast('Choose a PDF first.', { type: 'error' });
+      return;
+    }
+    const btn = document.getElementById('jt-parse-btn');
+    const status = document.getElementById('jt-status');
+    btn.disabled = true;
+    status.textContent = 'Reading ticket — OCR + splitting pages, this can take a few seconds…';
+    document.getElementById('jt-results-wrap').style.display = 'none';
+
+    const fd = new FormData();
+    fd.append('pdfFile', selectedTicketFile);
+
+    try {
+      const resp = await fetch('/api/pdf-parser/parse', { method: 'POST', body: fd });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.error || `Request failed (${resp.status})`);
+      currentResult = data;
+      renderResult(data);
+      status.textContent = `Done — ${data.pageCount} page${data.pageCount === 1 ? '' : 's'} ready to upload.`;
+    } catch (err) {
+      status.textContent = '';
+      showToast(err.message || 'Could not read that ticket.', { type: 'error' });
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  function renderResult(data) {
+    document.getElementById('jt-ocr-text').value = data.text || '(no text detected)';
+    document.getElementById('jt-zip-btn').href = data.zipUrl;
+    // Reset the ST controls for the new upload.
+    document.getElementById('jt-job-number').value = '';
+    document.getElementById('jt-attach-status').textContent = '';
+
+    // Special Installation Instructions (only when the PDF had that box).
+    const si = data.specialInstructions || { found: false, bullets: [] };
+    const siWrap = document.getElementById('jt-si-wrap');
+    const siStatus = document.getElementById('jt-si-status');
+    siStatus.textContent = '';
+    if (si.found && Array.isArray(si.bullets) && si.bullets.length) {
+      document.getElementById('jt-si-text').value = si.bullets.map(b => '• ' + b).join('\n');
+      document.getElementById('jt-si-engine').textContent =
+        si.engine === 'ai' ? 'AI-formatted' : si.engine === 'fallback' ? 'auto-split' : '';
+      siWrap.style.display = 'block';
+    } else {
+      siWrap.style.display = 'none';
+    }
+
+    const grid = document.getElementById('jt-images-grid');
+    grid.innerHTML = '';
+    (data.files || []).forEach(f => {
+      const kb = (f.bytes / 1024).toFixed(0);
+      const card = document.createElement('div');
+      card.style.cssText = 'border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface2,#0d0f14);display:flex;flex-direction:column;';
+      card.innerHTML =
+        `<a href="${f.url}" target="_blank" rel="noopener" style="display:block;background:#000;">` +
+          `<img src="${f.url}" alt="${escHtml(f.label)}" loading="lazy" ` +
+            `style="width:100%;height:160px;object-fit:contain;display:block;" />` +
+        `</a>` +
+        `<div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px;">` +
+          `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">` +
+            `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;color:var(--text);">` +
+              `<input type="checkbox" class="jt-pick" data-name="${escHtml(f.name)}" checked /> ${escHtml(f.label)}` +
+              (f.kind === 'photo' ? ` <span style="color:var(--accent);">• original</span>` : ``) +
+            `</label>` +
+            `<span style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:10px;color:var(--muted);">${kb} KB</span>` +
+          `</div>` +
+          `<a class="btn" href="${f.url}?dl=1" style="padding:5px 10px;font-size:11px;text-align:center;text-decoration:none;">⬇ Download JPG</a>` +
+        `</div>`;
+      grid.appendChild(card);
+    });
+
+    document.getElementById('jt-results-wrap').style.display = 'block';
+  }
+
+  // ── Add the Special Installation Instructions to the ST job summary ─────────
+  async function addToJobSummary() {
+    if (!currentResult) return;
+    const jobNumber = document.getElementById('jt-job-number').value.trim();
+    if (!jobNumber) { showToast('Enter a ServiceTitan job number above.', { type: 'error' }); return; }
+
+    const instructions = document.getElementById('jt-si-text').value.trim();
+    if (!instructions) { showToast('There are no instructions to add.', { type: 'error' }); return; }
+
+    const btn = document.getElementById('jt-si-btn');
+    const status = document.getElementById('jt-si-status');
+    btn.disabled = true;
+    status.style.color = 'var(--muted)';
+    status.textContent = `Adding to job ${jobNumber} summary…`;
+
+    try {
+      const resp = await fetch('/api/pdf-parser/add-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobNumber, instructions })
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.error || `Request failed (${resp.status})`);
+      const msg = `Added ${data.bulletCount} line${data.bulletCount === 1 ? '' : 's'} to job ${data.jobNumber} summary (by ${data.addedBy}, ${data.date}).`;
+      status.style.color = '#3fb950';
+      status.textContent = msg;
+      showToast(msg);
+    } catch (err) {
+      status.textContent = '';
+      showToast(err.message || 'Could not update the job summary.', { type: 'error' });
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ── Attach selected images to a ServiceTitan job ────────────────────────────
+  async function attachToJob() {
+    if (!currentResult) return;
+    const jobNumber = document.getElementById('jt-job-number').value.trim();
+    if (!jobNumber) { showToast('Enter a ServiceTitan job number.', { type: 'error' }); return; }
+
+    const names = Array.from(document.querySelectorAll('.jt-pick:checked')).map(c => c.dataset.name);
+    if (names.length === 0) { showToast('Check at least one image to attach.', { type: 'error' }); return; }
+
+    const btn = document.getElementById('jt-attach-btn');
+    const status = document.getElementById('jt-attach-status');
+    btn.disabled = true;
+    status.style.color = 'var(--muted)';
+    status.textContent = `Attaching ${names.length} image${names.length === 1 ? '' : 's'} to job ${jobNumber}…`;
+
+    try {
+      const resp = await fetch('/api/pdf-parser/attach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentResult.id, jobNumber, files: names })
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.error || `Request failed (${resp.status})`);
+
+      const msg = `Attached ${data.attached} of ${data.results.length} image${data.results.length === 1 ? '' : 's'} to job ${data.jobNumber}.`;
+      status.style.color = data.failed ? 'var(--accent)' : '#3fb950';
+      status.textContent = msg + (data.failed ? ` ${data.failed} failed — see toast.` : '');
+      if (data.failed) {
+        const failed = data.results.filter(r => !r.ok).map(r => `${r.name}: ${r.error}`).join('\n');
+        showToast(msg + '\n\nFailures:\n' + failed, { type: 'warn', copy: failed });
+      } else {
+        showToast(msg);
+      }
+    } catch (err) {
+      status.textContent = '';
+      showToast(err.message || 'Attach failed.', { type: 'error' });
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function copyOcrText() {
+    const ta = document.getElementById('jt-ocr-text');
+    ta.select();
+    try {
+      navigator.clipboard.writeText(ta.value);
+      showToast('Ticket text copied.');
+    } catch (_) {
+      document.execCommand('copy');
+      showToast('Ticket text copied.');
+    }
+  }
+</script>
+</body>
+</html>

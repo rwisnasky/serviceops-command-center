@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Install Tracker — ServiceOps Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/styles.css" />
+<style>
+  /* ── KPI strip (matches /backflow + /open-jobs) ───────────────────── */
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:20px; }
+  .kpi-card { background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg); padding: 18px; }
+  .kpi-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+  .kpi-card .value { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--text); }
+  .kpi-card .value.accent { color: var(--accent); }
+  .kpi-card .value.info   { color: var(--accent3); }
+  .kpi-card .value.ok     { color: var(--ok); }
+  .kpi-card .value.warn   { color: var(--accent2); }
+  .kpi-card .sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* ── Date-range bar ───────────────────────────────────────────────── */
+  .range-bar {
+    display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap;
+    background: var(--surface); border:1px solid var(--border);
+    border-radius: var(--r-lg); padding: 16px 18px; margin-bottom: 18px;
+  }
+  .range-bar .group { display:flex; flex-direction:column; gap:5px; }
+  .range-bar label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); font-weight: 600;
+  }
+  .range-bar input[type="date"], .range-bar select {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 8px 12px; font-size: 13px;
+    font-family: inherit; min-width: 150px;
+  }
+  .range-bar .preset {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 8px 12px; font-size: 12px; cursor:pointer;
+  }
+  .range-bar .preset:hover { border-color: var(--border-strong); }
+  .range-bar .run-btn {
+    background: var(--accent); color: #fff; border:none;
+    border-radius: var(--r-md); padding: 9px 18px; font-size: 13px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .range-bar .run-btn:hover { filter: brightness(1.08); }
+  .range-bar .run-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .range-bar .csv-btn {
+    background: transparent; color: var(--text); border:1px solid var(--border-strong);
+    border-radius: var(--r-md); padding: 9px 14px; font-size: 12px; cursor: pointer;
+    font-family: inherit; text-decoration: none;
+  }
+  .range-bar .csv-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .range-bar .spacer { flex: 1; }
+
+  /* ── Toolbar (search + summary) ───────────────────────────────────── */
+  .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .toolbar input[type="search"] {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 8px 12px; font-size: 12px; min-width: 260px;
+  }
+  .summary-line { font-size:12px; color:var(--muted); }
+
+  /* ── Table ─────────────────────────────────────────────────────────── */
+  table.it-table { width:100%; border-collapse: collapse; background: var(--surface); border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--border); }
+  table.it-table th { text-align: left; padding: 11px 14px; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; }
+  table.it-table th.nosort { cursor: default; }
+  table.it-table th:hover:not(.nosort) { color: var(--text); }
+  table.it-table th.sorted::after { content: ' ▼'; color: var(--accent); }
+  table.it-table th.sorted.asc::after { content: ' ▲'; }
+  table.it-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); vertical-align: top; }
+  table.it-table tr:last-child td { border-bottom: 0; }
+  table.it-table td.muted { color: var(--muted); }
+  table.it-table td.center { text-align: center; }
+  table.it-table tr:hover td { background: var(--surface2); }
+  table.it-table tr.done-row td { background: rgba(63,185,111,0.06); }
+  table.it-table tr.done-row:hover td { background: rgba(63,185,111,0.1); }
+
+  a.job-link { color: var(--accent3); text-decoration: none; font-weight: 600; }
+  a.job-link:hover { text-decoration: underline; }
+
+  /* Category chip */
+  .cat-chip { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; border:1px solid var(--border-strong); color: var(--muted); white-space:nowrap; }
+  .cat-chip.hvac  { color:#7fb3ff; border-color:rgba(127,179,255,0.4); background:rgba(127,179,255,0.08); }
+  .cat-chip.water { color:#5fd0d0; border-color:rgba(95,208,208,0.4); background:rgba(95,208,208,0.08); }
+
+  /* ── Status toggle pill ────────────────────────────────────────────── */
+  .tgl {
+    display:inline-flex; align-items:center; gap:6px;
+    font-family: inherit; font-size: 12px; font-weight: 600;
+    padding: 5px 11px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--border-strong); background: transparent;
+    color: var(--muted); transition: background .12s, border-color .12s, color .12s, opacity .12s;
+    white-space: nowrap;
+  }
+  .tgl .ic { font-size: 12px; line-height: 1; }
+  .tgl.on  { background: rgba(63,185,111,0.14); border-color: rgba(63,185,111,0.55); color: var(--ok); }
+  .tgl.off:hover { border-color: var(--accent2); color: var(--accent2); }
+  .tgl:disabled { opacity: 0.5; cursor: default; }
+  .tgl-meta { display:block; font-size:10px; color:var(--muted); margin-top:4px; }
+
+  /* ── Notes cell ────────────────────────────────────────────────────── */
+  td.notes-cell { max-width: 240px; cursor: pointer; color: var(--muted); font-size: 12px; }
+  td.notes-cell .notes-preview { display:flex; align-items:center; gap:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  td.notes-cell .chev { display:inline-block; width:12px; flex-shrink:0; transition:transform .15s; color:var(--muted); }
+  tr.notes-open td.notes-cell .chev { transform: rotate(90deg); color: var(--accent); }
+  td.notes-cell.empty { color: var(--muted); opacity: 0.5; }
+  tr:hover td.notes-cell:not(.empty) { color: var(--text); }
+  tr.notes-detail-row td { background: var(--surface2); padding: 14px 18px; }
+  .notes-edit { display:flex; flex-direction:column; gap:8px; }
+  .notes-edit textarea {
+    width:100%; min-height:70px; resize:vertical; box-sizing:border-box;
+    background: var(--surface); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 10px 12px; font-size: 13px; font-family: inherit; line-height:1.5;
+  }
+  .notes-edit .row { display:flex; gap:8px; align-items:center; }
+  .notes-edit .save-btn {
+    background: var(--accent); color:#fff; border:none; border-radius: var(--r-sm);
+    padding: 7px 14px; font-size: 12px; font-weight:600; cursor:pointer; font-family:inherit;
+  }
+  .notes-edit .save-btn:hover { filter: brightness(1.08); }
+  .notes-edit .save-btn:disabled { opacity:0.5; cursor:default; }
+  .notes-edit .hint { font-size:11px; color:var(--muted); }
+
+  .empty { text-align:center; padding: 40px; color: var(--muted); background: var(--surface); border:1px dashed var(--border); border-radius: var(--r-lg); }
+  .loading { text-align:center; padding: 40px; color: var(--muted); }
+  .loading::before { content:'⏳'; display:block; font-size:22px; margin-bottom:8px; }
+</style>
+</head>
+<body>
+
+<!-- Nav is built dynamically by /js/shared.js. -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+  <div class="page-header">
+    <div>
+      <h1>Install <span class="accent">Tracker</span></h1>
+      <p>Every completed HVAC &amp; Water Heater install in the range — pulled live from ServiceTitan. Confirm the equipment is listed in ServiceTitan and the warranty is registered.</p>
+    </div>
+    <div class="status-bar"><span class="status-dot"></span> <span id="it-source">Loading…</span></div>
+  </div>
+
+  <!-- ── Controls ───────────────────────────────────────────────────── -->
+  <div class="range-bar">
+    <div class="group">
+      <label for="it-from">From</label>
+      <input type="date" id="it-from" />
+    </div>
+    <div class="group">
+      <label for="it-to">To</label>
+      <input type="date" id="it-to" />
+    </div>
+    <div class="group">
+      <label>Quick range</label>
+      <div style="display:flex;gap:6px;">
+        <button class="preset" data-preset="last30">Last 30</button>
+        <button class="preset" data-preset="last90">Last 90</button>
+        <button class="preset" data-preset="mtd">MTD</button>
+        <button class="preset" data-preset="ytd">YTD</button>
+      </div>
+    </div>
+    <div class="group">
+      <label for="it-status">Status</label>
+      <select id="it-status">
+        <option value="all">All installs</option>
+        <option value="needs">Needs attention</option>
+        <option value="done">Fully tracked</option>
+        <option value="no-equipment">Missing in ServiceTitan</option>
+        <option value="no-warranty">Missing warranty</option>
+      </select>
+    </div>
+    <div class="group">
+      <label for="it-cat">Category</label>
+      <select id="it-cat">
+        <option value="all">All</option>
+        <option value="HVAC">HVAC</option>
+        <option value="Water Heater">Water Heater</option>
+      </select>
+    </div>
+    <button class="run-btn" id="it-run">Run</button>
+    <span class="spacer"></span>
+    <a class="csv-btn" id="it-csv" href="#" download>↓ CSV</a>
+  </div>
+
+  <div id="it-kpi-row"></div>
+
+  <div class="toolbar">
+    <input id="it-search" type="search" placeholder="Search customer, job #, type, notes…" />
+    <span class="summary-line" id="it-summary"></span>
+    <span style="font-size:11px; color:var(--muted); margin-left:auto;">Click any sortable header to sort</span>
+  </div>
+
+  <div id="it-table-wrap"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+// ── Date helpers (local-date strings so <input type=date> matches) ──────────
+function toIso(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function firstOfMonth(d = new Date()) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+function startOfYear() { return new Date(new Date().getFullYear(), 0, 1); }
+function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d; }
+
+const fromEl   = document.getElementById("it-from");
+const toEl     = document.getElementById("it-to");
+const runEl    = document.getElementById("it-run");
+const csvEl    = document.getElementById("it-csv");
+const searchEl = document.getElementById("it-search");
+const statusEl = document.getElementById("it-status");
+const catEl    = document.getElementById("it-cat");
+
+// Default: last 90 days.
+fromEl.value = toIso(daysAgo(90));
+toEl.value   = toIso(new Date());
+
+document.querySelectorAll(".preset").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const k = btn.getAttribute("data-preset");
+    if (k === "last30")      { fromEl.value = toIso(daysAgo(30));    toEl.value = toIso(new Date()); }
+    else if (k === "last90") { fromEl.value = toIso(daysAgo(90));    toEl.value = toIso(new Date()); }
+    else if (k === "mtd")    { fromEl.value = toIso(firstOfMonth()); toEl.value = toIso(new Date()); }
+    else if (k === "ytd")    { fromEl.value = toIso(startOfYear());  toEl.value = toIso(new Date()); }
+    refreshCsvHref();
+  });
+});
+
+let state = {
+  data: null,            // { rows, summary, meta } — rows are the FULL range
+  search: "",
+  sortKey: "completedOn",
+  sortAsc: false,
+  loading: false,
+  openNotes: new Set(),  // job ids with the notes editor open
+  busy: new Set(),       // job ids with an in-flight status write
+};
+
+function refreshCsvHref() {
+  const f = encodeURIComponent(fromEl.value);
+  const t = encodeURIComponent(toEl.value);
+  const s = encodeURIComponent(statusEl.value);
+  csvEl.href = `/api/install-tracker/list.csv?from=${f}&to=${t}&status=${s}`;
+}
+refreshCsvHref();
+[fromEl, toEl].forEach(el => el.addEventListener("change", refreshCsvHref));
+statusEl.addEventListener("change", () => { refreshCsvHref(); renderTable(); renderKpis(); });
+catEl.addEventListener("change", () => { renderTable(); });
+
+async function runReport() {
+  const from = fromEl.value, to = toEl.value;
+  if (!from || !to) { showToast("Pick a from and to date.", { type: "warn" }); return; }
+  state.loading = true;
+  runEl.disabled = true;
+  runEl.textContent = "Running…";
+  document.getElementById("it-source").textContent = "Pulling from ServiceTitan…";
+  document.getElementById("it-table-wrap").innerHTML =
+    `<div class="loading">Pulling completed installs from ServiceTitan…<br><span style="font-size:11px;">Walks every HVAC + Water Heater install completed in the range — give it a few seconds.</span></div>`;
+
+  try {
+    // Always fetch the full range (status=all) so the tiles stay stable and
+    // the status dropdown filters instantly on the client.
+    const r = await fetch(`/api/install-tracker/list?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&status=all`);
+    const data = await r.json();
+    if (!r.ok || !data.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    state.data = data;
+    let status = `Live — ${data.meta.jobsScanned} installs · ${(data.meta.elapsedMs / 1000).toFixed(1)}s`;
+    if (data.meta.droppedNonInstall > 0) status += ` · dropped ${data.meta.droppedNonInstall} non-install rows`;
+    if (data.meta.customerFails > 0) {
+      status += ` · ⚠ ${data.meta.customerFails} customer lookups failed`;
+      showToast(`Heads up — ${data.meta.customerFails} customer name lookups failed (rate limit). A few rows may show a blank customer.`, { type: "warn" });
+    }
+    document.getElementById("it-source").textContent = status;
+    renderKpis();
+    renderTable();
+  } catch (err) {
+    document.getElementById("it-table-wrap").innerHTML = `<div class="empty">Failed to load: ${escHtml(err.message)}</div>`;
+    document.getElementById("it-source").textContent = "Error";
+    showToast("Install Tracker failed: " + err.message, { type: "error" });
+  } finally {
+    state.loading = false;
+    runEl.disabled = false;
+    runEl.textContent = "Run";
+  }
+}
+runEl.addEventListener("click", runReport);
+[fromEl, toEl].forEach(el => el.addEventListener("keydown", (e) => { if (e.key === "Enter") runReport(); }));
+
+// ── KPIs — recomputed from the full row set so they update live on toggle ───
+function computeSummary(rows) {
+  let total = rows.length, done = 0, needEquipment = 0, needWarranty = 0;
+  for (const r of rows) {
+    if (r.equipmentListed && r.warrantyRegistered) done++;
+    if (!r.equipmentListed) needEquipment++;
+    if (!r.warrantyRegistered) needWarranty++;
+  }
+  return { total, done, needsAttention: total - done, needEquipment, needWarranty };
+}
+function renderKpis() {
+  if (!state.data) return;
+  const s = computeSummary(state.data.rows);
+  document.getElementById("it-kpi-row").innerHTML = `<div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="label">Completed Installs</div>
+      <div class="value">${s.total}</div>
+      <div class="sub">in the selected range</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Fully Tracked</div>
+      <div class="value ok">${s.done}</div>
+      <div class="sub">${s.total ? Math.round((s.done / s.total) * 100) : 0}% listed + registered</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Missing in ServiceTitan</div>
+      <div class="value ${s.needEquipment ? "accent" : "ok"}">${s.needEquipment}</div>
+      <div class="sub">equipment not yet listed</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Missing Warranty</div>
+      <div class="value ${s.needWarranty ? "warn" : "ok"}">${s.needWarranty}</div>
+      <div class="sub">not yet registered</div>
+    </div>
+  </div>`;
+}
+
+// ── Table ───────────────────────────────────────────────────────────────────
+const COLUMNS = [
+  ["completedOn",        "Completed",         "date",   true],
+  ["customerName",       "Customer",          "text",   true],
+  ["jobNumber",          "Job #",             "job",    true],
+  ["category",           "Category",          "cat",    true],
+  ["jobType",            "Job Type",          "text",   true],
+  ["equipmentListed",    "In ServiceTitan",   "toggle", true],
+  ["warrantyRegistered", "Warranty Reg.",     "toggle", true],
+  ["notes",              "Notes",             "notes",  false],
+];
+
+function statusFilter(rows) {
+  const s = statusEl.value;
+  if (s === "needs")        return rows.filter(r => !(r.equipmentListed && r.warrantyRegistered));
+  if (s === "done")         return rows.filter(r => r.equipmentListed && r.warrantyRegistered);
+  if (s === "no-equipment") return rows.filter(r => !r.equipmentListed);
+  if (s === "no-warranty")  return rows.filter(r => !r.warrantyRegistered);
+  return rows;
+}
+function categoryFilter(rows) {
+  const c = catEl.value;
+  return c === "all" ? rows : rows.filter(r => (r.category || "") === c);
+}
+function searchFilter(rows) {
+  const q = state.search.trim().toLowerCase();
+  if (!q) return rows;
+  return rows.filter(r =>
+    (r.customerName || "").toLowerCase().includes(q) ||
+    String(r.jobNumber || "").toLowerCase().includes(q) ||
+    (r.jobType || "").toLowerCase().includes(q) ||
+    (r.notes || "").toLowerCase().includes(q)
+  );
+}
+function applySort(rows) {
+  const k = state.sortKey, asc = state.sortAsc ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    let va = a[k], vb = b[k];
+    if (typeof va === "boolean") va = va ? 1 : 0;
+    if (typeof vb === "boolean") vb = vb ? 1 : 0;
+    if (va == null && vb == null) return 0;
+    if (va == null) return -asc;
+    if (vb == null) return asc;
+    if (typeof va === "string" || typeof vb === "string") {
+      va = String(va).toLowerCase(); vb = String(vb).toLowerCase();
+      return va < vb ? -asc : va > vb ? asc : 0;
+    }
+    return (Number(va) - Number(vb)) * asc;
+  });
+}
+
+function fmtDate(iso) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return escHtml(iso || "");
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (isNaN(dt)) return escHtml(iso);
+  return dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function togglePill(row, field) {
+  const on = !!row[field];
+  const label = field === "equipmentListed" ? (on ? "Listed" : "Not listed") : (on ? "Registered" : "Not reg.");
+  const ic = on ? "✓" : "○";
+  const busy = state.busy.has(row.jobId);
+  const metaTs = field === "equipmentListed" ? row.equipmentListedAt : row.warrantyRegisteredAt;
+  const metaBy = field === "equipmentListed" ? row.equipmentListedBy : row.warrantyRegisteredBy;
+  let meta = "";
+  if (on && metaTs) {
+    const who = metaBy ? ` · ${escHtml(shortActor(metaBy))}` : "";
+    meta = `<span class="tgl-meta">${escHtml(fmtTs(metaTs))}${who}</span>`;
+  }
+  return `<button class="tgl ${on ? "on" : "off"}" data-job="${row.jobId}" data-field="${field}" ${busy ? "disabled" : ""}>
+    <span class="ic">${ic}</span> ${escHtml(label)}
+  </button>${meta}`;
+}
+function shortActor(a) {
+  const s = String(a || "");
+  return s.includes("@") ? s.split("@")[0] : s;
+}
+
+function renderTable() {
+  if (!state.data) return;
+  const wrap = document.getElementById("it-table-wrap");
+  const sumEl = document.getElementById("it-summary");
+
+  const filtered = searchFilter(categoryFilter(statusFilter(state.data.rows)));
+  const rows = applySort(filtered);
+
+  if (!rows.length) {
+    wrap.innerHTML = `<div class="empty">No installs match the current filters.</div>`;
+    sumEl.textContent = "";
+    return;
+  }
+
+  const doneCount = rows.filter(r => r.equipmentListed && r.warrantyRegistered).length;
+  sumEl.innerHTML = `Showing <b>${rows.length}</b> installs · <b>${doneCount}</b> fully tracked · <b>${rows.length - doneCount}</b> need attention`;
+
+  const arrow = k => state.sortKey === k ? (state.sortAsc ? " asc" : "") : "";
+  const ths = COLUMNS.map(([key, label, , sortable]) => {
+    const sortedClass = state.sortKey === key ? "sorted" + arrow(key) : "";
+    return `<th class="${sortedClass} ${sortable ? "" : "nosort"}" ${sortable ? `data-sort="${key}"` : ""}>${escHtml(label)}</th>`;
+  }).join("");
+
+  let html = `<table class="it-table"><thead><tr>${ths}</tr></thead><tbody>`;
+  const colCount = COLUMNS.length;
+
+  for (const r of rows) {
+    const isDone = r.equipmentListed && r.warrantyRegistered;
+    const isOpen = state.openNotes.has(r.jobId);
+    const cleanNotes = (r.notes || "").trim();
+    const preview = cleanNotes ? (cleanNotes.split(/\n/).find(l => l.trim()) || "").slice(0, 60) : "";
+
+    html += `<tr class="${isDone ? "done-row" : ""}${isOpen ? " notes-open" : ""}">` + COLUMNS.map(([key, , kind]) => {
+      const v = r[key];
+      if (kind === "date")  return `<td>${v ? fmtDate(v) : '<span class="muted">—</span>'}</td>`;
+      if (kind === "job") {
+        return `<td><a class="job-link" href="https://go.servicetitan.com/#/job/${encodeURIComponent(r.jobId)}" target="_blank" rel="noopener">${escHtml(v || "")}</a></td>`;
+      }
+      if (kind === "cat") {
+        const cls = v === "HVAC" ? "hvac" : v === "Water Heater" ? "water" : "";
+        return `<td>${v ? `<span class="cat-chip ${cls}">${escHtml(v)}</span>` : '<span class="muted">—</span>'}</td>`;
+      }
+      if (kind === "toggle") return `<td class="center">${togglePill(r, key)}</td>`;
+      if (kind === "notes") {
+        if (!cleanNotes) {
+          return `<td class="notes-cell empty" data-notes="${r.jobId}" title="Add a note"><span class="notes-preview"><span class="chev">▸</span><span>Add note</span></span></td>`;
+        }
+        return `<td class="notes-cell" data-notes="${r.jobId}" title="Click to edit"><span class="notes-preview"><span class="chev">▸</span><span>${escHtml(preview)}${cleanNotes.length > 60 ? "…" : ""}</span></span></td>`;
+      }
+      return `<td>${escHtml(v || "")}</td>`;
+    }).join("") + `</tr>`;
+
+    if (isOpen) {
+      html += `<tr class="notes-detail-row"><td colspan="${colCount}">
+        <div class="notes-edit">
+          <textarea data-notes-input="${r.jobId}" placeholder="Notes for job #${escHtml(r.jobNumber)} — e.g. warranty confirmation #, who registered, follow-up needed…">${escHtml(r.notes || "")}</textarea>
+          <div class="row">
+            <button class="save-btn" data-notes-save="${r.jobId}">Save note</button>
+            <span class="hint">Job #${escHtml(r.jobNumber)} · ${escHtml(r.customerName || "")}</span>
+          </div>
+        </div>
+      </td></tr>`;
+    }
+  }
+
+  html += `</tbody></table>`;
+  wrap.innerHTML = html;
+  wireTableEvents(wrap);
+}
+
+function wireTableEvents(wrap) {
+  wrap.querySelectorAll("th[data-sort]").forEach(th => {
+    th.addEventListener("click", () => {
+      const k = th.getAttribute("data-sort");
+      if (state.sortKey === k) state.sortAsc = !state.sortAsc;
+      else { state.sortKey = k; state.sortAsc = false; }
+      renderTable();
+    });
+  });
+
+  wrap.querySelectorAll("button.tgl").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const jobId = Number(btn.getAttribute("data-job"));
+      const field = btn.getAttribute("data-field");
+      onToggle(jobId, field);
+    });
+  });
+
+  wrap.querySelectorAll("td.notes-cell[data-notes]").forEach(td => {
+    td.addEventListener("click", () => {
+      const jobId = Number(td.getAttribute("data-notes"));
+      if (state.openNotes.has(jobId)) state.openNotes.delete(jobId);
+      else state.openNotes.add(jobId);
+      renderTable();
+    });
+  });
+
+  wrap.querySelectorAll("button[data-notes-save]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const jobId = Number(btn.getAttribute("data-notes-save"));
+      const ta = wrap.querySelector(`textarea[data-notes-input="${jobId}"]`);
+      onSaveNotes(jobId, ta ? ta.value : "", btn);
+    });
+  });
+}
+
+// Build the display snapshot the server stores alongside the overlay row.
+function snapshotOf(row) {
+  return {
+    jobNumber: row.jobNumber, jobTypeId: row.jobTypeId, jobType: row.jobType,
+    category: row.category, customerId: row.customerId, customerName: row.customerName,
+    locationId: row.locationId, completedOn: row.completedOn,
+  };
+}
+
+async function onToggle(jobId, field) {
+  const row = state.data.rows.find(r => r.jobId === jobId);
+  if (!row || state.busy.has(jobId)) return;
+  const newVal = !row[field];
+  state.busy.add(jobId);
+  renderTable();
+  try {
+    const r = await fetch("/api/install-tracker/status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobId, field, value: newVal, snapshot: snapshotOf(row) }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    // Sync from the saved row so timestamps + actor come from the server.
+    row.equipmentListed      = !!d.row.equipment_listed;
+    row.warrantyRegistered   = !!d.row.warranty_registered;
+    row.equipmentListedAt    = d.row.equipment_listed_at;
+    row.equipmentListedBy    = d.row.equipment_listed_by;
+    row.warrantyRegisteredAt = d.row.warranty_registered_at;
+    row.warrantyRegisteredBy = d.row.warranty_registered_by;
+    const label = field === "equipmentListed" ? "Equipment in ServiceTitan" : "Warranty registered";
+    showToast(`${newVal ? "✓ Marked" : "Cleared"}: ${label} — job #${row.jobNumber}`);
+  } catch (err) {
+    showToast("Couldn't save: " + err.message, { type: "error" });
+  } finally {
+    state.busy.delete(jobId);
+    renderKpis();
+    renderTable();
+  }
+}
+
+async function onSaveNotes(jobId, notes, btn) {
+  const row = state.data.rows.find(r => r.jobId === jobId);
+  if (!row) return;
+  if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
+  try {
+    const r = await fetch("/api/install-tracker/notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobId, notes, snapshot: snapshotOf(row) }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    row.notes = d.row.notes || "";
+    state.openNotes.delete(jobId);
+    showToast("📝 Note saved — job #" + row.jobNumber);
+    renderTable();
+  } catch (err) {
+    showToast("Couldn't save note: " + err.message, { type: "error" });
+    if (btn) { btn.disabled = false; btn.textContent = "Save note"; }
+  }
+}
+
+searchEl.addEventListener("input", e => { state.search = e.target.value; renderTable(); });
+
+// Auto-run on first load with the last-90-days default.
+runReport();
+</script>
+</body>
+</html>

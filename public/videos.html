@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Videos - ServiceOps Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+
+<!-- ── Navigation Bar ───────────────────────────────────────────────── -->
+<!-- Nav: built by /js/shared.js — do not hand-edit, it gets wiped on load. -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+
+  <div class="page-header">
+    <div>
+      <h1>Job <span class="accent">Videos</span></h1>
+      <p>Upload job walkthroughs to YouTube as unlisted videos — titled by street address, tagged by job number, ready to share.</p>
+    </div>
+    <div class="status-bar"><span class="status-dot"></span> YouTube pipeline live</div>
+  </div>
+
+  <div class="section-label">Upload Job Video to YouTube</div>
+  <div class="panel">
+    <div style="color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;margin-bottom:14px;line-height:1.6;">
+      Download the video from the ST job, drop it here with the job number, and we'll upload it to YouTube as <strong style="color:var(--text);">unlisted</strong> using the job's street address as the title.
+    </div>
+    <div class="search-row">
+      <input class="search-input" id="video-job-number" placeholder="Enter job number (e.g. 2602739)..." />
+      <button class="btn" id="video-upload-btn" onclick="uploadJobVideo()">Upload to YouTube</button>
+    </div>
+    <div id="video-drop-zone" style="margin-top:12px;border:2px dashed var(--border);border-radius:12px;padding:28px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;" onclick="document.getElementById('video-file-input').click()">
+      <div id="video-drop-label" style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--muted);pointer-events:none;">
+        Drag &amp; drop a video file here, or <span style="color:var(--accent);text-decoration:underline;">click to browse</span>
+      </div>
+      <input type="file" id="video-file-input" accept="video/*,.mp4,.mov,.m4v,.avi,.mkv,.webm" style="display:none;" onchange="handleVideoFileSelect(this)" />
+    </div>
+    <div id="video-upload-status" style="margin-top:8px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--muted);min-height:18px;"></div>
+    <div id="video-upload-result" style="margin-top:14px;"></div>
+  </div>
+
+  <div class="section-label" style="margin-top:28px;">Recent Uploads</div>
+  <div class="panel" id="video-recent-panel" style="min-height:60px;">
+    <div style="color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;">Loading…</div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+  let selectedVideoFile = null;
+
+  // Drag & drop + file select handlers
+  (function initDropZone() {
+    const zone = document.getElementById('video-drop-zone');
+    if (!zone) return;
+    zone.addEventListener('dragover', e => {
+      e.preventDefault();
+      zone.style.borderColor = 'var(--accent)';
+      zone.style.background = 'rgba(196,18,48,0.06)';
+    });
+    zone.addEventListener('dragleave', e => {
+      e.preventDefault();
+      zone.style.borderColor = 'var(--border)';
+      zone.style.background = '';
+    });
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.style.borderColor = 'var(--border)';
+      zone.style.background = '';
+      const file = e.dataTransfer.files[0];
+      if (file) setVideoFile(file);
+    });
+  })();
+
+  function handleVideoFileSelect(input) {
+    if (input.files[0]) setVideoFile(input.files[0]);
+  }
+
+  function setVideoFile(file) {
+    selectedVideoFile = file;
+    const label = document.getElementById('video-drop-label');
+    const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+    label.innerHTML = `<span style="color:var(--accent);">✓ ${escHtml(file.name)}</span> <span style="color:var(--muted);">(${sizeMB} MB)</span><br><span style="color:var(--muted);font-size:11px;">Click or drop again to change</span>`;
+  }
+
+  async function uploadJobVideo() {
+    const input = document.getElementById('video-job-number');
+    const btn = document.getElementById('video-upload-btn');
+    const statusEl = document.getElementById('video-upload-status');
+    const resultEl = document.getElementById('video-upload-result');
+
+    const jobNumber = input.value.trim();
+    if (!jobNumber) {
+      statusEl.textContent = 'Enter a job number first.';
+      statusEl.style.color = 'var(--accent2)';
+      return;
+    }
+    if (!selectedVideoFile) {
+      statusEl.textContent = 'Drop or select a video file first.';
+      statusEl.style.color = 'var(--accent2)';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Uploading…';
+    statusEl.style.color = 'var(--accent3)';
+    statusEl.textContent = `Uploading ${selectedVideoFile.name} for job ${jobNumber}… this may take a few minutes.`;
+    resultEl.innerHTML = '';
+
+    const formData = new FormData();
+    formData.append('jobNumber', jobNumber);
+    formData.append('videoFile', selectedVideoFile);
+
+    try {
+      const res = await fetch('/api/videos/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Upload failed');
+
+      statusEl.style.color = 'var(--accent)';
+      statusEl.textContent = `✓ Uploaded "${data.title}" — unlisted on YouTube.`;
+
+      resultEl.innerHTML = `
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;">
+          <div style="font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:6px;">YouTube Link (unlisted)</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <a id="yt-link" href="${escHtml(data.youtubeUrl)}" target="_blank" rel="noopener"
+               style="color:var(--accent);word-break:break-all;font-family:'JetBrains Mono','DM Mono',monospace;font-size:13px;text-decoration:none;">
+               ${escHtml(data.youtubeUrl)}
+            </a>
+            <button class="btn" style="padding:6px 14px;font-size:11px;" onclick="copyYtLink('${escHtml(data.youtubeUrl)}', this)">Copy</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:10px;font-family:'JetBrains Mono','DM Mono',monospace;">
+            Job #${escHtml(data.jobNumber)} · ${escHtml(data.streetAddress)}${data.fileName ? ` · ${escHtml(data.fileName)}` : ''}
+          </div>
+        </div>
+      `;
+      showToast('✓ Video uploaded to YouTube');
+
+      // Reset file selection
+      selectedVideoFile = null;
+      document.getElementById('video-file-input').value = '';
+      document.getElementById('video-drop-label').innerHTML = 'Drag &amp; drop a video file here, or <span style="color:var(--accent);text-decoration:underline;">click to browse</span>';
+
+      loadRecentUploads();
+    } catch (err) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '✗ ' + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Upload to YouTube';
+    }
+  }
+
+  function copyYtLink(url, btn) {
+    navigator.clipboard.writeText(url).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    });
+  }
+
+  async function loadRecentUploads() {
+    const panel = document.getElementById('video-recent-panel');
+    try {
+      const res = await fetch('/api/videos/recent?limit=15');
+      const data = await res.json();
+      const rows = data.uploads || [];
+      if (!rows.length) {
+        panel.innerHTML = `<div style="color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;">No uploads yet.</div>`;
+        return;
+      }
+      panel.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr;gap:10px;">
+          ${rows.map(r => `
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap;">
+              <div style="flex:1;min-width:200px;">
+                <div style="font-size:13px;font-weight:700;">${escHtml(r.street_address || '(no address)')}</div>
+                <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-top:3px;">
+                  Job #${escHtml(r.job_number || '—')} · ${escHtml(fmtTs(r.created_at))}
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <a href="${escHtml(r.youtube_url)}" target="_blank" rel="noopener"
+                   style="color:var(--accent);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;text-decoration:none;">Open ▸</a>
+                <button class="btn" style="padding:6px 12px;font-size:11px;" onclick="copyYtLink('${escHtml(r.youtube_url)}', this)">Copy</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    } catch (err) {
+      panel.innerHTML = `<div style="color:var(--danger);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;">Failed to load: ${escHtml(err.message)}</div>`;
+    }
+  }
+
+  // Load recent uploads on page load
+  loadRecentUploads();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,25 @@
+ServiceOps Command Center
+© 2026 Ryan Wisnasky. All rights reserved.
+
+This repository is published as a portfolio piece — a real production system,
+rebuilt to run standalone on generated data so that it can be read and
+evaluated without credentials.
+
+No license is granted. Viewing and forking through GitHub's interface is
+permitted under GitHub's Terms of Service; no other rights to use, copy,
+modify, or redistribute this code are given, expressly or by implication.
+
+If you would like to use any part of it, get in touch.
+
+---
+
+The company depicted, "Grounded Home Services," is fictional, as are its
+staff, customers, service area, and financial figures. All of it is produced
+by the deterministic generator in src/demo/. Every phone number falls within
+the 555-01XX block that the North American Numbering Plan permanently reserves
+for fictional use.
+
+Third-party product names (ServiceTitan, GoHighLevel, and the equipment
+manufacturers referenced in the pricebook and warranty parsers) are the
+trademarks of their respective owners and appear here only to describe what
+this software integrates with.

@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Monthly Review — ServiceOps Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/styles.css" />
+<style>
+  /* Page-specific tweaks (kept minimal — uses dashboard design system) */
+  .mr-controls { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin-bottom:24px; }
+  .mr-controls select, .mr-controls .toggle-pill {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 10px 14px; font-family: var(--font-sans);
+    font-size: 13px; cursor: pointer;
+  }
+  .toggle-pill { display:inline-flex; align-items:center; gap:8px; user-select:none; }
+  .toggle-pill input { accent-color: var(--accent); }
+  .toggle-pill.active { border-color: var(--accent); color: var(--accent); }
+
+  .mr-source { font-size: 12px; color: var(--muted); }
+  .mr-source .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--ok); margin-right:6px; vertical-align:middle; }
+  .mr-source.live .dot { background: var(--accent); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:32px; }
+  .kpi-card {
+    background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg);
+    padding: 20px; box-shadow: var(--shadow-sm);
+  }
+  .kpi-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+  .kpi-card .value { font-family: var(--font-display); font-size: 30px; font-weight: 700; color: var(--text); }
+  .kpi-card .value.accent { color: var(--accent); }
+  .kpi-card .value.info   { color: var(--accent3); }
+  .kpi-card .value.ok     { color: var(--ok); }
+  .kpi-card .sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  .mr-section-title { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--text); margin: 28px 0 12px; }
+  .mr-section-title .sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 10px; }
+
+  table.mr-table { width:100%; border-collapse: collapse; background: var(--surface); border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--border); }
+  table.mr-table th { text-align: left; padding: 11px 14px; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+  table.mr-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); }
+  table.mr-table tr:last-child td { border-bottom: 0; }
+  table.mr-table tr.total td { background: var(--surface2); font-weight: 600; border-top: 1px solid var(--border-strong); }
+  table.mr-table td.num, table.mr-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.mr-table td.muted { color: var(--muted); }
+  table.mr-table tr.flag td { background: rgba(196,18,48,0.05); }
+
+  .mr-card-row { display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom: 24px; }
+  @media (max-width: 800px) { .mr-card-row { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg);
+    padding: 18px 22px; box-shadow: var(--shadow-sm);
+  }
+  .panel h3 { font-family: var(--font-display); font-size: 14px; color: var(--text); margin-bottom: 10px; }
+  .panel p, .panel li { font-size: 13px; color: var(--muted); line-height: 1.55; }
+  .panel ul { padding-left: 18px; margin-top: 6px; }
+  .panel .figure { font-family: var(--font-display); font-size: 22px; font-weight: 600; color: var(--accent); }
+
+  .recommendation {
+    border-left: 3px solid var(--accent2); padding: 8px 14px; background: rgba(232,168,56,0.05);
+    border-radius: 0 var(--r-md) var(--r-md) 0; margin-top: 10px; font-size: 13px; color: var(--text);
+  }
+
+  .loading-state, .empty-state { text-align: center; padding: 40px; color: var(--muted); }
+  .empty-state .help { margin-top: 12px; font-size: 12px; }
+  .empty-state code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-family: var(--font-mono); }
+
+  /* ── Info tooltip — hoverable (?) icon next to KPI labels ──────── */
+  .info-tip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 9px;
+    font-weight: 700;
+    font-family: var(--font-sans);
+    margin-left: 5px;
+    cursor: help;
+    position: relative;
+    user-select: none;
+    vertical-align: middle;
+    line-height: 1;
+  }
+  .info-tip:hover, .info-tip:focus {
+    background: var(--accent3);
+    border-color: var(--accent3);
+    color: white;
+    outline: none;
+  }
+  .info-tip .info-tip-body {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 280px;
+    background: #f7f7f7;
+    color: #1a1a1a;
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 1.45;
+    text-align: left;
+    text-transform: none;
+    letter-spacing: 0;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    z-index: 100;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+  .info-tip:hover .info-tip-body, .info-tip:focus .info-tip-body {
+    visibility: visible;
+    opacity: 1;
+  }
+  .info-tip .info-tip-body::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #f7f7f7;
+  }
+  .info-tip .info-tip-body b { color: #1f3a5f; }
+  /* When tip would overflow viewport on small cards, anchor it left-aligned */
+  .info-tip.tip-left .info-tip-body { left: 0; transform: none; }
+  .info-tip.tip-left .info-tip-body::after { left: 14px; transform: none; }
+
+  /* ── Print styles ─────────────────────────────────────────────
+     Reformats the dark dashboard into a clean light-on-white printable
+     report. Hides interactive controls (toggles, buttons, inputs).
+     Triggered by browser print or window.print().
+     ───────────────────────────────────────────────────────────── */
+  @media print {
+    @page { size: letter; margin: 0.5in; }
+    body { background: #fff !important; color: #111 !important; }
+    body::before { display: none; }
+    .nav-bar, .mr-controls, .no-print, #job-lookup-input, #job-lookup-btn,
+    #oh-add, .toggle-pill, [data-remove], #print-btn,
+    button { display: none !important; }
+    /* Show overhead panel as a printed summary, not as inputs */
+    #oh-list input { border: none !important; background: transparent !important; color: #111 !important; padding: 0 !important; pointer-events: none; }
+    #oh-list { display: block !important; }
+    #oh-list > div { background: transparent !important; border: none !important; padding: 2px 0 !important; }
+    /* Make all dark backgrounds white */
+    .panel, .kpi-card, .kpi-mini-card, table.mr-table,
+    table.mr-table th, table.mr-table tr.total td,
+    [style*="background: var(--surface)"], [style*="background:var(--surface)"],
+    [style*="background: var(--surface2)"], [style*="background:var(--surface2)"] {
+      background: #fff !important;
+      color: #111 !important;
+      border-color: #888 !important;
+      box-shadow: none !important;
+    }
+    table.mr-table th { background: #e8e8e8 !important; color: #111 !important; }
+    table.mr-table tr:nth-child(even) td { background: #f8f8f8 !important; }
+    table.mr-table tr.flag td { background: #fef0f0 !important; }
+    /* Headings stay readable */
+    h1, h2, h3, .mr-section-title { color: #111 !important; }
+    .accent { color: #c41230 !important; }
+    .value, .value.accent, .value.info, .value.ok, .value.warn,
+    .kpi-mini-value { color: #111 !important; }
+    .label, .sub, .muted, .kpi-mini-label, td.muted { color: #555 !important; }
+    /* Avoid awkward breaks inside cards/tables */
+    .panel, .kpi-card, table.mr-table, .kpi-grid { page-break-inside: avoid; }
+    .mr-section-title { page-break-after: avoid; margin-top: 16px; }
+    /* Tighten footprint */
+    .app { padding: 0 !important; }
+    .page-header h1 { font-size: 22px !important; }
+    .kpi-card .value { font-size: 22px !important; }
+    .status-bar { display: none; }
+    /* Print-only header banner */
+    body::after {
+      content: "";
+      display: none;
+    }
+    .print-header { display: block !important; }
+  }
+  .print-header { display: none; }
+</style>
+</head>
+<body>
+
+<!-- Nav: built by /js/shared.js — do not hand-edit, it gets wiped on load. -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+
+  <div class="page-header">
+    <div>
+      <h1>Monthly <span class="accent">Review</span></h1>
+      <p>Profitability, utilization, and findings — pulled live from ServiceTitan jobs and timesheet data.</p>
+    </div>
+    <div class="status-bar"><span class="status-dot"></span> <span id="mr-source-label">Loading…</span></div>
+  </div>
+
+  <!-- Print-only header (visible only when printing) -->
+  <div class="print-header" style="border-bottom:2px solid #c41230; padding-bottom:8px; margin-bottom:16px;">
+    <div style="font-size:18px; font-weight:700; color:#1f3a5f;">Monthly Operational Review — <span id="print-period">…</span></div>
+    <div style="font-size:11px; color:#555;">Grounded Home Services · Generated <span id="print-date"></span> · Source: ServiceTitan</div>
+  </div>
+
+  <!-- Controls -->
+  <div class="mr-controls">
+    <div>
+      <label style="font-size:11px; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:4px;">Period</label>
+      <select id="month-picker"><option>Loading…</option></select>
+    </div>
+    <label class="toggle-pill" id="toggle-construction">
+      <input type="checkbox" id="cb-construction" />
+      <span>Include construction</span>
+    </label>
+    <label class="toggle-pill" id="toggle-adjusted">
+      <input type="checkbox" id="cb-adjusted" checked />
+      <span>Adjust for training &amp; PTO</span>
+    </label>
+    <button id="print-btn" class="no-print" style="margin-left:auto; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:var(--r-md); padding:10px 16px; font-size:13px; cursor:pointer;" title="Print this report or save as PDF">🖨 Print / Save as PDF</button>
+  </div>
+
+  <!-- Job lookup tool -->
+  <div style="background: var(--surface); border:1px solid var(--border); border-radius: var(--r-md); padding: 14px 16px; margin-bottom: 24px;">
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <span style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted);">Job Lookup</span>
+      <input id="job-lookup-input" type="text" placeholder="Enter job number (e.g. 2602316)" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:var(--r-sm); padding:6px 10px; font-family:var(--font-mono); font-size:12px; width:240px;" />
+      <button id="job-lookup-btn" style="background:var(--accent3); color:white; border:none; padding:6px 14px; border-radius:var(--r-sm); font-size:12px; cursor:pointer;">Look up</button>
+      <span style="font-size:11px; color:var(--muted);">Pulls scheduled appointment(s) from ServiceTitan + matches against any cached arrival data.</span>
+    </div>
+    <div id="job-lookup-result" style="margin-top:12px; display:none;"></div>
+  </div>
+
+  <!-- Overhead costs panel — saved in localStorage, applied to gross profit -->
+  <div style="background: var(--surface); border:1px solid var(--border); border-radius: var(--r-md); padding: 14px 16px; margin-bottom: 24px;">
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
+      <span style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted);">Monthly Overhead Costs</span>
+      <span style="font-size:11px; color:var(--muted);">(saved on this device — applied to every month's profit calc)</span>
+      <button id="oh-reset" class="no-print" style="margin-left:auto; background:transparent; color:var(--muted); border:1px solid var(--border); padding:4px 10px; border-radius:4px; font-size:11px; cursor:pointer;" title="Restore the standard overhead defaults">↺ Reset to defaults</button>
+      <button id="oh-add" class="no-print" style="background:var(--surface2); color:var(--text); border:1px solid var(--border); padding:4px 10px; border-radius:4px; font-size:11px; cursor:pointer;">+ Add line</button>
+    </div>
+    <div id="oh-list" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:8px;"></div>
+    <div id="oh-summary" style="margin-top:10px; font-size:12px; color:var(--muted); border-top:1px dashed var(--border); padding-top:10px;"></div>
+  </div>
+
+  <div id="mr-content">
+    <div class="loading-state">Loading review…</div>
+  </div>
+
+</div>
+
+<script src="/js/shared.js"></script>
+<script>
+const $ = sel => document.querySelector(sel);
+const $$ = sel => document.querySelectorAll(sel);
+const fmt$ = n => "$" + Math.round(Number(n) || 0).toLocaleString();
+const fmtN = (n, d=1) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d });
+const fmtPct = (n, d=1) => `${(Number(n) || 0).toFixed(d)}%`;
+
+let currentReview = null;
+let includeConstruction = false;
+
+// ── Overhead costs (persisted in localStorage) ─────────────────────────────
+// Bumping the storage key version forces a refresh of saved values on devices
+// that haven't visited since the defaults changed. Increment when defaults
+// meaningfully change.
+const OH_STORAGE_KEY = "mr_overhead_costs_v2";
+const DEFAULT_OVERHEAD = [
+  { name: "ServiceTitan",        monthly: 6013.57 },
+  { name: "Web/Marketing Site",  monthly: 597 },
+  { name: "GPS",                 monthly: 458.16 },
+  { name: "Vehicle Maintenance", monthly: 12848 },
+  { name: "Monthly Office Pay",  monthly: 65000 },
+];
+let overheadItems = loadOverhead();
+
+function loadOverhead() {
+  try {
+    const raw = localStorage.getItem(OH_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { /* ignore */ }
+  return DEFAULT_OVERHEAD.slice();
+}
+function saveOverhead() {
+  try { localStorage.setItem(OH_STORAGE_KEY, JSON.stringify(overheadItems)); }
+  catch (e) { /* ignore quota errors */ }
+}
+function totalOverhead() {
+  return overheadItems.reduce((s, it) => s + (parseFloat(it.monthly) || 0), 0);
+}
+
+function renderOverheadPanel() {
+  const list = document.getElementById("oh-list");
+  if (!list) return;
+  list.innerHTML = "";
+  overheadItems.forEach((it, i) => {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex; gap:6px; align-items:center; background:var(--surface2); border:1px solid var(--border); border-radius:var(--r-sm); padding:6px 8px;";
+    row.innerHTML = `
+      <input type="text" value="${escapeHtml(it.name)}" placeholder="Vendor" data-i="${i}" data-field="name"
+             style="flex:1; background:transparent; border:none; color:var(--text); font-size:12px; outline:none; min-width:0;" />
+      <span style="color:var(--muted); font-size:12px;">$</span>
+      <input type="number" value="${it.monthly || ''}" step="1" placeholder="0" data-i="${i}" data-field="monthly"
+             style="width:80px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:4px; padding:3px 6px; font-size:12px; font-family:var(--font-mono); text-align:right; outline:none;" />
+      <span style="color:var(--muted); font-size:11px;">/mo</span>
+      <button data-remove="${i}" title="Remove" style="background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; padding:0 4px;">×</button>
+    `;
+    list.appendChild(row);
+  });
+  document.getElementById("oh-summary").innerHTML =
+    `<b style="color:var(--text);">Total monthly overhead: $${totalOverhead().toLocaleString()}</b>` +
+    ` &nbsp; — subtracted from each month's gross profit to estimate net.`;
+}
+
+document.addEventListener("input", e => {
+  const el = e.target;
+  if (el.dataset && el.dataset.i !== undefined && el.dataset.field) {
+    const i = parseInt(el.dataset.i, 10);
+    const field = el.dataset.field;
+    if (!overheadItems[i]) return;
+    overheadItems[i][field] = field === "monthly" ? (parseFloat(el.value) || 0) : el.value;
+    saveOverhead();
+    document.getElementById("oh-summary").innerHTML =
+      `<b style="color:var(--text);">Total monthly overhead: $${totalOverhead().toLocaleString()}</b>` +
+      ` &nbsp; — subtracted from each month's gross profit to estimate net.`;
+    if (currentReview) render(currentReview);
+  }
+});
+document.addEventListener("click", e => {
+  if (e.target.id === "oh-add") {
+    overheadItems.push({ name: "", monthly: 0 });
+    saveOverhead();
+    renderOverheadPanel();
+  } else if (e.target.id === "oh-reset") {
+    if (confirm("Reset overhead values to the company defaults? Your current customizations will be lost on this device.")) {
+      overheadItems = DEFAULT_OVERHEAD.slice().map(it => ({...it}));
+      saveOverhead();
+      renderOverheadPanel();
+      if (currentReview) render(currentReview);
+    }
+  } else if (e.target.dataset && e.target.dataset.remove !== undefined) {
+    const i = parseInt(e.target.dataset.remove, 10);
+    overheadItems.splice(i, 1);
+    saveOverhead();
+    renderOverheadPanel();
+    if (currentReview) render(currentReview);
+  }
+});
+renderOverheadPanel();
+let adjustForTrainingPTO = true;
+
+async function loadMonths() {
+  const r = await fetch("/api/monthly-review/list");
+  const data = await r.json();
+  const sel = $("#month-picker");
+  sel.innerHTML = "";
+
+  // Always offer "Current month (live)" first
+  const now = new Date();
+  const cur = document.createElement("option");
+  cur.value = "current";
+  cur.textContent = `Current month — ${monthName(now.getMonth() + 1)} ${now.getFullYear()} (live)`;
+  sel.appendChild(cur);
+
+  for (const m of (data.months || [])) {
+    const o = document.createElement("option");
+    o.value = `${m.year}/${m.month}`;
+    o.textContent = `${monthName(m.month)} ${m.year}`;
+    sel.appendChild(o);
+  }
+  // Default selection: most recent imported month if any, else current
+  if (data.months && data.months.length) {
+    sel.value = `${data.months[0].year}/${data.months[0].month}`;
+  }
+}
+
+function monthName(m) {
+  return ["January","February","March","April","May","June","July","August","September","October","November","December"][m - 1];
+}
+
+async function loadReview() {
+  const sel = $("#month-picker");
+  const v = sel.value;
+  $("#mr-content").innerHTML = `<div class="loading-state">Loading review for ${sel.options[sel.selectedIndex].textContent}…</div>`;
+  let url;
+  if (v === "current") url = "/api/monthly-review/current";
+  else {
+    const [y, m] = v.split("/");
+    url = `/api/monthly-review/${y}/${m}`;
+  }
+  try {
+    const r = await fetch(url);
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      $("#mr-content").innerHTML = `<div class="empty-state">Could not load review.<br/><small>${err.error || r.statusText}</small></div>`;
+      return;
+    }
+    currentReview = await r.json();
+    updateSourceLabel(currentReview.source);
+    render(currentReview);
+  } catch (e) {
+    $("#mr-content").innerHTML = `<div class="empty-state">Error loading review.<br/><small>${e.message}</small></div>`;
+  }
+}
+
+function updateSourceLabel(source) {
+  const el = $(".status-bar");
+  const lbl = $("#mr-source-label");
+  if (source === "live") {
+    el.classList.add("live");
+    lbl.textContent = "Live data — ServiceTitan API";
+  } else {
+    el.classList.remove("live");
+    lbl.textContent = "Cached data — imported xlsx";
+  }
+}
+
+function render(review) {
+  if (!review || !review.headline) {
+    $("#mr-content").innerHTML = `<div class="empty-state">No data for this period.</div>`;
+    return;
+  }
+  const h = review.headline;
+  const fleet = review.timesheets.fleet;
+
+  // Determine what utilization figure to show (toggle-aware)
+  const utilFigure = includeConstruction ? h.fleetUtilization
+                   : (adjustForTrainingPTO ? h.serviceUtilizationAdjusted : h.serviceUtilization);
+  const utilLabel  = includeConstruction ? "Fleet Utilization (incl. construction)"
+                   : (adjustForTrainingPTO ? "Adjusted Service Utilization" : "Service Utilization (raw)");
+
+  const paidHours = includeConstruction ? h.paidAllHours : h.paidServiceHours;
+  const paidLabel = includeConstruction ? "Total paid hours" : "Service paid hours";
+  const dollarsPerHour = paidHours > 0 ? Math.round(h.billing / paidHours) : 0;
+
+  let html = "";
+
+  // ── Live-mode caveat banner
+  if (review.source === "live" && review.liveCaveats) {
+    const caveats = [];
+    if (review.liveCaveats.timesheetUnavailable) caveats.push("technician utilization (requires ST Payroll API scope)");
+    if (review.liveCaveats.costsUnavailable)     caveats.push("material/labor cost breakdown");
+    if (caveats.length) {
+      html += `<div style="background:rgba(91,140,201,0.10); border:1px solid rgba(91,140,201,0.30); border-radius:var(--r-md); padding:12px 16px; margin-bottom:18px; font-size:12px; color:var(--text);">
+        <b style="color:var(--accent3);">Live mode</b> — pulling directly from ServiceTitan. The following metrics aren't yet available in live mode: <b>${caveats.join(", ")}</b>. To see the full review for the current month, export the WIP and Timesheet xlsx files from ServiceTitan and run the import script.
+      </div>`;
+    }
+  }
+
+  // ── Headline KPIs
+  const overheadMo = totalOverhead();
+  const netAfterOverhead = h.operationalGrossProfit - overheadMo;
+  const netMarginPct = h.operationalBilling > 0 ? (netAfterOverhead / h.operationalBilling * 100) : 0;
+  const hasCarryover = (h.carryoverJobCount || 0) > 0;
+
+  html += `<div class="kpi-grid">
+    <div class="kpi-card"><div class="label">Customer Billing${infoTip(`<b>Customer Billing</b> — total revenue invoiced on jobs that were <b>completed</b> in this period. Sourced from the Job Completed report (revenue recognized on completion, not creation). Includes labor, materials, and any flat-rate charges to the customer.`)}</div><div class="value">${fmt$(h.reportedBilling)}</div><div class="sub">${h.completedJobs} completed jobs</div></div>
+    <div class="kpi-card"><div class="label">Operational GM${infoTip(`<b>Operational GM</b> — gross margin on jobs that were <b>both created AND completed</b> in this period. Excludes carry-over jobs (created earlier, completed this period) where cost data was captured in a prior month. <br/><br/>This is the <b>honest "did we price the work right?"</b> number — comparable month over month for measuring operational health.`, true)}</div><div class="value ok">${fmtPct(h.operationalGrossMarginPct)}</div><div class="sub">${fmt$(h.operationalGrossProfit)} on ${h.operationalJobCount} matched jobs</div></div>
+    <div class="kpi-card"><div class="label">Reported GM${infoTip(`<b>Reported GM</b> — gross margin on <b>all jobs completed</b> in this period, including carry-overs created in prior months. <br/><br/>This is the <b>fiscal-year P&amp;L view</b>: revenue recognized on completion, costs as recorded against those jobs. Carry-over jobs lift this number because their costs were absorbed in earlier months — only the revenue lands here.`)}</div><div class="value info">${fmtPct(h.reportedGrossMarginPct)}</div><div class="sub">${fmt$(h.reportedGrossProfit)} on ${h.completedJobs} jobs (FY P&amp;L view)</div></div>
+    <div class="kpi-card"><div class="label">Revenue / Paid Hour${infoTip(`<b>Revenue / Paid Hour</b> = customer billing ÷ total paid service hours.<br/><br/>Every hour we pay a service technician — wrenching, driving, idle between jobs, training, meetings — divided into total customer billing. The <b>true all-in productivity</b> metric: shows what each tech-hour-on-the-clock generates in revenue.<br/><br/>Compare to the loaded labor cost rate (~\$98–127/hr) to gauge true profitability.`)}</div><div class="value accent">${fmt$(dollarsPerHour)}</div><div class="sub">${paidLabel}</div></div>
+  </div>`;
+
+  // FY-to-Date section (loaded async after main render — placeholder here)
+  html += `<div id="fytd-section" style="display:none; margin-bottom:24px;"></div>`;
+
+  // Carry-over caveat banner — explains why Operational and Reported differ
+  if (hasCarryover) {
+    html += `<div style="background:rgba(91,140,201,0.08); border:1px solid rgba(91,140,201,0.30); border-radius:var(--r-md); padding:10px 14px; margin-bottom:18px; font-size:12px; color:var(--text);">
+      <b style="color:var(--accent3);">${h.carryoverJobCount} carry-over job${h.carryoverJobCount === 1 ? '' : 's'}</b>
+      contributed <b>${fmt$(h.carryoverRevenue)}</b> of revenue in this period from work created in earlier months.
+      Their costs were absorbed in those earlier months, which is why Reported GM (${fmtPct(h.reportedGrossMarginPct)})
+      is higher than Operational GM (${fmtPct(h.operationalGrossMarginPct)}). For monthly job-pricing health, look at Operational.
+      For FY P&amp;L recognition, look at Reported.
+    </div>`;
+  }
+
+  // ── Profitability + Time summary side-by-side
+  html += `<div class="mr-card-row">`;
+
+  // Profitability summary — make the subtraction visibly tie out
+  const completedMaterials = review.jobs.byStatus.Completed?.materials || 0;
+  const completedLabor     = review.jobs.byStatus.Completed?.labor || 0;
+  const calculatedGM       = h.billing - completedMaterials - completedLabor;
+  const otherCosts         = calculatedGM - h.grossProfit; // residual = ST's "other" cost categories
+
+  html += `<div class="panel">
+    <h3>Profitability summary</h3>
+    <table class="mr-table" style="margin-top:8px;">
+      <tr><td>Customer Billing (${h.completedJobs} completed jobs)</td><td class="num">${fmt$(h.billing)}</td></tr>
+      <tr><td class="muted">Less: Materials, Equipment, PO/Bill Costs</td><td class="num muted">(${fmt$(completedMaterials)})</td></tr>
+      <tr><td class="muted">Less: Technician Labor Costs</td><td class="num muted">(${fmt$(completedLabor)})</td></tr>
+      ${Math.abs(otherCosts) >= 1
+        ? `<tr><td class="muted">Less: Other Job Costs <span style="font-size:10px; color:var(--muted);">(subcontractors, fees, equipment-tracked-separately)</span></td><td class="num muted">(${fmt$(otherCosts)})</td></tr>`
+        : ""}
+      <tr class="total"><td>Job-level Gross Margin</td><td class="num">${fmt$(h.grossProfit)}</td></tr>
+      ${overheadMo > 0 ? `
+        <tr><td colspan="2" style="border-top:1px dashed var(--border); padding-top:10px;"></td></tr>
+        ${overheadItems.filter(it => (parseFloat(it.monthly) || 0) > 0).map(it => `
+          <tr><td class="muted">Less: ${escapeHtml(it.name || 'Overhead')}</td><td class="num muted">(${fmt$(it.monthly)})</td></tr>
+        `).join('')}
+        <tr class="total" style="${netAfterOverhead < 0 ? 'background: rgba(196,18,48,0.08);' : ''}"><td>Net After Overhead</td><td class="num">${fmt$(netAfterOverhead)}</td></tr>
+      ` : ''}
+    </table>
+    ${Math.abs(otherCosts) >= 1
+      ? `<p style="margin-top:10px; font-size:11px; color:var(--muted);">'Other Job Costs' is the residual between ServiceTitan's calculated gross margin and the Materials+Labor subtotal. Sourced from ST's 'Jobs Gross Margin' field per job.</p>`
+      : ""}
+    ${overheadMo > 0
+      ? `<p style="margin-top:8px; font-size:11px; color:var(--muted);">Overhead values come from the 'Monthly Overhead Costs' panel at the top of the page. Edit them there to update this calculation. Net After Overhead is an estimate — it doesn't include all overhead categories (rent, vehicles, fuel, salaries, etc.) unless you list them.</p>`
+      : ""}
+  </div>`;
+
+  // Time on the clock — distinguish service-allocated drive/idle from construction-allocated,
+  // and pull OFF/PTO out of the "paid" total (it's not paid hours by definition)
+  const constrDrive = (fleet.driving || 0) - (fleet.svcDriving || 0);
+  const constrIdle  = (fleet.idle    || 0) - (fleet.svcIdle    || 0);
+  const constrOther = (fleet.otherMisc || 0) - (fleet.svcOtherMisc || 0);
+  const constrAllocated = constrDrive + constrIdle + constrOther;
+
+  html += `<div class="panel">
+    <h3>Time on the clock</h3>
+    <table class="mr-table" style="margin-top:8px;">
+      <tr><td>Service paid hours</td><td class="num">${fmtN(h.paidServiceHours)}</td><td class="num muted">${fmtPct((h.paidServiceHours/h.paidAllHours)*100)}</td></tr>
+      <tr><td>Construction wrench hours</td><td class="num">${fmtN(h.constructionHours)}</td><td class="num muted">${fmtPct((h.constructionHours/h.paidAllHours)*100)}</td></tr>
+      ${constrAllocated > 0.5
+        ? `<tr><td>Construction drive / idle (allocated)</td><td class="num">${fmtN(constrAllocated)}</td><td class="num muted">${fmtPct((constrAllocated/h.paidAllHours)*100)}</td></tr>`
+        : ""}
+      <tr class="total"><td>Total paid (all)</td><td class="num">${fmtN(h.paidAllHours)}</td><td class="num">100.0%</td></tr>
+    </table>
+    <div style="margin-top:14px; padding-top:10px; border-top:1px dashed var(--border); font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted);">Service-side breakdown</div>
+    <table class="mr-table" style="margin-top:6px;">
+      <tr><td>Drive (service-allocated)</td><td class="num">${fmtN(fleet.svcDriving)}</td><td class="num muted">${fmtPct((fleet.svcDriving/h.paidServiceHours)*100)}</td></tr>
+      <tr><td>Idle (service-allocated, real)</td><td class="num">${fmtN(fleet.svcIdle)}</td><td class="num muted">${fmtPct((fleet.svcIdle/h.paidServiceHours)*100)}</td></tr>
+      <tr><td>Training, meetings, prep, meals</td><td class="num">${fmtN(fleet.svcOtherMisc)}</td><td class="num muted">${fmtPct((fleet.svcOtherMisc/h.paidServiceHours)*100)}</td></tr>
+    </table>
+    <div style="margin-top:14px; padding-top:10px; border-top:1px dashed var(--border); font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted);">Day context</div>
+    <table class="mr-table" style="margin-top:6px;">
+      <tr><td>Training days <span style="font-size:10px; color:var(--muted);">(paid; included in total above)</span></td><td class="num">${fmtN(fleet.training)}</td><td class="num muted">${fleet.trainingDays} days</td></tr>
+      <tr><td>OFF / PTO / Unpaid days <span style="font-size:10px; color:var(--muted);">(unpaid; NOT in total above)</span></td><td class="num">${fmtN(fleet.off)}</td><td class="num muted">${fleet.offDays} days</td></tr>
+    </table>
+    ${review.timesheets.artifacts.removedIdleCount > 0
+      ? `<p style="margin-top:10px; font-size:12px;">Cleaned <b>${review.timesheets.artifacts.removedIdleCount}</b> long-block idle entries (${fmtN(review.timesheets.artifacts.removedIdleHours)} hrs) treated as missed clock-out artifacts.</p>`
+      : ""}
+  </div>`;
+
+  html += `</div>`;
+
+  // ── Labor cost per hour (fleet + per-tech)
+  if (review.laborRates && review.laborRates.fleet.totalWrenchHours > 0) {
+    const lr = review.laborRates;
+    const revPerHr = h.dollarsPerWrenchHour;
+    const costPerHr = h.laborCostPerWrenchHour;
+    const marginPerHr = h.marginPerWrenchHour;
+    const marginPct = revPerHr > 0 ? Math.round((marginPerHr / revPerHr) * 100) : 0;
+
+    html += `<div class="mr-section-title">Labor cost per wrench hour <span class="sub">implied burdened rate from ServiceTitan job data</span></div>`;
+    html += `<div class="kpi-grid" style="margin-bottom:18px;">
+      <div class="kpi-card"><div class="label">Revenue / Wrench Hour${infoTip(`<b>Revenue / Wrench Hour</b> = customer billing ÷ hours techs spent actively working on jobs ("Working" timesheet entries).<br/><br/>Different from <b>Revenue / Paid Hour</b> — this excludes drive time, idle time, training, and meetings. Tells you how much each <b>productive</b> hour generates.`)}</div><div class="value ok">${fmt$(revPerHr)}</div><div class="sub">${fmt$(h.billing)} ÷ ${fmtN(lr.fleet.totalWrenchHours)} hrs</div></div>
+      <div class="kpi-card"><div class="label">Labor Cost / Wrench Hour${infoTip(`<b>Labor Cost / Wrench Hour</b> = total labor cost ServiceTitan recorded on completed jobs ÷ wrench hours.<br/><br/>This is the <b>burdened rate</b> ST is using for cost calc — base wage + payroll taxes + workers comp + insurance + benefits + fringe + (likely) vehicle/overhead allocation. Compare to your union sheet's true burdened rate (~\$98/hr) — if ST shows higher (~\$127), there's overhead baked in.`)}</div><div class="value accent">${fmt$(costPerHr)}</div><div class="sub">${fmt$(lr.fleet.totalLaborCost)} ÷ ${fmtN(lr.fleet.totalWrenchHours)} hrs (ST burdened rate)</div></div>
+      <div class="kpi-card"><div class="label">Margin / Wrench Hour${infoTip(`<b>Margin / Wrench Hour</b> = Revenue per Wrench Hour minus Labor Cost per Wrench Hour.<br/><br/>The <b>profit per productive hour</b> after labor cost. If a tech wrenches for 1 hour, this is what's left over to cover materials, overhead, and net profit.`)}</div><div class="value info">${fmt$(marginPerHr)}</div><div class="sub">${marginPct}% of revenue</div></div>
+      <div class="kpi-card"><div class="label">Multiplier${infoTip(`<b>Multiplier</b> = Revenue ÷ Labor Cost.<br/><br/>For every dollar paid to techs, how many dollars of revenue come back. Industry benchmarks: <b>2.5–3.5x is healthy</b>, 4x+ is best-in-class. Below 2x means jobs are priced too tight or too much non-billable time on jobs.`)}</div><div class="value">${(revPerHr / Math.max(costPerHr,1)).toFixed(1)}x</div><div class="sub">revenue per dollar of labor</div></div>
+    </div>`;
+
+    // Per-tech implied burdened rate (from solo-tech jobs)
+    if (lr.perTech.length > 0) {
+      html += `<div class="mr-section-title" style="font-size:14px; margin-top:18px;">Implied burdened rate by tech <span class="sub">based on solo-tech completed jobs</span></div>`;
+      html += `<table class="mr-table"><thead><tr>
+        <th>Technician</th>
+        <th class="num">Solo Jobs</th>
+        <th class="num">Hours</th>
+        <th class="num">Labor Cost</th>
+        <th class="num">$ / Hour</th>
+      </tr></thead><tbody>`;
+      for (const t of lr.perTech) {
+        html += `<tr>
+          <td><b>${escapeHtml(t.tech)}</b></td>
+          <td class="num">${t.jobs}</td>
+          <td class="num">${fmtN(t.hours)}</td>
+          <td class="num">${fmt$(t.laborCost)}</td>
+          <td class="num"><b>${fmt$(t.impliedRate)}</b></td>
+        </tr>`;
+      }
+      html += `<tr class="total">
+        <td>Fleet (all completed jobs)</td>
+        <td class="num">${review.headline.completedJobs}</td>
+        <td class="num">${fmtN(lr.fleet.totalWrenchHours)}</td>
+        <td class="num">${fmt$(lr.fleet.totalLaborCost)}</td>
+        <td class="num"><b>${fmt$(lr.fleet.impliedRate)}</b></td>
+      </tr>`;
+      html += `</tbody></table>`;
+      html += `<p style="font-size:11px; color:var(--muted); margin-top:8px;">Per-tech rates use only jobs where that tech was the sole assignee, since multi-tech jobs blend rates. Techs with under 1 hour of solo work in the period are omitted.</p>`;
+    }
+  }
+
+  // ── Per-tech utilization table
+  html += `<div class="mr-section-title">Per-technician utilization <span class="sub">${includeConstruction ? "all hours" : "service-only"}${adjustForTrainingPTO ? ", adjusted for training/PTO" : ""}</span></div>`;
+  html += `<table class="mr-table"><thead><tr>
+    <th>Technician</th>
+    <th class="num">Paid</th>
+    <th class="num">Wrench</th>
+    <th class="num">Construction</th>
+    <th class="num">Drive</th>
+    <th class="num">Idle</th>
+    <th class="num">Training</th>
+    <th class="num">PTO Days</th>
+    <th class="num">Util %</th>
+  </tr></thead><tbody>`;
+  for (const t of review.timesheets.techs) {
+    const paid    = includeConstruction ? t.paidAll : t.paidService;
+    const wrench  = includeConstruction ? t.wrenchAll : t.working;
+    const drv     = includeConstruction ? t.driving : t.svcDriving;
+    const idl     = includeConstruction ? t.idle : t.svcIdle;
+    const util    = includeConstruction ? t.utilAll
+                  : (adjustForTrainingPTO ? t.utilServiceAdjusted : t.utilService);
+    html += `<tr>
+      <td><b>${escapeHtml(t.tech)}</b></td>
+      <td class="num">${fmtN(paid)}</td>
+      <td class="num">${fmtN(wrench)}</td>
+      <td class="num">${fmtN(t.construction)}</td>
+      <td class="num">${fmtN(drv)}</td>
+      <td class="num">${fmtN(idl)}</td>
+      <td class="num">${fmtN(t.training)}</td>
+      <td class="num">${t.offDays}</td>
+      <td class="num"><b>${fmtPct(util)}</b></td>
+    </tr>`;
+  }
+  const f = review.timesheets.fleet;
+  const fleetPaid = includeConstruction ? f.paidAll : f.paidService;
+  const fleetWrench = includeConstruction ? (f.working + f.construction) : f.working;
+  const fleetUtil = includeConstruction ? f.utilAll : (adjustForTrainingPTO ? f.utilServiceAdjusted : f.utilService);
+  html += `<tr class="total">
+    <td>Fleet Total</td>
+    <td class="num">${fmtN(fleetPaid)}</td>
+    <td class="num">${fmtN(fleetWrench)}</td>
+    <td class="num">${fmtN(f.construction)}</td>
+    <td class="num">${fmtN(includeConstruction ? f.driving : f.svcDriving)}</td>
+    <td class="num">${fmtN(includeConstruction ? f.idle : f.svcIdle)}</td>
+    <td class="num">${fmtN(f.training)}</td>
+    <td class="num">${f.offDays}</td>
+    <td class="num">${fmtPct(fleetUtil)}</td>
+  </tr>`;
+  html += `</tbody></table>`;
+
+  // ── Job type usage / classification health
+  const allTypes = review.jobs.byType;
+  const totalCompletedJobs = allTypes.reduce((s, t) => s + t.jobs, 0);
+  const totalBilled = allTypes.reduce((s, t) => s + t.billed, 0);
+  const isMisc = name => /^misc /i.test(name) || /^miscellaneous/i.test(name);
+  const miscTypes = allTypes.filter(t => isMisc(t.name));
+  const miscJobs = miscTypes.reduce((s, t) => s + t.jobs, 0);
+  const miscBilled = miscTypes.reduce((s, t) => s + t.billed, 0);
+  const miscHours = miscTypes.reduce((s, t) => s + t.hours, 0);
+  const miscJobShare = totalCompletedJobs > 0 ? (miscJobs / totalCompletedJobs * 100) : 0;
+  const miscBilledShare = totalBilled > 0 ? (miscBilled / totalBilled * 100) : 0;
+
+  html += `<div class="mr-section-title">Job type usage <span class="sub">${allTypes.length} distinct job types used this month</span></div>`;
+
+  // Headline KPIs for classification health
+  const miscColor = miscJobShare < 10 ? "ok" : miscJobShare < 20 ? "info" : "accent";
+  html += `<div class="kpi-grid" style="margin-bottom:18px;">
+    <div class="kpi-card"><div class="label">Distinct Job Types Used${infoTip(`<b>Distinct Job Types Used</b> — how many different job-type categories had at least one job in this period. ServiceTitan has ~95 configured types but only a fraction get used per month.<br/><br/>If this number is growing month over month, it means CSRs are using more specific categories instead of defaulting to "Misc."`)}</div><div class="value">${allTypes.length}</div><div class="sub">out of ~95 configured in ServiceTitan</div></div>
+    <div class="kpi-card"><div class="label">Misc Share (Jobs)${infoTip(`<b>Misc Share (Jobs)</b> — % of completed jobs that landed in "Misc HVAC Job" or "Misc Plumbing Job" buckets.<br/><br/>Industry best-practice is <b>under 10%</b>. When CSRs aren't sure which specific type fits, they default to Misc — which makes reports less useful and hides what kinds of work we're really doing.`)}</div><div class="value ${miscColor}">${fmtPct(miscJobShare)}</div><div class="sub">${miscJobs} of ${totalCompletedJobs} completed jobs</div></div>
+    <div class="kpi-card"><div class="label">Misc Share (Hours)${infoTip(`<b>Misc Share (Hours)</b> — % of total wrench hours that went to Misc-category jobs.<br/><br/>Often higher than the job-share % because Misc tends to absorb longer / more complex calls. Can also mean techs are doing real specialized work but it's getting mis-classified.`)}</div><div class="value ${miscColor}">${fmtPct(totalCompletedJobs > 0 ? (miscHours / allTypes.reduce((s,t)=>s+t.hours,0) * 100) : 0)}</div><div class="sub">${fmtN(miscHours)} of ${fmtN(allTypes.reduce((s,t)=>s+t.hours,0))} completed hrs</div></div>
+    <div class="kpi-card"><div class="label">Misc Share (Billed)${infoTip(`<b>Misc Share (Billed)</b> — % of total customer billing that came through Misc job types.<br/><br/>Often lower than job-share because Misc work tends to be priced lower than properly-classified install or diagnostic work. Reclassifying these jobs to specific types usually lifts both billing per ticket and overall margin.`)}</div><div class="value ${miscColor}">${fmtPct(miscBilledShare)}</div><div class="sub">${fmt$(miscBilled)} of ${fmt$(totalBilled)} billed</div></div>
+  </div>`;
+
+  if (miscJobShare > 10) {
+    html += `<div style="background:rgba(232,168,56,0.10); border:1px solid rgba(232,168,56,0.30); border-radius:var(--r-md); padding:10px 14px; margin-bottom:18px; font-size:12px; color:var(--text);">
+      <b style="color:var(--accent2);">Classification opportunity:</b> ${miscJobs} jobs (${fmtPct(miscJobShare)}) landed in "Misc" buckets. Industry best-practice is &lt;10%. Most of these can be reclassified into existing specific types like <i>Bi-Annual HVAC Maintenance</i>, <i>HVAC Quote</i>, <i>AC Diagnostic</i>, etc.
+    </div>`;
+  }
+
+  // Sortable, collapsible full-list table
+  const showAllJobTypes = false;
+  const initialRowCount = 15;
+  const sortedByJobs = [...allTypes].sort((a, b) => b.jobs - a.jobs);
+
+  html += `<div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; font-size:11px; color:var(--muted);">
+    <span>Sort:</span>
+    <button class="jt-sort active" data-sort="jobs" style="background:var(--accent3); color:white; border:none; padding:3px 10px; border-radius:4px; font-size:11px; cursor:pointer;">By Jobs</button>
+    <button class="jt-sort" data-sort="billed" style="background:var(--surface2); color:var(--text); border:1px solid var(--border); padding:3px 10px; border-radius:4px; font-size:11px; cursor:pointer;">By Billed</button>
+    <button class="jt-sort" data-sort="dollarsPerHour" style="background:var(--surface2); color:var(--text); border:1px solid var(--border); padding:3px 10px; border-radius:4px; font-size:11px; cursor:pointer;">By $/Hr</button>
+    <button class="jt-sort" data-sort="hours" style="background:var(--surface2); color:var(--text); border:1px solid var(--border); padding:3px 10px; border-radius:4px; font-size:11px; cursor:pointer;">By Hours</button>
+  </div>`;
+
+  html += `<div id="jt-table-wrap"></div>`;
+  html += `<div style="text-align:center; margin-top:10px;">
+    <button id="jt-toggle-all" style="background:var(--surface2); color:var(--text); border:1px solid var(--border); padding:6px 14px; border-radius:6px; font-size:12px; cursor:pointer;">Show all ${allTypes.length} types ↓</button>
+  </div>`;
+
+  // Render function for the job type table — called inline & by sort/expand handlers
+  window._jtState = { sort: "jobs", expanded: false, allTypes };
+  setTimeout(() => renderJobTypeTable(), 0);
+
+  // ── Missed invoice candidates
+  const flagged = review.jobs.zeroBilledWithMaterials.filter(z => !z.followUp);
+  const explained = review.jobs.zeroBilledWithMaterials.filter(z => z.followUp);
+
+  html += `<div class="mr-section-title">Missed invoice candidates <span class="sub">completed jobs with material cost but $0 billed</span></div>`;
+  if (flagged.length === 0) {
+    html += `<div class="panel"><p>No missed-invoice candidates this period. ✓</p></div>`;
+  } else {
+    html += `<table class="mr-table"><thead><tr>
+      <th>Job #</th><th>Type</th><th>Tech</th><th class="num">Hrs</th><th class="num">Materials</th><th class="num">Labor</th>
+    </tr></thead><tbody>`;
+    for (const z of flagged) {
+      html += `<tr class="flag">
+        <td><b>${escapeHtml(z.jobNumber)}</b></td>
+        <td>${escapeHtml(z.jobType || "")}</td>
+        <td>${escapeHtml(z.technicians || "")}</td>
+        <td class="num">${fmtN(z.hours)}</td>
+        <td class="num">${fmt$(z.materials)}</td>
+        <td class="num">${fmt$(z.labor)}</td>
+      </tr>`;
+    }
+    html += `</tbody></table>`;
+    if (explained.length) {
+      html += `<p style="margin-top:8px; font-size:12px; color:var(--muted);">${explained.length} additional zero-billed-with-materials job(s) had a same-customer follow-up that likely captured the billing.</p>`;
+    }
+  }
+
+  // ── On-time performance
+  if (review.onTime && review.onTime.bySlot.length) {
+    const ot = review.onTime;
+    const sevenAm = ot.bySlot.find(s => s.scheduledStart === 7*60);
+
+    const isAuthoritative = ot.dataSource === "servicetitan-appointments";
+    const sourceBadge = isAuthoritative
+      ? `<span style="background:rgba(63,174,106,0.15); color:var(--ok); padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600; margin-left:8px;">LIVE ST APPOINTMENTS</span>`
+      : `<span style="background:rgba(232,168,56,0.15); color:var(--accent2); padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600; margin-left:8px;" title="Appointment data not cached for this month — falling back to parsing dispatch notes from job summaries.">DISPATCH-NOTE PARSE (incomplete)</span>`;
+    const refreshBtn = isAuthoritative ? "" : `
+      <button id="mr-refresh-appts" style="margin-left:10px; background:var(--accent3); color:white; border:none; padding:4px 12px; border-radius:6px; font-size:11px; cursor:pointer;">↻ Pull from ServiceTitan</button>`;
+    html += `<div class="mr-section-title">On-time performance${sourceBadge}${refreshBtn}<span class="sub">scheduled vs actual arrival</span></div>`;
+
+    const grace = ot.onTimeGraceMinutes || 10;
+
+    // Headline summary card for the 7am slot if present
+    if (sevenAm) {
+      const onTimeColor = sevenAm.withinGracePct >= 50 ? "ok" : (sevenAm.withinGracePct >= 25 ? "info" : "accent");
+      html += `<div class="kpi-grid" style="margin-bottom:18px;">
+        <div class="kpi-card"><div class="label">7AM On-Time (≤+${grace}min)${infoTip(`<b>7AM On-Time</b> — % of 7am-scheduled appointments where the tech actually arrived within ${grace} minutes of 7:00am.<br/><br/>Measured from each tech's first "Working" timesheet entry on the job (when they tap "On Site"). Excludes the install crew, who work scheduled all-day jobs rather than customer arrival windows.`)}</div><div class="value ${onTimeColor}">${fmtPct(sevenAm.withinGracePct)}</div><div class="sub">${sevenAm.withinGrace} of ${sevenAm.jobs} jobs</div></div>
+        <div class="kpi-card"><div class="label">7AM Within Window (≤9am)${infoTip(`<b>7AM Within Window</b> — % of 7am-scheduled appointments where the tech arrived <b>by 9am</b> (the end of the typical 7-9am dispatch window).<br/><br/>If you sell customers a "7-9am window" rather than a hard 7am promise, this is the number that matters for customer satisfaction.`)}</div><div class="value info">${fmtPct(sevenAm.withinWindowPct)}</div><div class="sub">${sevenAm.withinWindow} of ${sevenAm.jobs} jobs</div></div>
+        <div class="kpi-card"><div class="label">Avg 7AM Arrival${infoTip(`<b>Avg 7AM Arrival</b> — average actual arrival time for jobs scheduled at 7am.<br/><br/>If this consistently shows 8:00+, your 7am window is being missed by an hour on average — worth either tightening dispatch or changing customer-facing promises to "8-10am" to match reality.`)}</div><div class="value">${escapeHtml(sevenAm.avgArrivalLabel)}</div><div class="sub">${Math.max(0, Math.round((sevenAm.avgArrivalMin - 7*60)))} min after scheduled</div></div>
+        <div class="kpi-card"><div class="label">Slots Matched${infoTip(`<b>Slots Matched</b> — how many scheduled appointments we successfully matched to actual tech arrivals in the timesheet.<br/><br/>If this is well below 100%, some appointments either had no tech show up, were rescheduled across the month boundary, or had data quality issues.`)}</div><div class="value">${ot.totals.jobsMatched}</div><div class="sub">of ${ot.totals.jobsScheduled} scheduled (${Math.round(ot.totals.jobsMatched/ot.totals.jobsScheduled*100)}%)</div></div>
+      </div>`;
+    }
+
+    // By scheduled slot
+    html += `<table class="mr-table"><thead><tr>
+      <th>Scheduled Slot</th>
+      <th class="num">Jobs</th>
+      <th class="num">Strictly On Time</th>
+      <th class="num">Within +${grace}</th>
+      <th class="num">Within +30</th>
+      <th class="num">In Window</th>
+      <th class="num">Avg Arrival</th>
+    </tr></thead><tbody>`;
+    for (const s of ot.bySlot) {
+      const isMorning = s.scheduledStart === 7*60;
+      html += `<tr${isMorning ? ' class="flag"' : ""}>
+        <td><b>${escapeHtml(s.label)}</b></td>
+        <td class="num">${s.jobs}</td>
+        <td class="num">${s.strictOnTime} (${fmtPct(s.strictOnTimePct)})</td>
+        <td class="num">${s.withinGrace} (${fmtPct(s.withinGracePct)})</td>
+        <td class="num">${s.within30} (${fmtPct(s.within30Pct)})</td>
+        <td class="num">${s.withinWindow} (${fmtPct(s.withinWindowPct)})</td>
+        <td class="num">${escapeHtml(s.avgArrivalLabel)}</td>
+      </tr>`;
+    }
+    html += `</tbody></table>`;
+
+    // Per-tech 7am leaderboard
+    if (ot.byTech7am.length) {
+      html += `<div class="mr-section-title" style="font-size:14px; margin-top:18px;">Per-tech 7AM on-time rate <span class="sub">on-time = arrived within +${grace} min</span></div>`;
+      html += `<table class="mr-table"><thead><tr>
+        <th>Technician</th>
+        <th class="num">7AM Jobs</th>
+        <th class="num">On Time</th>
+        <th class="num">In Window</th>
+        <th class="num">% On Time</th>
+        <th class="num">Avg Arrival</th>
+      </tr></thead><tbody>`;
+      for (const t of ot.byTech7am) {
+        const cls = t.onTimePct >= 50 ? "" : (t.onTimePct === 0 ? ' class="flag"' : "");
+        html += `<tr${cls}>
+          <td><b>${escapeHtml(t.tech)}</b></td>
+          <td class="num">${t.jobs}</td>
+          <td class="num">${t.onTime}</td>
+          <td class="num">${t.withinWindow}</td>
+          <td class="num"><b>${fmtPct(t.onTimePct)}</b></td>
+          <td class="num">${escapeHtml(t.avgArrivalLabel)}</td>
+        </tr>`;
+      }
+      html += `</tbody></table>`;
+      html += `<p style="font-size:11px; color:var(--muted); margin-top:8px;">Excluding ${ot.excludedTechs.join(", ")} (manager / construction-only).</p>`;
+    }
+  }
+
+  // ── Aging WIP
+  const wip = review.jobs.byStatus["In Progress"];
+  if (wip && wip.count > 0) {
+    html += `<div class="mr-section-title">Aging WIP <span class="sub">created in this period, still open</span></div>`;
+    html += `<div class="panel">
+      <p><b>${wip.count}</b> in-progress jobs are carrying <b>${fmt$(wip.materials)}</b> in materials and <b>${fmtN(wip.hours)}</b> hours of labor without invoicing yet.</p>
+    </div>`;
+  }
+
+  $("#mr-content").innerHTML = html;
+
+  // Async-load FY-to-Date rollup and inject it
+  loadFYToDate(review.period.year, review.period.month);
+
+  // Wire the "Pull from ServiceTitan" button if it exists on this render
+  const refreshBtn = document.getElementById("mr-refresh-appts");
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", async () => {
+      const sel = $("#month-picker");
+      const v = sel.value;
+      let year, month;
+      if (v === "current") {
+        const now = new Date();
+        year = now.getFullYear(); month = now.getMonth() + 1;
+      } else {
+        [year, month] = v.split("/").map(Number);
+      }
+      refreshBtn.disabled = true;
+      refreshBtn.textContent = "Pulling…";
+      try {
+        const r = await fetch(`/api/monthly-review/refresh-appointments/${year}/${month}`, { method: "POST" });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || r.statusText);
+        refreshBtn.textContent = `✓ ${data.count} appointments cached`;
+        // Reload the review with fresh data
+        setTimeout(loadReview, 600);
+      } catch (e) {
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = `✗ ${e.message}`;
+        setTimeout(() => { refreshBtn.textContent = "↻ Pull from ServiceTitan"; }, 4000);
+      }
+    });
+  }
+}
+
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+// Inline definition popup — wraps a (?) icon with a hover tooltip.
+// Pass HTML for the body (use <b>...</b> to highlight terms).
+function infoTip(bodyHtml, leftAlign = false) {
+  return `<span class="info-tip${leftAlign ? ' tip-left' : ''}" tabindex="0">?<span class="info-tip-body">${bodyHtml}</span></span>`;
+}
+
+async function loadFYToDate(year, month) {
+  const sec = document.getElementById("fytd-section");
+  if (!sec) return;
+  try {
+    const r = await fetch(`/api/monthly-review/fy-to-date/${year}/${month}`);
+    if (!r.ok) return;
+    const d = await r.json();
+    if (!d.totals || d.monthsWithData === 0) return;
+    const t = d.totals;
+    const fyOverhead = totalOverhead() * d.monthsWithData;
+    const fyNetAfterOverhead = t.operationalGrossProfit - fyOverhead;
+    const fyNetMarginPct = t.operationalBilling > 0 ? (fyNetAfterOverhead / t.operationalBilling * 100) : 0;
+
+    let html = `<div class="mr-section-title">${escapeHtml(d.fyLabel)} Fiscal Year-to-Date <span class="sub">${d.monthsWithData} of ${d.monthsRequested} months in cache · runs Oct 1 → Sep 30</span> <a href="/fy-review?fy=${escapeHtml(d.fyLabel)}" style="font-size:12px; color:var(--accent3); text-decoration:none; margin-left:12px;">View full FY report →</a></div>`;
+    html += `<div class="kpi-grid">
+      <div class="kpi-card"><div class="label">FYTD Customer Billing${infoTip(`<b>FYTD Customer Billing</b> — total customer billing across every cached month from October 1 (FY start) through the currently selected month.<br/><br/>${d.monthsWithData} of ${d.monthsRequested} months have cached data — this number grows as more months are imported.`)}</div><div class="value">${fmt$(t.reportedBilling)}</div><div class="sub">${t.completedJobs} completed jobs</div></div>
+      <div class="kpi-card"><div class="label">FYTD Operational GM${infoTip(`<b>FYTD Operational GM</b> — running operational gross margin % across the FY so far. Aggregated from monthly data: only counts jobs where we have full cost data (matched jc+wip).<br/><br/>This is the <b>honest year-to-date pricing health</b> — comparable across FYs.`)}</div><div class="value ok">${fmtPct(t.operationalGrossMarginPct)}</div><div class="sub">${fmt$(t.operationalGrossProfit)} on ${t.operationalJobCount} matched jobs</div></div>
+      <div class="kpi-card"><div class="label">FYTD Reported GM${infoTip(`<b>FYTD Reported GM</b> — running gross margin % across the FY using the same revenue-recognition basis as your fiscal P&amp;L.<br/><br/>Includes carry-over jobs whose costs were captured in prior fiscal periods. This is the <b>number that hits the books</b>; the discrepancy with Operational GM is the carry-over effect.`)}</div><div class="value info">${fmtPct(t.reportedGrossMarginPct)}</div><div class="sub">${fmt$(t.reportedGrossProfit)} (FY P&amp;L view)</div></div>
+      ${fyOverhead > 0
+        ? `<div class="kpi-card"><div class="label">FYTD Net After Overhead${infoTip(`<b>FYTD Net After Overhead</b> — Operational gross profit FYTD minus your <b>Monthly Overhead × number of months elapsed</b>.<br/><br/>Uses the overhead values you set at the top of the page. Closer to "real net profit" than monthly GM, but still doesn't include every overhead category — only what you've listed.`)}</div><div class="value ${fyNetAfterOverhead >= 0 ? 'info' : 'accent'}">${fmt$(fyNetAfterOverhead)}</div><div class="sub">${fmtPct(fyNetMarginPct)} of revenue · ${fmt$(fyOverhead)} overhead</div></div>`
+        : `<div class="kpi-card"><div class="label">FYTD Service Util${infoTip(`<b>FYTD Service Utilization</b> — running service-tech utilization % across the FY. Productive (wrench) hours ÷ paid service hours. Industry target: 65–75%.`)}</div><div class="value accent">${fmtPct(t.serviceUtilization)}</div><div class="sub">${Math.round(t.serviceWrenchHours)} wrench / ${Math.round(t.paidServiceHours)} paid hrs</div></div>`}
+    </div>`;
+    sec.innerHTML = html;
+    sec.style.display = "block";
+  } catch (e) {
+    console.warn("[FYTD]", e.message);
+  }
+}
+
+function renderJobTypeTable() {
+  const state = window._jtState;
+  if (!state) return;
+  const wrap = document.getElementById("jt-table-wrap");
+  if (!wrap) return;
+  const isMisc = name => /^misc /i.test(name) || /^miscellaneous/i.test(name);
+
+  const sorted = [...state.allTypes].sort((a, b) => {
+    const av = a[state.sort] ?? 0, bv = b[state.sort] ?? 0;
+    return bv - av;
+  });
+  const list = state.expanded ? sorted : sorted.slice(0, 15);
+
+  let html = `<table class="mr-table"><thead><tr>
+    <th>Job Type</th>
+    <th class="num">Jobs</th>
+    <th class="num">Hours</th>
+    <th class="num">Billed</th>
+    <th class="num">$/Hr</th>
+    <th class="num">Mult.</th>
+    <th class="num">GM %</th>
+  </tr></thead><tbody>`;
+  for (const t of list) {
+    const lowRate = t.billed > 1000 && t.dollarsPerHour < 200;
+    const miscRow = isMisc(t.name);
+    const cls = miscRow ? ' class="flag"' : (lowRate ? ' class="flag"' : "");
+    const tag = miscRow ? ` <span style="background:rgba(232,168,56,0.20); color:var(--accent2); padding:1px 6px; border-radius:8px; font-size:9px; font-weight:600; margin-left:6px;">MISC</span>` : "";
+    html += `<tr${cls}>
+      <td><b>${escapeHtml(t.name)}</b>${tag}</td>
+      <td class="num">${t.jobs}</td>
+      <td class="num">${(t.hours || 0).toFixed(1)}</td>
+      <td class="num">$${Math.round(t.billed).toLocaleString()}</td>
+      <td class="num">$${Math.round(t.dollarsPerHour).toLocaleString()}</td>
+      <td class="num">${(t.laborMultiplier || 0).toFixed(1)}x</td>
+      <td class="num">${(t.gmPct || 0).toFixed(1)}%</td>
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+  wrap.innerHTML = html;
+
+  // Update toggle button label
+  const btn = document.getElementById("jt-toggle-all");
+  if (btn) {
+    btn.textContent = state.expanded
+      ? `Show top 15 only ↑`
+      : `Show all ${state.allTypes.length} types ↓`;
+  }
+
+  // Update sort button highlights
+  document.querySelectorAll(".jt-sort").forEach(b => {
+    const isActive = b.getAttribute("data-sort") === state.sort;
+    b.style.background = isActive ? "var(--accent3)" : "var(--surface2)";
+    b.style.color      = isActive ? "white" : "var(--text)";
+    b.style.border     = isActive ? "none" : "1px solid var(--border)";
+  });
+}
+
+// Delegated event handlers for the job type table sort/expand controls
+document.addEventListener("click", e => {
+  if (e.target.classList && e.target.classList.contains("jt-sort")) {
+    if (!window._jtState) return;
+    window._jtState.sort = e.target.getAttribute("data-sort");
+    renderJobTypeTable();
+  } else if (e.target.id === "jt-toggle-all") {
+    if (!window._jtState) return;
+    window._jtState.expanded = !window._jtState.expanded;
+    renderJobTypeTable();
+  }
+});
+
+// ── Job Lookup ─────────────────────────────────────────────────────────────
+async function runJobLookup() {
+  const input = $("#job-lookup-input");
+  const out   = $("#job-lookup-result");
+  const jn    = (input.value || "").trim();
+  if (!jn || !/^\d+$/.test(jn)) {
+    out.style.display = "block";
+    out.innerHTML = `<div style="color:var(--accent); font-size:12px;">Please enter a numeric job number.</div>`;
+    return;
+  }
+  out.style.display = "block";
+  out.innerHTML = `<div style="color:var(--muted); font-size:12px;">Looking up job ${escapeHtml(jn)}…</div>`;
+  try {
+    const r = await fetch(`/api/monthly-review/job-lookup/${encodeURIComponent(jn)}`);
+    const data = await r.json();
+    if (!r.ok) {
+      out.innerHTML = `<div style="color:var(--accent); font-size:12px;">${escapeHtml(data.error || r.statusText)}</div>`;
+      return;
+    }
+    renderJobLookup(data, out);
+  } catch (e) {
+    out.innerHTML = `<div style="color:var(--accent); font-size:12px;">Error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderJobLookup(data, container) {
+  const job = data.job;
+  const appts = data.appointments || [];
+  const arrivals = data.arrivals || [];
+
+  // Helper: format ISO timestamp as local time
+  const fmtTime = (iso) => {
+    if (!iso) return "—";
+    try {
+      const d = new Date(iso);
+      // Display as Central Time (the shop's timezone). Browsers handle TZ
+      // automatically when a Z or offset is present.
+      return d.toLocaleString("en-US", {
+        timeZone: "America/Chicago",
+        month: "numeric", day: "numeric", year: "numeric",
+        hour: "numeric", minute: "2-digit", hour12: true,
+      });
+    } catch { return iso; }
+  };
+
+  let html = `<div style="background:var(--surface2); border-radius:var(--r-sm); padding:12px 14px;">`;
+  html += `<div style="font-size:13px;"><b>Job ${escapeHtml(job.jobNumber)}</b> · ${escapeHtml(job.type || "")} · <span style="color:var(--muted);">${escapeHtml(job.status || "")}</span></div>`;
+  if (appts.length === 0) {
+    html += `<div style="font-size:12px; color:var(--accent2); margin-top:8px;">⚠ No appointments returned from ServiceTitan for this job.</div>`;
+  } else {
+    html += `<div style="font-size:11px; text-transform:uppercase; color:var(--muted); margin-top:10px; margin-bottom:4px;">Scheduled Appointments (${appts.length})</div>`;
+    html += `<table class="mr-table" style="margin-top:0;">
+      <thead><tr>
+        <th>Appt #</th>
+        <th>Scheduled Start</th>
+        <th>Scheduled End</th>
+        <th>Arrival Window</th>
+        <th>Status</th>
+        <th>Tech IDs</th>
+      </tr></thead><tbody>`;
+    for (const a of appts) {
+      const winStr = (a.arrivalWindowStart && a.arrivalWindowStart !== a.scheduledStart)
+        ? `${fmtTime(a.arrivalWindowStart)} – ${fmtTime(a.arrivalWindowEnd)}`
+        : "(same as scheduled)";
+      html += `<tr>
+        <td><b>${escapeHtml(a.appointmentNumber || a.appointmentId)}</b></td>
+        <td>${escapeHtml(fmtTime(a.scheduledStart))}</td>
+        <td>${escapeHtml(fmtTime(a.scheduledEnd))}</td>
+        <td>${escapeHtml(winStr)}</td>
+        <td>${escapeHtml(a.status || "")}</td>
+        <td style="font-family:var(--font-mono); font-size:11px;">${(a.technicianIds || []).join(", ") || "—"}</td>
+      </tr>`;
+    }
+    html += `</tbody></table>`;
+  }
+
+  if (arrivals.length === 0) {
+    html += `<div style="font-size:12px; color:var(--muted); margin-top:8px;">No actual-arrival data cached for this job (no timesheet entries matched).</div>`;
+  } else {
+    html += `<div style="font-size:11px; text-transform:uppercase; color:var(--muted); margin-top:14px; margin-bottom:4px;">Actual Arrivals (from cached timesheet)</div>`;
+    html += `<table class="mr-table" style="margin-top:0;">
+      <thead><tr><th>Date</th><th>Tech</th><th>Start (Working)</th><th>End</th><th class="num">Hours</th></tr></thead><tbody>`;
+    for (const a of arrivals) {
+      html += `<tr>
+        <td>${escapeHtml(a.date)}</td>
+        <td><b>${escapeHtml(a.tech)}</b></td>
+        <td>${escapeHtml(a.startTime)}</td>
+        <td>${escapeHtml(a.endTime)}</td>
+        <td class="num">${fmtN(a.durationHours)}</td>
+      </tr>`;
+    }
+    html += `</tbody></table>`;
+  }
+
+  // If we have both, compute on-time delta
+  if (appts.length > 0 && arrivals.length > 0) {
+    const a = appts[0];
+    const sched = new Date(a.arrivalWindowStart || a.scheduledStart);
+    const earliest = arrivals.reduce((min, ar) => {
+      const dt = new Date(`${ar.date}T${ar.startTime}:00-05:00`);
+      return (!min || dt < min) ? dt : min;
+    }, null);
+    if (earliest && sched) {
+      const diffMin = Math.round((earliest - sched) / 60000);
+      const verdict = diffMin <= 0 ? "EARLY" : (diffMin <= 10 ? "ON TIME (≤+10 min)" : (diffMin <= 30 ? "WITHIN +30 min" : "LATE"));
+      const color = diffMin <= 10 ? "var(--ok)" : (diffMin <= 30 ? "var(--accent2)" : "var(--accent)");
+      html += `<div style="margin-top:14px; padding:10px 14px; background:${color}; color:#0c0c0c; border-radius:var(--r-sm); font-size:13px; font-weight:600;">
+        Verdict: <b>${verdict}</b> — first arrival ${diffMin >= 0 ? "+" + diffMin : diffMin} min from scheduled start
+      </div>`;
+    }
+  }
+
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+// ── Print ──────────────────────────────────────────────────────────────────
+function preparePrint() {
+  // Populate print-only header with current period + today's date
+  const sel = $("#month-picker");
+  const periodLabel = sel && sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : "";
+  const periodEl = document.getElementById("print-period");
+  if (periodEl) periodEl.textContent = periodLabel.replace(" (live)", "");
+  const dateEl = document.getElementById("print-date");
+  if (dateEl) dateEl.textContent = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  // Make sure the per-tech "Show all" view is fully expanded so printing
+  // captures every row (otherwise the user only prints the first 15)
+  if (window._jtState && !window._jtState.expanded) {
+    window._jtState.expanded = true;
+    if (typeof renderJobTypeTable === "function") renderJobTypeTable();
+  }
+  setTimeout(() => window.print(), 100);
+}
+
+const printBtn = document.getElementById("print-btn");
+if (printBtn) printBtn.addEventListener("click", preparePrint);
+
+// ── Wire up ────────────────────────────────────────────────────────────────
+$("#job-lookup-btn").addEventListener("click", runJobLookup);
+$("#job-lookup-input").addEventListener("keypress", e => { if (e.key === "Enter") runJobLookup(); });
+$("#month-picker").addEventListener("change", loadReview);
+$("#cb-construction").addEventListener("change", e => {
+  includeConstruction = e.target.checked;
+  $("#toggle-construction").classList.toggle("active", e.target.checked);
+  if (currentReview) render(currentReview);
+});
+$("#cb-adjusted").addEventListener("change", e => {
+  adjustForTrainingPTO = e.target.checked;
+  $("#toggle-adjusted").classList.toggle("active", e.target.checked);
+  if (currentReview) render(currentReview);
+});
+$("#toggle-adjusted").classList.add("active");
+
+(async () => {
+  await loadMonths();
+  await loadReview();
+})();
+</script>
+</body>
+</html>

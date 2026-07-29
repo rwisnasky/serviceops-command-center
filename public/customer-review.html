@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Customer Review — ServiceOps Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/styles.css" />
+<style>
+  /* Reuses the dashboard design system; only page-specific tweaks below. */
+  .cr-controls {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 22px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 16px 18px;
+  }
+  @media (max-width: 1100px) {
+    .cr-controls { grid-template-columns: 1fr 1fr 1fr; }
+  }
+  @media (max-width: 700px) {
+    .cr-controls { grid-template-columns: 1fr 1fr; }
+  }
+  .cr-controls label.field-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .cr-controls input[type="text"], .cr-controls input[type="date"], .cr-controls input[type="number"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--r-md);
+    padding: 9px 12px;
+    font-family: var(--font-sans);
+    font-size: 13px;
+  }
+  .cr-controls input:focus {
+    border-color: var(--accent3);
+    outline: none;
+  }
+  .cr-run-btn {
+    background: var(--accent3);
+    border: 1px solid var(--accent3);
+    color: white;
+    border-radius: var(--r-md);
+    padding: 9px 20px;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cr-run-btn:hover { filter: brightness(1.1); }
+  .cr-run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Typeahead dropdown */
+  .cr-search-wrap { position: relative; }
+  .cr-suggest {
+    position: absolute;
+    top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    max-height: 280px;
+    overflow-y: auto;
+    z-index: 200;
+    box-shadow: var(--shadow-lg);
+    display: none;
+  }
+  .cr-suggest.open { display: block; }
+  .cr-suggest-item {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .cr-suggest-item:last-child { border-bottom: 0; }
+  .cr-suggest-item:hover, .cr-suggest-item.active {
+    background: var(--surface2);
+    color: var(--accent3);
+  }
+  .cr-suggest-item .sub { font-size: 11px; color: var(--muted); }
+
+  /* KPIs (reuse same look as Monthly Review) */
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:28px; }
+  .kpi-card {
+    background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg);
+    padding: 20px; box-shadow: var(--shadow-sm);
+  }
+  .kpi-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+  .kpi-card .value { font-family: var(--font-display); font-size: 28px; font-weight: 700; color: var(--text); }
+  .kpi-card .value.accent { color: var(--accent); }
+  .kpi-card .value.info   { color: var(--accent3); }
+  .kpi-card .value.ok     { color: var(--ok); }
+  .kpi-card .value.warn   { color: var(--accent2); }
+  .kpi-card .sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  .cr-section-title {
+    font-family: var(--font-display); font-size: 16px; font-weight: 600;
+    color: var(--text); margin: 24px 0 10px;
+  }
+  .cr-section-title .sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 10px; }
+
+  table.cr-table {
+    width: 100%; border-collapse: collapse;
+    background: var(--surface);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    font-size: 12.5px;
+  }
+  table.cr-table th {
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  table.cr-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  table.cr-table tr:last-child td { border-bottom: 0; }
+  table.cr-table tr.total td { background: var(--surface2); font-weight: 600; border-top: 1px solid var(--border-strong); }
+  table.cr-table td.num, table.cr-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.cr-table td.muted { color: var(--muted); }
+  table.cr-table tr.under-rate td { background: rgba(196,18,48,0.07); }
+  table.cr-table tr.over-rate td  { background: rgba(91,140,201,0.05); }
+  table.cr-table td.tight { white-space: nowrap; }
+
+  .cr-rate-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 18px 22px;
+    margin-bottom: 22px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+  }
+  .cr-rate-panel .item .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .cr-rate-panel .item .value {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .cr-rate-panel .item .value.pos { color: var(--ok); }
+  .cr-rate-panel .item .value.neg { color: var(--accent); }
+
+  .cr-loc-row { background: rgba(91,140,201,0.04); cursor: pointer; }
+  .cr-loc-row:hover { background: rgba(91,140,201,0.10); }
+  .cr-loc-detail { background: var(--surface2); }
+  .cr-loc-detail td { padding-left: 28px; }
+
+  .cr-job-summary {
+    color: var(--muted); font-size: 11px; max-width: 280px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .cr-empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .cr-empty h3 { margin-bottom: 8px; font-family: var(--font-display); color: var(--text); }
+
+  .cr-action-row {
+    display: flex; gap: 10px; align-items: center; margin-bottom: 18px;
+  }
+  .cr-action-btn {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    border-radius: var(--r-md);
+    padding: 6px 12px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .cr-action-btn:hover { border-color: var(--accent3); color: var(--accent3); }
+
+  .cr-progress { color: var(--muted); font-size: 12px; }
+
+  @media print {
+    @page { size: letter; margin: 0.5in; }
+    body { background: #fff !important; color: #111 !important; }
+    body::before { display: none; }
+    .nav-bar, .cr-controls, .cr-action-row, .no-print { display: none !important; }
+    .panel, .kpi-card, table.cr-table, .cr-rate-panel,
+    table.cr-table th, table.cr-table tr.total td {
+      background: #fff !important;
+      color: #111 !important;
+      border-color: #888 !important;
+      box-shadow: none !important;
+    }
+    table.cr-table th { background: #e8e8e8 !important; color: #111 !important; }
+    h1, h2, h3, .cr-section-title { color: #111 !important; }
+    .accent { color: #c41230 !important; }
+    .value, .value.accent, .value.info, .value.ok, .value.warn { color: #111 !important; }
+    .label, .sub, .muted, td.muted { color: #555 !important; }
+    .app { padding: 0 !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Nav: built by /js/shared.js -->
+<nav class="nav-bar"><div class="nav-container"></div></nav>
+
+<div class="app">
+
+  <div class="page-header">
+    <div>
+      <h1>Customer <span class="accent">Review</span></h1>
+      <p>Cost vs benefit across all of a customer's locations for any date range — pulled live from ServiceTitan.</p>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="cr-controls">
+    <div class="cr-search-wrap">
+      <label class="field-label" for="cr-customer">Customer (name, phone, or ID)</label>
+      <input id="cr-customer" type="text" autocomplete="off" placeholder="Start typing… e.g. Metro East" />
+      <div id="cr-suggest" class="cr-suggest"></div>
+    </div>
+    <div>
+      <label class="field-label" for="cr-start">Start date</label>
+      <input id="cr-start" type="date" />
+    </div>
+    <div>
+      <label class="field-label" for="cr-end">End date</label>
+      <input id="cr-end" type="date" />
+    </div>
+    <div>
+      <label class="field-label" for="cr-rate">Expected $/hour (optional)</label>
+      <input id="cr-rate" type="number" min="0" step="1" placeholder="e.g. 185" />
+    </div>
+    <div>
+      <label class="field-label" for="cr-datefield">Filter by</label>
+      <select id="cr-datefield" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:var(--r-md); padding:9px 12px; font-family:var(--font-sans); font-size:13px;">
+        <option value="modified">Modified date (default)</option>
+        <option value="completed">Completion date</option>
+      </select>
+    </div>
+    <div>
+      <button id="cr-run" class="cr-run-btn" disabled>Run report</button>
+    </div>
+  </div>
+
+  <div id="cr-content"></div>
+
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="/js/shared.js"></script>
+<script>
+const $ = sel => document.querySelector(sel);
+
+// ── Formatters ─────────────────────────────────────────────────────────────
+const fmt$ = n => (n == null || isNaN(n)) ? "—" :
+  ("$" + Math.round(n).toLocaleString());
+const fmt$2 = n => (n == null || isNaN(n)) ? "—" :
+  ("$" + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const fmtN = n => (n == null || isNaN(n)) ? "—" :
+  Number(n).toLocaleString(undefined, { maximumFractionDigits: 1 });
+const fmtPct = n => (n == null || isNaN(n)) ? "—" :
+  Number(n).toFixed(1) + "%";
+const fmtDate = d => {
+  if (!d) return "—";
+  const t = new Date(d);
+  return isNaN(t) ? "—" : t.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+};
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+}[c]));
+
+// ── State ──────────────────────────────────────────────────────────────────
+let selectedCustomer = null;
+let lastReport = null;
+let suggestTimer = null;
+let suggestActiveIdx = -1;
+let suggestItems = [];
+
+// Default date range: last 90 days
+(function initDates() {
+  const today = new Date();
+  const start = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
+  $("#cr-end").value   = today.toISOString().slice(0, 10);
+  $("#cr-start").value = start.toISOString().slice(0, 10);
+})();
+
+// ── Typeahead ──────────────────────────────────────────────────────────────
+$("#cr-customer").addEventListener("input", () => {
+  const q = $("#cr-customer").value.trim();
+  selectedCustomer = null;
+  refreshRunBtnState();
+  clearTimeout(suggestTimer);
+  if (q.length < 2) { closeSuggest(); return; }
+  suggestTimer = setTimeout(() => runSuggest(q), 240);
+});
+
+$("#cr-customer").addEventListener("keydown", e => {
+  if (!$("#cr-suggest").classList.contains("open")) return;
+  if (e.key === "ArrowDown") { e.preventDefault(); moveSuggest(1); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); moveSuggest(-1); }
+  else if (e.key === "Enter" && suggestActiveIdx >= 0) {
+    e.preventDefault();
+    pickSuggest(suggestItems[suggestActiveIdx]);
+  } else if (e.key === "Escape") {
+    closeSuggest();
+  }
+});
+
+document.addEventListener("click", e => {
+  if (!e.target.closest(".cr-search-wrap")) closeSuggest();
+});
+
+async function runSuggest(q) {
+  try {
+    const r = await fetch(`/api/customer-review/search?q=${encodeURIComponent(q)}`);
+    if (!r.ok) { closeSuggest(); return; }
+    const data = await r.json();
+    suggestItems = data.customers || [];
+    // Auto-highlight the first match so Enter picks it without an arrow-down
+    // step. The typing UX expects "type ID, press Enter" to work.
+    suggestActiveIdx = suggestItems.length > 0 ? 0 : -1;
+    renderSuggest();
+  } catch (_) { closeSuggest(); }
+}
+
+function renderSuggest() {
+  const box = $("#cr-suggest");
+  if (!suggestItems.length) {
+    box.innerHTML = `<div class="cr-suggest-item muted">No customers match. Try a different spelling, customer ID, or phone.</div>`;
+    box.classList.add("open");
+    return;
+  }
+  box.innerHTML = suggestItems.map((c, i) => `
+    <div class="cr-suggest-item${i === suggestActiveIdx ? " active" : ""}" data-i="${i}">
+      <div>${esc(c.name)} <span style="color:var(--muted);font-size:11px;">#${esc(c.id)}</span></div>
+      <div class="sub">${esc(c.type || "")} ${c.address ? "· " + esc(c.address) : ""}</div>
+    </div>
+  `).join("");
+  box.classList.add("open");
+  box.querySelectorAll(".cr-suggest-item").forEach(el => {
+    el.addEventListener("mousedown", e => {
+      e.preventDefault();
+      const i = parseInt(el.dataset.i, 10);
+      if (!isNaN(i)) pickSuggest(suggestItems[i]);
+    });
+  });
+}
+
+function moveSuggest(delta) {
+  if (!suggestItems.length) return;
+  suggestActiveIdx = (suggestActiveIdx + delta + suggestItems.length) % suggestItems.length;
+  renderSuggest();
+}
+
+function pickSuggest(c) {
+  if (!c) return;
+  selectedCustomer = c;
+  $("#cr-customer").value = `${c.name} · #${c.id}`;
+  closeSuggest();
+  refreshRunBtnState();
+}
+
+function closeSuggest() {
+  $("#cr-suggest").classList.remove("open");
+}
+
+function refreshRunBtnState() {
+  $("#cr-run").disabled = !selectedCustomer;
+}
+
+// ── Run report ─────────────────────────────────────────────────────────────
+$("#cr-run").addEventListener("click", runReport);
+
+async function runReport() {
+  if (!selectedCustomer) return;
+  const startDate = $("#cr-start").value;
+  const endDate   = $("#cr-end").value;
+  const rate      = $("#cr-rate").value;
+  if (!startDate || !endDate) {
+    showToast("Please pick both a start and end date.", { type: "warn" });
+    return;
+  }
+
+  $("#cr-content").innerHTML = `<div class="cr-empty"><h3>Running report…</h3>
+    <p class="cr-progress">Pulling jobs, invoices, and labor data from ServiceTitan. This can take 20–60 seconds for active customers.</p></div>`;
+  $("#cr-run").disabled = true;
+
+  try {
+    const params = new URLSearchParams({
+      customerId: selectedCustomer.id,
+      startDate, endDate,
+    });
+    if (rate && Number(rate) > 0) params.set("expectedHourlyRate", rate);
+    const df = $("#cr-datefield").value;
+    if (df) params.set("dateField", df);
+
+    const r = await fetch(`/api/customer-review/report?${params.toString()}`);
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${r.status}`);
+    }
+    lastReport = await r.json();
+    render(lastReport);
+  } catch (e) {
+    $("#cr-content").innerHTML = `<div class="cr-empty"><h3>Report failed</h3><p>${esc(e.message)}</p></div>`;
+    showToast(`Report failed: ${e.message}`, { type: "error" });
+  } finally {
+    $("#cr-run").disabled = false;
+  }
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+function render(rep) {
+  if (!rep || !rep.totals || rep.totals.jobCount === 0) {
+    const period = `${fmtDate(rep?.period?.startDate)} – ${fmtDate(rep?.period?.endDate)}`;
+    const d = rep?.diagnostics || {};
+    const reason = d.emptyReason || "No jobs in the selected date range.";
+    const stCount = d.totalCustomerJobsInST;
+    $("#cr-content").innerHTML = `<div class="cr-empty">
+      <h3>No jobs found</h3>
+      <p><b>${esc(rep?.customer?.name || "This customer")}</b> has no jobs ServiceTitan returned between ${esc(period)}.</p>
+      <div style="margin:20px auto; max-width:560px; text-align:left; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); padding:14px 18px; font-size:12px; color:var(--muted); line-height:1.6;">
+        <div><b style="color:var(--text);">What we checked</b></div>
+        <div>· Tried <b>${esc(d.requestedDateField || "modified")}-date</b> filter → ${d.primaryCount ?? "0"} job${d.primaryCount === 1 ? "" : "s"} returned by ST.</div>
+        ${d.fallbackTried ? `<div>· Tried the other date field as fallback → ${d.fallbackCount ?? "0"} job${d.fallbackCount === 1 ? "" : "s"} returned.</div>` : ""}
+        ${stCount != null ? `<div>· Customer <b>${esc(rep.customer.id)}</b> has <b>${stCount}${stCount >= 100 ? "+" : ""}</b> total job${stCount === 1 ? "" : "s"} on file in ST (any date).</div>` : ""}
+        <div style="margin-top:10px; color:var(--text);">${esc(reason)}</div>
+      </div>
+      <p class="cr-progress" style="margin-top:14px;">
+        Try widening the date range, or flip the "Filter by" dropdown to the other date field and re-run.
+      </p>
+    </div>`;
+    return;
+  }
+
+  // Surface a small notice if the server's fallback kicked in so the user
+  // knows their requested filter returned nothing but we found data the other
+  // way around.
+  if (rep.diagnostics && rep.diagnostics.fallbackUsed) {
+    showToast(`No jobs matched ${rep.diagnostics.requestedDateField}-date filter; using ${rep.diagnostics.effectiveDateField} instead.`, { type: "warn" });
+  }
+
+  const t = rep.totals;
+  const c = rep.customer;
+  const ra = rep.rateAdherence;
+  const period = `${fmtDate(rep.period.startDate)} – ${fmtDate(rep.period.endDate)}`;
+
+  let html = "";
+
+  // Header strip
+  html += `<div style="margin-bottom:18px;">
+    <h2 style="font-family:var(--font-display); font-size:22px; color:var(--text); margin-bottom:4px;">
+      ${esc(c.name)}
+      <span style="color:var(--muted);font-size:14px;font-weight:400;margin-left:8px;">Customer #${esc(c.id)} · ${esc(c.type || "Customer")}</span>
+    </h2>
+    <div style="color:var(--muted);font-size:13px;">
+      Period: <b>${esc(period)}</b> · ${t.jobCount} job${t.jobCount === 1 ? "" : "s"} across ${t.locationCount} location${t.locationCount === 1 ? "" : "s"}
+      ${rep.diagnostics?.jobErrors ? ` · <span style="color:var(--accent2)">${rep.diagnostics.jobErrors} enrichment error${rep.diagnostics.jobErrors === 1 ? "" : "s"}</span>` : ""}
+    </div>
+  </div>`;
+
+  // Action row
+  html += `<div class="cr-action-row no-print">
+    <button class="cr-action-btn" id="cr-csv">📥 Export CSV</button>
+    <button class="cr-action-btn" id="cr-print">🖨 Print / Save as PDF</button>
+    ${rep.diagnostics?.hoursDataNote
+      ? `<span class="cr-progress" style="margin-left:auto;">⚠ ${esc(rep.diagnostics.hoursDataNote)}</span>`
+      : ""}
+  </div>`;
+
+  // KPI grid
+  html += `<div class="kpi-grid">
+    <div class="kpi-card"><div class="label">Total Billed</div>
+      <div class="value">${fmt$(t.billed)}</div>
+      <div class="sub">${t.jobCount} job${t.jobCount === 1 ? "" : "s"}</div>
+    </div>
+    <div class="kpi-card"><div class="label">Service Hours</div>
+      <div class="value info">${fmtN(t.hours)}</div>
+      <div class="sub">${t.hours > 0 ? "From ST labor splits" : "Hours unavailable"}</div>
+    </div>
+    <div class="kpi-card"><div class="label">$ / Service Hour</div>
+      <div class="value accent">${t.dollarsPerHour != null ? fmt$(t.dollarsPerHour) : "—"}</div>
+      <div class="sub">Actual revenue ÷ hours worked</div>
+    </div>
+    <div class="kpi-card"><div class="label">Locations Touched</div>
+      <div class="value">${t.locationCount}</div>
+      <div class="sub">Distinct service addresses</div>
+    </div>
+  </div>`;
+
+  // Rate adherence panel
+  if (ra) {
+    const variancePos = ra.variance >= 0;
+    const variancePctLabel = ra.variancePct != null ? fmtPct(ra.variancePct) : "—";
+    html += `<h3 class="cr-section-title">Rate Adherence <span class="sub">vs expected $${ra.expectedHourlyRate}/hour</span></h3>
+    <div class="cr-rate-panel">
+      <div class="item">
+        <div class="label">Expected Billing</div>
+        <div class="value">${fmt$(ra.expectedBilling)}</div>
+      </div>
+      <div class="item">
+        <div class="label">Actual Billing</div>
+        <div class="value">${fmt$(ra.actualBilling)}</div>
+      </div>
+      <div class="item">
+        <div class="label">Variance</div>
+        <div class="value ${variancePos ? "pos" : "neg"}">${variancePos ? "+" : ""}${fmt$(ra.variance)}</div>
+      </div>
+      <div class="item">
+        <div class="label">Variance %</div>
+        <div class="value ${variancePos ? "pos" : "neg"}">${variancePos && ra.variancePct != null ? "+" : ""}${variancePctLabel}</div>
+      </div>
+      <div class="item">
+        <div class="label">Actual $/Hour</div>
+        <div class="value">${ra.actualHourlyRate != null ? fmt$(ra.actualHourlyRate) : "—"}</div>
+      </div>
+    </div>
+    ${ra.actualHours === 0
+      ? `<p class="cr-progress" style="margin-top:-12px; margin-bottom:18px;">Variance figures rely on labor hours from ST Payroll. Until that scope is granted, only actual billing is meaningful here.</p>`
+      : ""}
+    `;
+  }
+
+  // Profitability — uses costs from the cached WIP imports (same numbers
+  // Monthly Review shows). For jobs not yet imported, costs show as "—".
+  const costNote = rep.diagnostics?.costDataNote;
+  html += `<h3 class="cr-section-title">Profitability <span class="sub">cost & margin from imported WIP data</span></h3>
+    <table class="cr-table" style="margin-bottom:8px;">
+      <thead><tr>
+        <th>Category</th>
+        <th class="num">Amount</th>
+        <th class="num">% of Billed</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>Total Billed</td>
+          <td class="num">${fmt$(t.billed)}</td>
+          <td class="num muted">100.0%</td></tr>
+        <tr><td class="muted">Less: Materials, Equipment, PO/Bill Costs <span style="font-size:10px; color:var(--muted);">(WIP aggregate)</span></td>
+          <td class="num muted">(${fmt$(t.materialCost)})</td>
+          <td class="num muted">${t.billed > 0 ? fmtPct(t.materialCost / t.billed * 100) : "—"}</td></tr>
+        ${t.poCost > 0 ? `
+          <tr><td class="muted" style="padding-left:32px;">↳ of which actual PO cost (live ST)</td>
+            <td class="num muted">${fmt$(t.poCost)}</td>
+            <td class="num muted">${t.materialCost > 0 ? fmtPct(t.poCost / t.materialCost * 100) + " of mat." : "—"}</td></tr>
+        ` : ""}
+        <tr><td class="muted">Less: Technician Labor Costs</td>
+          <td class="num muted">(${fmt$(t.laborCost)})</td>
+          <td class="num muted">${t.billed > 0 ? fmtPct(t.laborCost / t.billed * 100) : "—"}</td></tr>
+        ${t.otherCost > 0 ? `
+          <tr><td class="muted">Less: Other Job Costs <span style="font-size:10px; color:var(--muted);">(subs, fees, equipment tracked separately)</span></td>
+            <td class="num muted">(${fmt$(t.otherCost)})</td>
+            <td class="num muted">${t.billed > 0 ? fmtPct(t.otherCost / t.billed * 100) : "—"}</td></tr>
+        ` : ""}
+        <tr class="total"><td>Gross Margin</td>
+          <td class="num">${fmt$(t.margin)}</td>
+          <td class="num">${t.marginPct != null ? fmtPct(t.marginPct) : "—"}</td></tr>
+      </tbody>
+    </table>
+    ${costNote ? `<p class="cr-progress" style="margin-bottom:24px;">${esc(costNote)}</p>` : "<div style='margin-bottom:24px;'></div>"}`;
+
+  // Full job detail — now ABOVE the per-location rollup so the most
+  // actionable data lands first.
+  html += `<h3 class="cr-section-title">All Jobs <span class="sub">${rep.jobs.length} row${rep.jobs.length === 1 ? "" : "s"}</span></h3>
+    <table class="cr-table" style="margin-bottom:24px;">
+      <thead><tr>
+        <th>Job #</th>
+        <th>Date</th>
+        <th>Location</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th class="num">Hours</th>
+        <th class="num">Billed</th>
+        <th class="num">PO Cost</th>
+        <th class="num">Margin</th>
+        <th class="num">$/Hour</th>
+      </tr></thead>
+      <tbody>${rep.jobs.map(j => {
+        const locName = (rep.locations.find(l => l.locationId === j.locationId)?.locationName) || "—";
+        const cls = j.dollarsPerHour == null ? "" :
+          ra && ra.expectedHourlyRate > 0
+            ? (j.dollarsPerHour < ra.expectedHourlyRate * 0.85 ? "under-rate"
+            :  j.dollarsPerHour > ra.expectedHourlyRate * 1.15 ? "over-rate" : "")
+            : "";
+        const jobHref = j.jobId
+          ? `https://go.servicetitan.com/#/job/${esc(j.jobId)}`
+          : null;
+        const marginCell = j.margin == null ? "—"
+          : (j.marginPct != null ? `${fmt$(j.margin)} <span style="font-size:10px;color:var(--muted)">(${fmtPct(j.marginPct)})</span>` : fmt$(j.margin));
+        const poCell = (j.poCost > 0)
+          ? `${fmt$(j.poCost)}${j.poCount > 1 ? ` <span style="font-size:10px;color:var(--muted)">(${j.poCount} POs)</span>` : ""}`
+          : "—";
+        return `
+          <tr class="${cls}">
+            <td class="tight">${jobHref
+              ? `<a href="${jobHref}" target="_blank" rel="noopener" title="Open in ServiceTitan" style="color:var(--accent3);text-decoration:none;">${esc(j.jobNumber)}</a>`
+              : esc(j.jobNumber)}</td>
+            <td class="tight">${esc(fmtDate(j.completedOn || j.createdOn))}</td>
+            <td>${esc(locName)}</td>
+            <td>${esc(j.jobType)}</td>
+            <td>${esc(j.status || "")}</td>
+            <td class="num">${fmtN(j.hours)}</td>
+            <td class="num">${fmt$(j.billed)}</td>
+            <td class="num">${poCell}</td>
+            <td class="num">${marginCell}</td>
+            <td class="num">${j.dollarsPerHour != null ? fmt$(j.dollarsPerHour) : "—"}</td>
+          </tr>
+        `;
+      }).join("")}</tbody>
+    </table>
+    ${rep.diagnostics?.poDataNote ? `<p class="cr-progress" style="margin-top:-12px; margin-bottom:6px;">${esc(rep.diagnostics.poDataNote)}</p>` : ""}
+    <p class="cr-progress" style="margin-top:-12px; margin-bottom:24px;">
+      Pulled in ${rep.diagnostics?.elapsedMs ? Math.round(rep.diagnostics.elapsedMs / 1000) : "?"}s.
+      ${ra && ra.expectedHourlyRate > 0
+        ? `Jobs below 85% of $${ra.expectedHourlyRate}/hr are highlighted red; above 115% blue.`
+        : ""}
+    </p>`;
+
+  // Location breakdown — below the all-jobs table now, so you can scan the
+  // detail first and use this as a roll-up.
+  html += `<h3 class="cr-section-title">Location Breakdown <span class="sub">click a row to expand its jobs</span></h3>
+    <table class="cr-table" style="margin-bottom:24px;">
+      <thead><tr>
+        <th>Location</th>
+        <th class="num">Jobs</th>
+        <th class="num">Hours</th>
+        <th class="num">Billed</th>
+        <th class="num">Margin</th>
+        <th class="num">$/Hour</th>
+      </tr></thead>
+      <tbody>
+        ${(rep.locations || []).map((l, i) => `
+          <tr class="cr-loc-row" data-loc="${i}">
+            <td>
+              <b>${esc(l.locationName)}</b>
+              ${l.address ? `<div style="font-size:11px;color:var(--muted)">${esc(l.address)}</div>` : ""}
+            </td>
+            <td class="num">${l.jobCount}</td>
+            <td class="num">${fmtN(l.hours)}</td>
+            <td class="num">${fmt$(l.billed)}</td>
+            <td class="num">${fmt$(l.margin)}${l.marginPct != null ? ` <span style="font-size:10px;color:var(--muted)">(${fmtPct(l.marginPct)})</span>` : ""}</td>
+            <td class="num">${l.dollarsPerHour != null ? fmt$(l.dollarsPerHour) : "—"}</td>
+          </tr>
+          <tr class="cr-loc-detail" data-loc-detail="${i}" style="display:none;">
+            <td colspan="6">
+              <table class="cr-table" style="border:none; border-radius:0;">
+                <thead><tr>
+                  <th>Job #</th>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th class="num">Hours</th>
+                  <th class="num">Billed</th>
+                  <th class="num">$/Hour</th>
+                  <th>Summary</th>
+                </tr></thead>
+                <tbody>${l.jobs.map(j => renderJobRow(j, ra)).join("")}</tbody>
+              </table>
+            </td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>`;
+
+  $("#cr-content").innerHTML = html;
+
+  // Wire location expand/collapse
+  document.querySelectorAll(".cr-loc-row").forEach(row => {
+    row.addEventListener("click", () => {
+      const i = row.dataset.loc;
+      const detail = document.querySelector(`[data-loc-detail="${i}"]`);
+      if (!detail) return;
+      detail.style.display = detail.style.display === "none" ? "table-row" : "none";
+    });
+  });
+
+  // Wire actions
+  document.getElementById("cr-csv")?.addEventListener("click", exportCsv);
+  document.getElementById("cr-print")?.addEventListener("click", () => window.print());
+}
+
+function renderJobRow(j, ra) {
+  const cls = j.dollarsPerHour == null ? "" :
+    ra && ra.expectedHourlyRate > 0
+      ? (j.dollarsPerHour < ra.expectedHourlyRate * 0.85 ? "under-rate"
+      :  j.dollarsPerHour > ra.expectedHourlyRate * 1.15 ? "over-rate" : "")
+      : "";
+  return `<tr class="${cls}">
+    <td class="tight">${esc(j.jobNumber)}</td>
+    <td class="tight">${esc(fmtDate(j.completedOn || j.createdOn))}</td>
+    <td>${esc(j.jobType)}</td>
+    <td>${esc(j.status || "")}</td>
+    <td class="num">${fmtN(j.hours)}</td>
+    <td class="num">${fmt$(j.billed)}</td>
+    <td class="num">${j.dollarsPerHour != null ? fmt$(j.dollarsPerHour) : "—"}</td>
+    <td><div class="cr-job-summary" title="${esc(j.summary)}">${esc(j.summary)}</div></td>
+  </tr>`;
+}
+
+// ── CSV export ─────────────────────────────────────────────────────────────
+function exportCsv() {
+  if (!lastReport) return;
+  const headers = ["Job #","Date","Location","Type","Status","Hours","Billed","Material Cost (WIP)","Labor Cost","Other Cost","PO Cost (Live)","PO Count","Margin","Margin %","$/Hour","Cost Source","Summary"];
+  const rows = lastReport.jobs.map(j => {
+    const locName = (lastReport.locations.find(l => l.locationId === j.locationId)?.locationName) || "";
+    return [
+      j.jobNumber,
+      fmtDate(j.completedOn || j.createdOn),
+      locName,
+      j.jobType,
+      j.status || "",
+      j.hours,
+      j.billed.toFixed(2),
+      (j.materialCost || 0).toFixed(2),
+      (j.laborCost || 0).toFixed(2),
+      (j.otherCost || 0).toFixed(2),
+      (j.poCost || 0).toFixed(2),
+      j.poCount || 0,
+      j.margin != null ? j.margin.toFixed(2) : "",
+      j.marginPct != null ? j.marginPct.toFixed(1) : "",
+      j.dollarsPerHour != null ? j.dollarsPerHour.toFixed(2) : "",
+      j.costSource || "",
+      (j.summary || "").replace(/\s+/g, " ").slice(0, 200),
+    ];
+  });
+  const csv = [headers, ...rows].map(r =>
+    r.map(v => {
+      const s = String(v ?? "");
+      return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(",")
+  ).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url;
+  a.download = `customer-review_${lastReport.customer.id}_${lastReport.period.startDate}_to_${lastReport.period.endDate}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
+
+</body>
+</html>

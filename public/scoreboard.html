@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Lookup - ServiceOps Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    /* ── Scoreboard-specific styling ──────────────────────────── */
+    .sb-hero {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .sb-stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 18px 18px 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .sb-stat-label {
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .sb-stat-value {
+      font-family: var(--font-display);
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+    .sb-stat-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .sb-stat.accent .sb-stat-value { color: var(--accent); }
+    .sb-stat.info   .sb-stat-value { color: var(--accent3); }
+    .sb-stat.warn   .sb-stat-value { color: var(--accent2); }
+    .sb-stat.ok     .sb-stat-value { color: var(--ok); }
+
+    .sb-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 18px 20px;
+      margin-bottom: 18px;
+    }
+    .sb-card h3 {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .sb-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px 24px;
+      font-size: 13px;
+    }
+    .sb-meta-grid .label {
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+    .sb-meta-grid .value { font-weight: 500; }
+
+    .sb-summary {
+      background: var(--surface2);
+      border-left: 3px solid var(--accent3);
+      padding: 12px 14px;
+      border-radius: var(--r-sm);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.55;
+      max-height: 360px;
+      overflow-y: auto;
+      color: var(--text);
+    }
+    .sb-summary div { margin: 0; }
+    .sb-summary b, .sb-summary strong { color: var(--text); font-weight: 600; }
+    .sb-summary br + b, .sb-summary br + strong { display: inline-block; margin-top: 6px; }
+    .sb-summary p { margin-bottom: 6px; }
+    .sb-summary ul, .sb-summary ol { padding-left: 22px; margin: 4px 0; }
+    .sb-summary a { color: var(--accent3); }
+
+    table.sb-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    table.sb-table th, table.sb-table td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    table.sb-table th {
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    table.sb-table td.num, table.sb-table th.num { text-align: right; font-family: var(--font-mono); }
+    table.sb-table tr:last-child td { border-bottom: 0; }
+    table.sb-table tfoot td {
+      border-top: 1px solid var(--border-strong);
+      font-weight: 600;
+    }
+
+    .verdict-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: var(--r-sm);
+      font-size: 13px;
+      font-weight: 600;
+      color: #0c0c0c;
+    }
+    .verdict-EARLY    { background: var(--ok); }
+    .verdict-ON       { background: var(--ok); }
+    .verdict-WITHIN   { background: var(--accent2); }
+    .verdict-LATE     { background: var(--accent); color: white; }
+
+    .lookup-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .lookup-row input {
+      background: var(--surface2);
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      border-radius: var(--r-sm);
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      width: 220px;
+    }
+    .lookup-row input:focus { outline: 2px solid var(--accent3); border-color: var(--accent3); }
+    .lookup-row button {
+      background: var(--accent3);
+      color: white;
+      border: none;
+      padding: 10px 22px;
+      border-radius: var(--r-sm);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .lookup-row button:hover { filter: brightness(1.1); }
+    .lookup-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .empty-state .big { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: var(--r-full);
+      font-size: 10px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-weight: 600;
+      background: var(--surface2);
+      color: var(--muted);
+    }
+    .pill.completed { background: rgba(63,174,106,0.15); color: var(--ok); }
+    .pill.in-progress { background: rgba(91,140,201,0.15); color: var(--accent3); }
+    .pill.canceled  { background: rgba(196,18,48,0.15); color: var(--accent); }
+
+    /* ── Job chips (roll-up) ──────────────────────────────── */
+    .ru-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--r-full);
+      padding: 4px 10px 4px 12px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+    }
+    .ru-chip.loading { opacity: 0.6; }
+    .ru-chip.error   { border-color: var(--accent); color: var(--accent); }
+    .ru-chip .x {
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 700;
+      padding: 0 4px;
+      line-height: 1;
+      font-size: 14px;
+    }
+    .ru-chip .x:hover { color: var(--accent); }
+    .ru-chip-empty {
+      font-size: 11px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .warning-banner {
+      background: rgba(232,168,56,0.10);
+      border: 1px solid rgba(232,168,56,0.35);
+      color: var(--accent2);
+      padding: 10px 14px;
+      border-radius: var(--r-sm);
+      font-size: 12px;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Navigation Bar ───────────────────────────────────────────────── -->
+<!-- Nav: built by /js/shared.js — do not hand-edit, it gets wiped on load. -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+
+  <div class="page-header">
+    <div>
+      <h1>Job <span class="accent">Lookup</span></h1>
+      <p>Type a ServiceTitan job number to pull a one-page review — hours, invoice, appointments, and on-time verdict.</p>
+    </div>
+  </div>
+
+  <div class="sb-card">
+    <div class="lookup-row">
+      <label for="sb-input" style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted);">Job Number</label>
+      <input id="sb-input" type="text" inputmode="numeric" placeholder="e.g. 2602316" autocomplete="off" />
+      <button id="sb-btn">Pull Stats</button>
+      <span id="sb-status" style="font-size:12px; color:var(--muted);"></span>
+    </div>
+  </div>
+
+  <!-- ── Roll-up Mode ────────────────────────────────────────────────── -->
+  <div class="sb-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <div>
+        <h3 style="font-family:var(--font-display); font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin:0;">Roll-up Mode</h3>
+        <div style="font-size:12px; color:var(--muted); margin-top:4px;">Add multiple job numbers to total up time and money across jobs.</div>
+      </div>
+      <span id="ru-status" style="font-size:12px; color:var(--muted);"></span>
+    </div>
+    <div class="lookup-row" style="margin-bottom:10px;">
+      <input id="ru-input" type="text" inputmode="numeric" placeholder="Add job number" autocomplete="off" style="width:180px;" />
+      <button id="ru-add-btn" style="background:var(--surface2); color:var(--text); border:1px solid var(--border-strong);">+ Add Job</button>
+      <button id="ru-calc-btn">Calculate Totals</button>
+      <button id="ru-clear-btn" style="background:transparent; color:var(--muted); border:1px solid var(--border-strong);">Clear all</button>
+    </div>
+    <div id="ru-chips" style="display:flex; flex-wrap:wrap; gap:6px; min-height:24px;"></div>
+  </div>
+
+  <div id="ru-output"></div>
+
+  <div id="sb-output">
+    <div class="empty-state">
+      <div class="big">📋</div>
+      <div>Enter a job number above to load the scoreboard.</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+  const $    = sel => document.querySelector(sel);
+  const out  = $("#sb-output");
+  const btn  = $("#sb-btn");
+  const inp  = $("#sb-input");
+  const stat = $("#sb-status");
+
+  // ── Helpers ─────────────────────────────────────────────────────────────
+  const fmt$ = n => "$" + (Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+  const fmtN = (n, d = 1) => (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+  const esc  = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  // Job summaries from ServiceTitan often contain rich-text HTML (<div>, <b>,
+  // <br>, <ul>, etc.) entered through the dispatch board's WYSIWYG editor.
+  // Render that markup verbatim, but strip anything that could execute code
+  // (scripts, iframes, on* event handlers, javascript: URIs).
+  const sanitizeHtml = s => {
+    if (s == null) return "";
+    return String(s)
+      .replace(/<\/?(?:script|style|iframe|object|embed|link|meta|form|input|button)[^>]*>/gi, "")
+      .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
+      .replace(/\son\w+\s*=\s*'[^']*'/gi, "")
+      .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
+      .replace(/javascript:/gi, "");
+  };
+  const fmtTime = iso => {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleString("en-US", {
+        timeZone: "America/Chicago",
+        month: "numeric", day: "numeric", year: "numeric",
+        hour: "numeric", minute: "2-digit", hour12: true,
+      });
+    } catch { return iso; }
+  };
+  const fmtDate = iso => {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "numeric", day: "numeric", year: "numeric" });
+    } catch { return iso; }
+  };
+  const statusClass = s => {
+    const v = String(s || "").toLowerCase();
+    if (v === "completed")  return "completed";
+    if (v.includes("progress")) return "in-progress";
+    if (v === "canceled" || v === "cancelled") return "canceled";
+    return "";
+  };
+  const verdictClass = v => {
+    if (!v) return "";
+    if (v === "EARLY")   return "verdict-EARLY";
+    if (v === "ON TIME") return "verdict-ON";
+    if (v === "LATE")    return "verdict-LATE";
+    return "verdict-WITHIN";
+  };
+
+  // ── Manual material-cost adjustment ─────────────────────────────────────
+  // Holds the most recent job payload so the material input can recompute the
+  // profit numbers without re-fetching. Extra material amounts are saved per
+  // job number in localStorage so they persist across lookups and refreshes.
+  let _lastData = null;
+  const EXTRA_MAT_KEY = "scoreboard.extraMaterial";
+  const loadExtraMap = () => {
+    try { return JSON.parse(localStorage.getItem(EXTRA_MAT_KEY) || "{}") || {}; }
+    catch { return {}; }
+  };
+  const getExtraMat = (jn) => {
+    const v = Number(loadExtraMap()[String(jn)]);
+    return isFinite(v) && v > 0 ? v : 0;
+  };
+  const setExtraMat = (jn, val) => {
+    const map = loadExtraMap();
+    const n = Number(val);
+    if (isFinite(n) && n > 0) map[String(jn)] = n;
+    else delete map[String(jn)];
+    try { localStorage.setItem(EXTRA_MAT_KEY, JSON.stringify(map)); } catch {}
+  };
+  // Recompute the profit chain from a billed / material / labor base plus a
+  // manual material addition. Shared by the single-job view and the roll-up.
+  const computeAdjusted = (billed, baseMaterial, labor, extra) => {
+    const material = (Number(baseMaterial) || 0) + (Number(extra) || 0);
+    const preGP    = (Number(billed) || 0) - material;
+    const netGP    = preGP - (Number(labor) || 0);
+    const b        = Number(billed) || 0;
+    return {
+      extra:    Number(extra) || 0,
+      material,
+      preGP,
+      prefPct: b > 0 ? (preGP / b) * 100 : 0,
+      netGP,
+      netPct:  b > 0 ? (netGP / b) * 100 : 0,
+    };
+  };
+  const marginColorClass = pct => (pct >= 40) ? "ok"  : (pct >= 20) ? "warn"      : "accent";
+  const marginColorVar   = pct => (pct >= 40) ? "var(--ok)" : (pct >= 20) ? "var(--accent2)" : "var(--accent)";
+
+  // Live recompute triggered by the material input. Updates the hero Net GP
+  // stat and the Profitability Breakdown cells in place (no full re-render, so
+  // the input keeps focus while typing).
+  function recalcMaterial() {
+    const d = _lastData;
+    if (!d) return;
+    const h = d.headline || {};
+    const j = d.job || {};
+    const jn = String(j.jobNumber || "");
+    const inputEl = document.getElementById("bd-extra-mat");
+    const extra = inputEl ? (parseFloat(inputEl.value) || 0) : 0;
+    setExtraMat(jn, extra);
+
+    const adj = computeAdjusted(h.billed, h.materialCost, h.laborCost, extra);
+
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+
+    // Hero Net GP stat
+    const heroStat = document.getElementById("hero-gp-stat");
+    if (heroStat) heroStat.className = "sb-stat " + marginColorClass(adj.netPct);
+    set("hero-gp-value", fmt$(adj.netGP));
+    set("hero-gp-sub", `${fmtN(adj.netPct, 1)}% net margin · after materials + labor`);
+
+    // Breakdown rows
+    set("bd-material", fmt$(adj.material));
+    const noteEl = document.getElementById("bd-material-note");
+    if (noteEl) {
+      noteEl.innerHTML = adj.extra > 0
+        ? `ServiceTitan ${fmt$(h.materialCost)} + manual ${fmt$(adj.extra)}`
+        : `cost field on Material/Equipment line items`;
+    }
+    set("bd-prelabor", fmt$(adj.preGP));
+    set("bd-prelabor-pct", `${fmtN(adj.prefPct, 1)}% margin (a.k.a. contribution margin)`);
+    const netEl = document.getElementById("bd-netgp");
+    if (netEl) { netEl.textContent = fmt$(adj.netGP); netEl.style.color = marginColorVar(adj.netPct); }
+    set("bd-netmargin", `${fmtN(adj.netPct, 1)}% net margin`);
+  }
+  window.recalcMaterial = recalcMaterial;
+
+  // ── Lookup ──────────────────────────────────────────────────────────────
+  async function runLookup() {
+    const jn = (inp.value || "").trim();
+    if (!jn || !/^\d+$/.test(jn)) {
+      stat.textContent = "Enter a numeric job number.";
+      stat.style.color = "var(--accent)";
+      return;
+    }
+    btn.disabled = true;
+    stat.style.color = "var(--muted)";
+    stat.textContent = `Loading job ${jn}…`;
+    out.innerHTML = `<div class="empty-state"><div class="big">⏳</div><div>Pulling job ${esc(jn)} from ServiceTitan…</div></div>`;
+    try {
+      const r = await fetch(`/api/scoreboard/${encodeURIComponent(jn)}`);
+      const data = await r.json();
+      if (!r.ok) {
+        stat.textContent = "";
+        out.innerHTML = `<div class="empty-state"><div class="big">⚠</div><div>${esc(data.error || r.statusText)}</div></div>`;
+        return;
+      }
+      stat.textContent = "";
+      render(data);
+    } catch (e) {
+      stat.textContent = "";
+      out.innerHTML = `<div class="empty-state"><div class="big">⚠</div><div>Error: ${esc(e.message)}</div></div>`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────
+  function render(d) {
+    const j  = d.job || {};
+    const h  = d.headline || {};
+    const it = d.invoiceTotals || {};
+    const c  = d.customer || {};
+    const l  = d.location || {};
+    const addr = (l && l.address) || {};
+
+    _lastData = d;
+    let html = "";
+
+    // Warnings (any sub-fetch failures)
+    if (Array.isArray(d.warnings) && d.warnings.length) {
+      html += `<div class="warning-banner" style="line-height:1.5;">${d.warnings.map(w => `⚠ ${esc(w)}`).join("<br>")}</div>`;
+    }
+
+    // Apply any saved manual material addition for this job so the numbers
+    // render already-adjusted on load.
+    const jnKey   = String(j.jobNumber || "");
+    const extraMat = getExtraMat(jnKey);
+    const adj = computeAdjusted(h.billed, h.materialCost, h.laborCost, extraMat);
+
+    // ── Hero stats row ────────────────────────────────────────────────────
+    const gpColor = marginColorClass(adj.netPct);
+    html += `<div class="sb-hero">
+      <div class="sb-stat accent">
+        <div class="sb-stat-label">Billed</div>
+        <div class="sb-stat-value">${fmt$(h.billed)}</div>
+        <div class="sb-stat-sub">${h.invoiceCount || 0} invoice(s) · ${it.itemCount || 0} line item(s)</div>
+      </div>
+      <div class="sb-stat ${gpColor}" id="hero-gp-stat">
+        <div class="sb-stat-label">Net Gross Profit</div>
+        <div class="sb-stat-value" id="hero-gp-value">${fmt$(adj.netGP)}</div>
+        <div class="sb-stat-sub" id="hero-gp-sub">${fmtN(adj.netPct, 1)}% net margin · after materials + labor</div>
+      </div>
+      <div class="sb-stat info">
+        <div class="sb-stat-label">Wrench Hours</div>
+        <div class="sb-stat-value">${fmtN(h.wrenchHours, 1)}</div>
+        <div class="sb-stat-sub">${fmtN(h.drivingHours, 1)} drive · ${fmtN(h.totalLaborHours, 1)} total</div>
+      </div>
+      <div class="sb-stat warn">
+        <div class="sb-stat-label">$ / Wrench Hour</div>
+        <div class="sb-stat-value">${fmt$(h.dollarsPerWrenchHr)}</div>
+        <div class="sb-stat-sub">${fmt$(h.dollarsPerPaidHr)} / paid hr · ${h.techCount || 0} tech(s)</div>
+      </div>
+      <div class="sb-stat info">
+        <div class="sb-stat-label">Appointments</div>
+        <div class="sb-stat-value">${h.appointmentCount || 0}</div>
+        <div class="sb-stat-sub">${h.uniqueDays || 0} day(s) on site</div>
+      </div>
+    </div>`;
+
+    // ── Profitability breakdown ──────────────────────────────────────────
+    // Surface every component of the GP calc so the user can spot-check.
+    html += `<div class="sb-card" style="padding:14px 18px;">
+      <h3 style="margin-bottom:8px;">Profitability Breakdown</h3>
+      <table class="sb-table" style="font-size:13px;">
+        <tbody>
+          <tr><td>Revenue (billed)</td><td class="num">${fmt$(h.billed)}</td><td style="color:var(--muted); font-size:11px;">sum of invoice totals</td></tr>
+          <tr><td>− Material cost</td><td class="num" id="bd-material">${fmt$(adj.material)}</td><td style="color:var(--muted); font-size:11px;" id="bd-material-note">${adj.extra > 0 ? `ServiceTitan ${fmt$(h.materialCost)} + manual ${fmt$(adj.extra)}` : `cost field on Material/Equipment line items`}</td></tr>
+          <tr>
+            <td style="padding-left:16px; color:var(--muted);">↳ add materials</td>
+            <td class="num">
+              <span style="color:var(--muted);">$</span><input id="bd-extra-mat" type="number" min="0" step="any" inputmode="decimal" placeholder="0"
+                value="${adj.extra > 0 ? adj.extra : ""}" oninput="recalcMaterial()"
+                style="width:100px; background:var(--surface2); border:1px solid var(--border-strong); color:var(--text); border-radius:var(--r-sm); padding:5px 8px; font-family:var(--font-mono); font-size:13px; text-align:right;" />
+            </td>
+            <td style="color:var(--muted); font-size:11px;">extra materials not on the ServiceTitan job (shop stock, parts off another truck, etc.) — saved per job</td>
+          </tr>
+          <tr><td>= Pre-labor GP</td><td class="num"><b id="bd-prelabor">${fmt$(adj.preGP)}</b></td><td style="color:var(--muted); font-size:11px;" id="bd-prelabor-pct">${fmtN(adj.prefPct, 1)}% margin (a.k.a. contribution margin)</td></tr>
+          <tr><td>− Labor cost</td><td class="num">${fmt$(h.laborCost)}</td><td style="color:var(--muted); font-size:11px;">${fmtN(h.paidLaborHours, 1)} hrs · effective $${h.laborRate}/hr<br>source: ${esc(h.laborSource || "—")} <a href="?laborRate=" onclick="event.preventDefault(); promptLaborRate()" style="color:var(--accent3); margin-left:6px;">override</a></td></tr>
+          <tr style="border-top:1px solid var(--border-strong);"><td><b>= Net GP</b></td><td class="num"><b id="bd-netgp" style="color:${marginColorVar(adj.netPct)};">${fmt$(adj.netGP)}</b></td><td style="color:var(--muted); font-size:11px;"><b id="bd-netmargin">${fmtN(adj.netPct, 1)}% net margin</b></td></tr>
+        </tbody>
+      </table>
+      ${h.laborBreakdown && h.laborBreakdown.length ? `
+        <details style="margin-top:10px; font-size:11px; color:var(--muted);">
+          <summary style="cursor:pointer;">Per-tech labor breakdown</summary>
+          <table class="sb-table" style="margin-top:6px;">
+            <thead><tr><th>Tech</th><th class="num">Paid Hrs</th><th class="num">Rate</th><th class="num">Cost</th><th>Rate Source</th></tr></thead>
+            <tbody>
+              ${h.laborBreakdown.map(b => `<tr>
+                <td><b>${esc(b.tech)}</b></td>
+                <td class="num">${fmtN(b.hours, 1)}</td>
+                <td class="num">$${b.rate}/hr</td>
+                <td class="num">${fmt$(b.cost)}</td>
+                <td><span class="pill">${esc(b.source === "tech-history" ? "tech history" : "fleet median")}</span></td>
+              </tr>`).join("")}
+            </tbody>
+          </table>
+        </details>
+      ` : ""}
+    </div>`;
+
+    // ── Job basics card ───────────────────────────────────────────────────
+    const techList = (j.technicians || []).map(t => typeof t === "object" ? (t.name || t.id) : t).join(", ");
+    html += `<div class="sb-card">
+      <h3>Job Details</h3>
+      <div style="display:flex; align-items:center; gap:14px; margin-bottom:14px; flex-wrap:wrap;">
+        <div style="font-family:var(--font-display); font-size:24px; font-weight:700;">Job ${esc(j.jobNumber)}</div>
+        <span class="pill ${statusClass(j.status)}">${esc(j.status)}</span>
+        <span class="pill">${esc(j.type)}</span>
+        ${j.priority ? `<span class="pill">${esc(j.priority)}</span>` : ""}
+        ${j.noCharge ? `<span class="pill canceled">No Charge</span>` : ""}
+      </div>
+      <div class="sb-meta-grid" style="margin-bottom:14px;">
+        <div><div class="label">Created</div><div class="value">${esc(fmtDate(j.createdOn))}</div></div>
+        <div><div class="label">Completed</div><div class="value">${esc(fmtDate(j.completedOn))}</div></div>
+        <div><div class="label">Modified</div><div class="value">${esc(fmtDate(j.modifiedOn))}</div></div>
+        <div><div class="label">Business Unit</div><div class="value">${esc(j.businessUnit || "—")}</div></div>
+        <div><div class="label">Campaign</div><div class="value">${esc(j.campaign || "—")}</div></div>
+        <div><div class="label">Assigned Tech(s)</div><div class="value">${esc(techList || "—")}</div></div>
+        <div><div class="label">Customer</div><div class="value">${esc(c.name || "—")}</div></div>
+        <div><div class="label">Service Address</div><div class="value">${formatAddress(addr)}</div></div>
+      </div>
+      ${j.summary ? `<div class="sb-summary">${sanitizeHtml(j.summary)}</div>` : `<div style="color:var(--muted); font-size:12px;">No summary on this job.</div>`}
+    </div>`;
+
+    // ── On-time verdict (if available) ────────────────────────────────────
+    if (d.onTime) {
+      const ot = d.onTime;
+      const cls = verdictClass(ot.verdict);
+      html += `<div class="sb-card">
+        <h3>On-Time Verdict</h3>
+        <div style="display:flex; gap:18px; align-items:center; flex-wrap:wrap;">
+          <span class="verdict-badge ${cls}">${esc(ot.verdict)}</span>
+          <div style="font-size:13px;">
+            Scheduled <b>${esc(fmtTime(ot.scheduledStart))}</b>
+            · Arrived <b>${esc(fmtTime(ot.actualArrival))}</b>
+            · Δ <b>${ot.diffMinutes >= 0 ? "+" : ""}${ot.diffMinutes} min</b>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // ── Tech hours per technician ─────────────────────────────────────────
+    const tech = d.techHours || {};
+    if (tech.perTech && tech.perTech.length) {
+      const sourceLabels = (tech.sources || []).map(s => ({
+        "cache":               { label: "Cached timesheet",    color: "var(--ok)"      },
+        "payroll-api":         { label: "ServiceTitan Payroll", color: "var(--accent3)" },
+        "appointment-estimate":{ label: "Appointment estimate", color: "var(--accent2)" },
+      }[s] || { label: s, color: "var(--muted)" }));
+      const sourceBadges = sourceLabels.map(s =>
+        `<span class="pill" style="background:${s.color}15; color:${s.color}; border:1px solid ${s.color}40;">${esc(s.label)}</span>`
+      ).join(" ");
+      // When the estimate fallback was used, build a precise diagnostic from
+      // the debug payload so the user knows the real reason — not a generic
+      // "grant the scope" warning.
+      let estimateNote = "";
+      if (tech.estimated) {
+        const dbg = d.debug?.payroll || {};
+        const ts  = dbg.timesheets || {};
+        const reasons = [];
+        if (ts.tried && ts.error)        reasons.push(`live timesheet API errored: <code>${esc(ts.error)}</code>`);
+        else if (ts.tried && ts.count === 0)        reasons.push(`live timesheet API returned <b>0 rows</b> tenant-wide`);
+        else if (ts.tried && ts.filteredCount === 0) reasons.push(`live timesheet API returned ${ts.count} row(s), but <b>0 matched this job</b>`);
+        if ((dbg.cacheRows ?? 0) === 0) reasons.push(`no cached xlsx entries for this job number`);
+        const reasonHTML = reasons.length ? reasons.join(" · ") : "no live or cached data";
+        estimateNote = `<div style="font-size:11px; color:var(--accent2); margin-top:6px; line-height:1.5;">
+          ⓘ <b>These hours are scheduled estimates, not real timesheet data.</b><br>
+          Reason: ${reasonHTML}.<br>
+          Most common cause: the tech(s) haven't dispatched or clocked in on this job yet — there's no real timesheet to pull until they do. Once they start the appointment in ServiceTitan, refresh this page to get actual hours.
+        </div>`;
+      }
+
+      html += `<div class="sb-card">
+        <h3>Tech Hours · ${tech.uniqueDays || 0} day(s) on site &nbsp; ${sourceBadges}</h3>
+        ${estimateNote}
+        <table class="sb-table">
+          <thead><tr>
+            <th>Technician</th>
+            <th class="num">Working</th>
+            <th class="num">Driving</th>
+            <th class="num">Idle</th>
+            <th class="num">Job Prep</th>
+            <th class="num">Total</th>
+          </tr></thead>
+          <tbody>
+            ${tech.perTech.map(t => `<tr>
+              <td><b>${esc(t.tech)}</b></td>
+              <td class="num">${fmtN(t.working, 1)}</td>
+              <td class="num">${fmtN(t.driving, 1)}</td>
+              <td class="num">${fmtN(t.idle, 1)}</td>
+              <td class="num">${fmtN(t.jobPrep, 1)}</td>
+              <td class="num"><b>${fmtN(t.total, 1)}</b></td>
+            </tr>`).join("")}
+          </tbody>
+          <tfoot><tr>
+            <td>Total</td>
+            <td class="num">${fmtN(tech.fleet.working, 1)}</td>
+            <td class="num">${fmtN(tech.fleet.driving, 1)}</td>
+            <td class="num">${fmtN(tech.fleet.idle, 1)}</td>
+            <td class="num">${fmtN(tech.fleet.jobPrep, 1)}</td>
+            <td class="num">${fmtN(tech.fleet.total, 1)}</td>
+          </tr></tfoot>
+        </table>
+      </div>`;
+    } else {
+      html += `<div class="sb-card">
+        <h3>Tech Hours</h3>
+        <div style="color:var(--muted); font-size:12px;">
+          No tech hours could be loaded for this job from any source. Possible reasons:
+          <ul style="margin-top:6px; padding-left:18px;">
+            <li>The job has no timesheet entries cached (try importing the month via <code>scripts/import-monthly-xlsx.js</code>).</li>
+            <li>The ServiceTitan Payroll API scope isn't granted to this app.</li>
+            <li>The job has no appointments scheduled yet.</li>
+          </ul>
+        </div>
+      </div>`;
+    }
+
+    // ── Invoice summary + line items ──────────────────────────────────────
+    if (d.invoices && d.invoices.length) {
+      html += `<div class="sb-card">
+        <h3>Invoices</h3>`;
+      for (const inv of d.invoices) {
+        html += `<div style="margin-bottom:18px;">
+          <div style="display:flex; gap:14px; align-items:baseline; flex-wrap:wrap; margin-bottom:8px;">
+            <div style="font-family:var(--font-display); font-size:16px; font-weight:600;">Invoice #${esc(inv.number || inv.id)}</div>
+            <div style="font-size:11px; color:var(--muted);">${esc(fmtDate(inv.invoiceDate))} · ${esc(inv.status || "—")}</div>
+            <div style="margin-left:auto; font-family:var(--font-mono); font-size:14px;">
+              <span style="color:var(--muted);">Subtotal</span> ${fmt$(inv.subtotal)}
+              · <span style="color:var(--muted);">Tax</span> ${fmt$(inv.tax)}
+              · <span style="color:var(--muted);">Total</span> <b>${fmt$(inv.total)}</b>
+              ${inv.balance > 0 ? ` · <span style="color:var(--accent2);">Balance ${fmt$(inv.balance)}</span>` : ""}
+            </div>
+          </div>
+          ${inv.summary ? `<div style="font-size:12px; color:var(--muted); margin-bottom:8px; font-style:italic;">${esc(inv.summary)}</div>` : ""}
+          ${inv.items && inv.items.length ? renderInvoiceItems(inv.items) : `<div style="color:var(--muted); font-size:12px;">No line items returned.</div>`}
+        </div>`;
+      }
+      html += `</div>`;
+    } else {
+      html += `<div class="sb-card">
+        <h3>Invoices</h3>
+        <div style="color:var(--muted); font-size:12px;">No invoices on this job.</div>
+      </div>`;
+    }
+
+    // ── Appointments ──────────────────────────────────────────────────────
+    if (d.appointments && d.appointments.length) {
+      html += `<div class="sb-card">
+        <h3>Scheduled Appointments</h3>
+        <table class="sb-table">
+          <thead><tr>
+            <th>Appt #</th>
+            <th>Scheduled Start</th>
+            <th>Scheduled End</th>
+            <th>Customer Window</th>
+            <th>Status</th>
+            <th>Tech IDs</th>
+          </tr></thead>
+          <tbody>
+            ${d.appointments.map(a => {
+              const winStr = (a.arrivalWindowStart && a.arrivalWindowStart !== a.scheduledStart)
+                ? `${fmtTime(a.arrivalWindowStart)} – ${fmtTime(a.arrivalWindowEnd)}`
+                : "(same as scheduled)";
+              return `<tr>
+                <td><b>${esc(a.appointmentNumber || a.appointmentId)}</b></td>
+                <td>${esc(fmtTime(a.scheduledStart))}</td>
+                <td>${esc(fmtTime(a.scheduledEnd))}</td>
+                <td>${esc(winStr)}</td>
+                <td><span class="pill ${statusClass(a.status)}">${esc(a.status || "")}</span></td>
+                <td style="font-family:var(--font-mono); font-size:11px;">${(a.technicianIds || []).join(", ") || "—"}</td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>`;
+    }
+
+    // ── Tech timeline (raw entries) ───────────────────────────────────────
+    if (tech.entries && tech.entries.length) {
+      html += `<div class="sb-card">
+        <h3>Activity Timeline</h3>
+        <table class="sb-table">
+          <thead><tr>
+            <th>Date</th>
+            <th>Tech</th>
+            <th>Activity</th>
+            <th>Start</th>
+            <th>End</th>
+            <th class="num">Hours</th>
+            <th>Source</th>
+          </tr></thead>
+          <tbody>
+            ${tech.entries.map(e => `<tr>
+              <td>${esc(e.date)}</td>
+              <td><b>${esc(e.tech)}</b></td>
+              <td>${esc(e.activity)}</td>
+              <td>${esc(e.startTime)}</td>
+              <td>${esc(e.endTime)}</td>
+              <td class="num">${fmtN(e.durationHours, 2)}</td>
+              <td><span class="pill">${esc(e.source || "—")}</span></td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+    }
+
+    // ── API debug panel (collapsed by default) ────────────────────────────
+    if (d.debug) {
+      const dbg = d.debug;
+      const fmtRow = (info) => {
+        if (!info?.tried) return "not attempted (cache had data)";
+        if (info.error)  return "❌ " + esc(info.error);
+        const filtered = info.filteredCount ?? 0;
+        const total    = info.count ?? 0;
+        let line = `${filtered} of ${total} row(s) matched this job`;
+        if (info.sampleJobId != null) line += ` · sample row jobId=${esc(String(info.sampleJobId))}`;
+        if (info.sampleKeys && info.sampleKeys.length) line += `<br>&nbsp;&nbsp;keys: ${esc(info.sampleKeys.join(", "))}`;
+        return line;
+      };
+      const tsLine     = `jobs/timesheets → ${fmtRow(dbg.payroll?.timesheets)}`;
+      const splitsLine = `jobs/splits → ${fmtRow(dbg.payroll?.splits)}`;
+      const gpLine     = `gross-pay-items → ${fmtRow(dbg.payroll?.grossPay)}`;
+      const lookupLine = dbg.payroll?.jobIdLookups
+        ? `looking for jobId=${esc(String(dbg.payroll.jobIdLookups.jobId))} or jobNumber=${esc(String(dbg.payroll.jobIdLookups.jobNumber))}`
+        : "";
+      html += `<details style="margin-top:14px; font-size:11px; color:var(--muted);" open>
+        <summary style="cursor:pointer; user-select:none;">API debug</summary>
+        <div style="margin-top:8px; padding:10px 12px; background:var(--surface2); border-radius:var(--r-sm); font-family:var(--font-mono); line-height:1.6;">
+          cache rows matched: <b>${dbg.cacheRows ?? 0}</b><br>
+          live rows used: <b>${dbg.liveRows ?? 0}</b><br>
+          ${lookupLine}<br>
+          ${tsLine}<br>
+          ${splitsLine}<br>
+          ${gpLine}
+        </div>
+      </details>`;
+    }
+
+    out.innerHTML = html;
+  }
+
+  function renderInvoiceItems(items) {
+    return `<table class="sb-table">
+      <thead><tr>
+        <th>SKU</th>
+        <th>Description</th>
+        <th>Type</th>
+        <th class="num">Qty</th>
+        <th class="num">Unit Price</th>
+        <th class="num">Total</th>
+      </tr></thead>
+      <tbody>
+        ${items.map(it => `<tr>
+          <td style="font-family:var(--font-mono); font-size:11px;">${esc(it.sku)}</td>
+          <td>${esc(it.description)}</td>
+          <td><span class="pill">${esc(it.type || "—")}</span></td>
+          <td class="num">${fmtN(it.quantity, 2)}</td>
+          <td class="num">${fmt$(it.unitPrice)}</td>
+          <td class="num"><b>${fmt$(it.total)}</b></td>
+        </tr>`).join("")}
+      </tbody>
+    </table>`;
+  }
+
+  function formatAddress(a) {
+    if (!a || (!a.street && !a.city)) return "—";
+    const line1 = [a.street, a.unit].filter(Boolean).join(" ");
+    const line2 = [a.city, a.state, a.zip].filter(Boolean).join(", ").replace(", ,", ",");
+    return esc([line1, line2].filter(Boolean).join(" · "));
+  }
+
+  // ── Wire up ─────────────────────────────────────────────────────────────
+  btn.addEventListener("click", runLookup);
+  inp.addEventListener("keypress", e => { if (e.key === "Enter") runLookup(); });
+
+  // Prompt for a new labor rate, then re-fetch with ?laborRate=N. The rate
+  // sticks for subsequent lookups in this tab via a query-string memory.
+  let _laborRate = new URLSearchParams(location.search).get("laborRate") || "";
+  function promptLaborRate() {
+    const raw = window.prompt("Loaded labor cost per hour (e.g. 50):", _laborRate || "50");
+    if (raw == null) return;
+    const n = parseFloat(raw);
+    if (isNaN(n) || n < 0) { alert("Enter a positive number."); return; }
+    _laborRate = String(n);
+    runLookup();
+  }
+  // Override fetch URL to include the labor rate when set.
+  const _origLookup = runLookup;
+  window.runLookup = async function patched() {
+    const jn = (inp.value || "").trim();
+    if (!jn || !/^\d+$/.test(jn)) return _origLookup();
+    btn.disabled = true;
+    stat.style.color = "var(--muted)";
+    stat.textContent = `Loading job ${jn}…`;
+    out.innerHTML = `<div class="empty-state"><div class="big">⏳</div><div>Pulling job ${esc(jn)} from ServiceTitan…</div></div>`;
+    try {
+      const url = `/api/scoreboard/${encodeURIComponent(jn)}${_laborRate ? `?laborRate=${encodeURIComponent(_laborRate)}` : ""}`;
+      const r = await fetch(url);
+      const data = await r.json();
+      if (!r.ok) {
+        stat.textContent = "";
+        out.innerHTML = `<div class="empty-state"><div class="big">⚠</div><div>${esc(data.error || r.statusText)}</div></div>`;
+        return;
+      }
+      stat.textContent = "";
+      render(data);
+    } catch (e) {
+      stat.textContent = "";
+      out.innerHTML = `<div class="empty-state"><div class="big">⚠</div><div>Error: ${esc(e.message)}</div></div>`;
+    } finally {
+      btn.disabled = false;
+    }
+  };
+  // Re-wire the click/enter handlers to the patched lookup.
+  btn.removeEventListener("click", runLookup);
+  btn.addEventListener("click", () => window.runLookup());
+  inp.addEventListener("keypress", e => { if (e.key === "Enter") window.runLookup(); });
+
+  // Auto-load if a job number is in the URL hash (e.g. /scoreboard#2602316)
+  if (location.hash && /^#\d+$/.test(location.hash)) {
+    inp.value = location.hash.slice(1);
+    window.runLookup();
+  }
+  inp.focus();
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Roll-up Mode — totals across multiple jobs
+  // ════════════════════════════════════════════════════════════════════════
+  const ruInput = $("#ru-input");
+  const ruAddBtn = $("#ru-add-btn");
+  const ruCalcBtn = $("#ru-calc-btn");
+  const ruClearBtn = $("#ru-clear-btn");
+  const ruChips = $("#ru-chips");
+  const ruStatus = $("#ru-status");
+  const ruOutput = $("#ru-output");
+
+  // Persist the chip list so it survives page refresh.
+  const RU_KEY = "scoreboard.rollup.jobs";
+  const loadJobs = () => {
+    try { return JSON.parse(localStorage.getItem(RU_KEY) || "[]"); }
+    catch { return []; }
+  };
+  const saveJobs = (jobs) => {
+    try { localStorage.setItem(RU_KEY, JSON.stringify(jobs)); } catch {}
+  };
+
+  let ruJobs = loadJobs();   // [{ jobNumber, status: 'pending'|'loading'|'ok'|'error', data?, error? }]
+
+  function renderChips() {
+    if (!ruJobs.length) {
+      ruChips.innerHTML = `<span class="ru-chip-empty">No jobs added yet — type a number above and click + Add Job.</span>`;
+      return;
+    }
+    ruChips.innerHTML = ruJobs.map((j, i) => {
+      let statusBadge = "";
+      if (j.status === "loading") statusBadge = ` <span style="color:var(--muted);">·</span> <span style="color:var(--muted);">loading…</span>`;
+      else if (j.status === "error") statusBadge = ` <span style="color:var(--accent);">· ${esc(j.error || "error")}</span>`;
+      else if (j.status === "ok" && j.data) statusBadge = ` <span style="color:var(--muted);">· ${fmt$(j.data.headline?.billed)} · ${fmtN(j.data.headline?.wrenchHours, 1)} hrs</span>`;
+      const cls = j.status === "loading" ? "ru-chip loading"
+                : j.status === "error"   ? "ru-chip error"
+                : "ru-chip";
+      return `<span class="${cls}" data-i="${i}">
+        <b>${esc(j.jobNumber)}</b>${statusBadge}
+        <span class="x" data-remove="${i}" title="Remove">×</span>
+      </span>`;
+    }).join("");
+  }
+
+  function addJob(jn) {
+    jn = String(jn || "").trim();
+    if (!/^\d+$/.test(jn)) { flash("Enter a numeric job number.", "var(--accent)"); return; }
+    if (ruJobs.some(j => j.jobNumber === jn)) { flash(`${jn} is already in the list.`, "var(--accent2)"); return; }
+    ruJobs.push({ jobNumber: jn, status: "pending" });
+    saveJobs(ruJobs);
+    renderChips();
+    ruInput.value = "";
+    ruInput.focus();
+  }
+
+  function removeJob(idx) {
+    ruJobs.splice(idx, 1);
+    saveJobs(ruJobs);
+    renderChips();
+    if (!ruJobs.length) ruOutput.innerHTML = "";
+  }
+
+  function flash(msg, color) {
+    ruStatus.textContent = msg;
+    ruStatus.style.color = color || "var(--muted)";
+    setTimeout(() => { if (ruStatus.textContent === msg) ruStatus.textContent = ""; }, 4000);
+  }
+
+  ruAddBtn.addEventListener("click", () => addJob(ruInput.value));
+  ruInput.addEventListener("keypress", e => { if (e.key === "Enter") addJob(ruInput.value); });
+  ruClearBtn.addEventListener("click", () => {
+    if (!ruJobs.length) return;
+    if (!confirm(`Clear all ${ruJobs.length} job(s) from the roll-up?`)) return;
+    ruJobs = [];
+    saveJobs(ruJobs);
+    renderChips();
+    ruOutput.innerHTML = "";
+  });
+  ruChips.addEventListener("click", e => {
+    const idx = e.target.getAttribute && e.target.getAttribute("data-remove");
+    if (idx != null) removeJob(parseInt(idx, 10));
+  });
+
+  // ── Calculate Totals ────────────────────────────────────────────────────
+  ruCalcBtn.addEventListener("click", calculateRollup);
+
+  async function calculateRollup() {
+    if (!ruJobs.length) { flash("Add at least one job first.", "var(--accent)"); return; }
+    ruCalcBtn.disabled = true;
+    ruStatus.style.color = "var(--muted)";
+    ruStatus.textContent = `Loading ${ruJobs.length} job(s)…`;
+
+    // Mark all as loading + render
+    for (const j of ruJobs) j.status = "loading";
+    renderChips();
+
+    // Fire all fetches in parallel. Each call hits the same endpoint as the
+    // single-job lookup, so labor + GP math stays consistent.
+    const url = jn => `/api/scoreboard/${encodeURIComponent(jn)}${_laborRate ? `?laborRate=${encodeURIComponent(_laborRate)}` : ""}`;
+    await Promise.all(ruJobs.map(async j => {
+      try {
+        const r = await fetch(url(j.jobNumber));
+        const data = await r.json();
+        if (!r.ok) {
+          j.status = "error";
+          j.error = (data && data.error) || `HTTP ${r.status}`;
+          j.data = null;
+        } else {
+          j.status = "ok";
+          j.data = data;
+          j.error = null;
+        }
+      } catch (e) {
+        j.status = "error";
+        j.error = e.message || "fetch failed";
+        j.data = null;
+      }
+    }));
+
+    saveJobs(ruJobs);
+    renderChips();
+    ruStatus.textContent = "";
+    ruCalcBtn.disabled = false;
+    renderRollup();
+  }
+
+  // ── Aggregate + render ─────────────────────────────────────────────────
+  function renderRollup() {
+    const ok = ruJobs.filter(j => j.status === "ok" && j.data);
+    const errs = ruJobs.filter(j => j.status === "error");
+    if (!ok.length && !errs.length) { ruOutput.innerHTML = ""; return; }
+
+    // Sum the headline numbers
+    const tot = {
+      jobs: ok.length,
+      billed: 0, materialCost: 0, laborCost: 0,
+      preLaborGP: 0, grossProfit: 0,
+      wrenchHours: 0, drivingHours: 0, totalLaborHours: 0,
+      paidLaborHours: 0,
+      uniqueDays: 0, appointmentCount: 0, invoiceCount: 0,
+      techSet: new Set(),
+    };
+    for (const j of ok) {
+      const h = j.data.headline || {};
+      // Fold in any manual material added to this job so roll-up totals match
+      // what the single-job view shows. Stash the adjusted figures on the chip
+      // object for the per-job detail table below.
+      const a = computeAdjusted(h.billed, h.materialCost, h.laborCost, getExtraMat(j.jobNumber));
+      j._adj = a;
+      tot.billed          += +h.billed          || 0;
+      tot.materialCost    += a.material;
+      tot.laborCost       += +h.laborCost       || 0;
+      tot.preLaborGP      += a.preGP;
+      tot.grossProfit     += a.netGP;
+      tot.wrenchHours     += +h.wrenchHours     || 0;
+      tot.drivingHours    += +h.drivingHours    || 0;
+      tot.totalLaborHours += +h.totalLaborHours || 0;
+      tot.paidLaborHours  += +h.paidLaborHours  || 0;
+      tot.uniqueDays      += +h.uniqueDays      || 0;
+      tot.appointmentCount+= +h.appointmentCount|| 0;
+      tot.invoiceCount    += +h.invoiceCount    || 0;
+      for (const t of (j.data.techHours?.perTech || [])) tot.techSet.add(t.tech);
+    }
+    const gmPct = tot.billed > 0 ? (tot.grossProfit / tot.billed) * 100 : 0;
+    const gpColor = (gmPct >= 40) ? "ok" : (gmPct >= 20) ? "warn" : "accent";
+    const dPerWrench = tot.wrenchHours > 0 ? Math.round(tot.billed / tot.wrenchHours) : 0;
+    const dPerPaid   = tot.paidLaborHours > 0 ? Math.round(tot.billed / tot.paidLaborHours) : 0;
+
+    let html = `<div class="sb-card" style="border-left:3px solid var(--accent3);">
+      <h3 style="margin-bottom:8px;">Roll-up Totals · ${tot.jobs} job${tot.jobs===1?"":"s"}${errs.length ? ` <span style="color:var(--accent); font-size:11px; text-transform:none; letter-spacing:0;">(${errs.length} error${errs.length===1?"":"s"} — see chips above)</span>` : ""}</h3>
+    </div>`;
+
+    // Hero stats
+    html += `<div class="sb-hero">
+      <div class="sb-stat accent">
+        <div class="sb-stat-label">Total Billed</div>
+        <div class="sb-stat-value">${fmt$(tot.billed)}</div>
+        <div class="sb-stat-sub">${tot.invoiceCount} invoice(s) across ${tot.jobs} job(s)</div>
+      </div>
+      <div class="sb-stat ${gpColor}">
+        <div class="sb-stat-label">Net Gross Profit</div>
+        <div class="sb-stat-value">${fmt$(tot.grossProfit)}</div>
+        <div class="sb-stat-sub">${fmtN(gmPct, 1)}% net margin</div>
+      </div>
+      <div class="sb-stat info">
+        <div class="sb-stat-label">Wrench Hours</div>
+        <div class="sb-stat-value">${fmtN(tot.wrenchHours, 1)}</div>
+        <div class="sb-stat-sub">${fmtN(tot.drivingHours, 1)} drive · ${fmtN(tot.totalLaborHours, 1)} total</div>
+      </div>
+      <div class="sb-stat warn">
+        <div class="sb-stat-label">$ / Wrench Hour</div>
+        <div class="sb-stat-value">${fmt$(dPerWrench)}</div>
+        <div class="sb-stat-sub">${fmt$(dPerPaid)} / paid hr · ${tot.techSet.size} unique tech(s)</div>
+      </div>
+      <div class="sb-stat info">
+        <div class="sb-stat-label">Appointments</div>
+        <div class="sb-stat-value">${tot.appointmentCount}</div>
+        <div class="sb-stat-sub">${tot.uniqueDays} on-site day(s) total</div>
+      </div>
+    </div>`;
+
+    // Profitability summary
+    html += `<div class="sb-card">
+      <h3>Aggregate Profitability</h3>
+      <table class="sb-table" style="font-size:13px;">
+        <tbody>
+          <tr><td>Revenue (billed)</td><td class="num">${fmt$(tot.billed)}</td></tr>
+          <tr><td>− Material cost</td><td class="num">${fmt$(tot.materialCost)}</td></tr>
+          <tr><td>= Pre-labor GP</td><td class="num"><b>${fmt$(tot.preLaborGP)}</b></td></tr>
+          <tr><td>− Labor cost</td><td class="num">${fmt$(tot.laborCost)}</td></tr>
+          <tr style="border-top:1px solid var(--border-strong);"><td><b>= Net GP</b></td><td class="num"><b style="color:${gmPct >= 40 ? 'var(--ok)' : gmPct >= 20 ? 'var(--accent2)' : 'var(--accent)'};">${fmt$(tot.grossProfit)}</b> · <b>${fmtN(gmPct, 1)}%</b></td></tr>
+        </tbody>
+      </table>
+    </div>`;
+
+    // Per-job verification table
+    html += `<div class="sb-card">
+      <h3>Per-Job Detail</h3>
+      <table class="sb-table">
+        <thead><tr>
+          <th>Job #</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th class="num">Billed</th>
+          <th class="num">Materials</th>
+          <th class="num">Labor</th>
+          <th class="num">Net GP</th>
+          <th class="num">GM %</th>
+          <th class="num">Wrench</th>
+          <th class="num">$/Hr</th>
+        </tr></thead>
+        <tbody>
+          ${ok.map(j => {
+            const h = j.data.headline || {};
+            const job = j.data.job || {};
+            const a = j._adj || computeAdjusted(h.billed, h.materialCost, h.laborCost, getExtraMat(j.jobNumber));
+            const margin = a.netPct;
+            const marginColor = marginColorVar(margin);
+            const matCell = a.extra > 0
+              ? `${fmt$(a.material)} <span style="color:var(--accent2); font-size:10px;">(+${fmt$(a.extra)})</span>`
+              : fmt$(a.material);
+            return `<tr>
+              <td><a href="#${esc(job.jobNumber)}" onclick="document.querySelector('#sb-input').value='${esc(job.jobNumber)}'; window.runLookup(); window.scrollTo({top:0,behavior:'smooth'}); return false;" style="color:var(--accent3); text-decoration:none;"><b>${esc(job.jobNumber)}</b></a></td>
+              <td style="font-size:11px;">${esc(job.type || "—")}</td>
+              <td><span class="pill ${statusClass(job.status)}">${esc(job.status || "")}</span></td>
+              <td class="num">${fmt$(h.billed)}</td>
+              <td class="num">${matCell}</td>
+              <td class="num">${fmt$(h.laborCost)}</td>
+              <td class="num"><b>${fmt$(a.netGP)}</b></td>
+              <td class="num" style="color:${marginColor};"><b>${fmtN(margin, 1)}%</b></td>
+              <td class="num">${fmtN(h.wrenchHours, 1)}</td>
+              <td class="num">${fmt$(h.dollarsPerWrenchHr)}</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+        <tfoot><tr>
+          <td><b>Total (${tot.jobs})</b></td>
+          <td></td>
+          <td></td>
+          <td class="num"><b>${fmt$(tot.billed)}</b></td>
+          <td class="num"><b>${fmt$(tot.materialCost)}</b></td>
+          <td class="num"><b>${fmt$(tot.laborCost)}</b></td>
+          <td class="num"><b>${fmt$(tot.grossProfit)}</b></td>
+          <td class="num"><b>${fmtN(gmPct, 1)}%</b></td>
+          <td class="num"><b>${fmtN(tot.wrenchHours, 1)}</b></td>
+          <td class="num"><b>${fmt$(dPerWrench)}</b></td>
+        </tr></tfoot>
+      </table>
+    </div>`;
+
+    // Errors detail
+    if (errs.length) {
+      html += `<div class="sb-card" style="border-left:3px solid var(--accent);">
+        <h3 style="color:var(--accent);">Failed Lookups</h3>
+        <table class="sb-table">
+          <thead><tr><th>Job #</th><th>Error</th></tr></thead>
+          <tbody>
+            ${errs.map(j => `<tr><td><b>${esc(j.jobNumber)}</b></td><td style="color:var(--accent);">${esc(j.error || "unknown")}</td></tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+    }
+
+    ruOutput.innerHTML = html;
+  }
+
+  // Initial render of any saved chips
+  renderChips();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in — ServiceOps Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    .login-shell {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      z-index: 1;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--r-xl);
+      padding: 36px 32px 28px;
+      box-shadow: var(--shadow-lg);
+    }
+    .login-brand {
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .login-brand .s { color: var(--accent); }
+    .login-brand .o { color: var(--text); }
+    .login-sub {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 28px;
+    }
+    .login-title {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .login-hint {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      margin: 14px 0 6px;
+    }
+    input[type=email], input[type=password] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--r-md);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      padding: 11px 13px;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input[type=email]:focus, input[type=password]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-tint);
+    }
+    button.login-submit {
+      width: 100%;
+      margin-top: 22px;
+      padding: 12px;
+      border: 0;
+      border-radius: var(--r-md);
+      background: var(--accent);
+      color: #fff;
+      font-family: var(--font-sans);
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: var(--shadow-red);
+      transition: transform .05s, opacity .15s;
+    }
+    button.login-submit:hover { opacity: 0.92; }
+    button.login-submit:active { transform: translateY(1px); }
+    button.login-submit[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .login-error {
+      margin-top: 16px;
+      padding: 10px 12px;
+      border-radius: var(--r-sm);
+      background: rgba(239,68,85,0.10);
+      border: 1px solid rgba(239,68,85,0.45);
+      color: #ffb3bb;
+      font-size: 13px;
+      display: none;
+    }
+    .login-error.show { display: block; }
+    .login-foot {
+      margin-top: 22px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-shell">
+    <form class="login-card" id="login-form" autocomplete="on">
+      <div class="login-brand">
+        <span class="s">SERVICE</span><span class="o">OPS</span>
+      </div>
+      <div class="login-sub">Command Center</div>
+
+      <div class="login-title">Sign in</div>
+      <div class="login-hint">Use your Grounded Home Services email and password.</div>
+
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="username" required autofocus />
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+      <button type="submit" class="login-submit" id="submit-btn">Sign in</button>
+      <div class="login-error" id="err"></div>
+      <div class="login-foot">Internal tool · access logged</div>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('login-form');
+    const errEl = document.getElementById('err');
+    const btn = document.getElementById('submit-btn');
+
+    function showErr(msg) {
+      errEl.textContent = msg;
+      errEl.classList.add('show');
+    }
+    function clearErr() {
+      errEl.textContent = '';
+      errEl.classList.remove('show');
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearErr();
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+      try {
+        const res = await fetch('/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('email').value.trim(),
+            password: document.getElementById('password').value,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          showErr(data.error || 'Sign-in failed.');
+          btn.disabled = false;
+          btn.textContent = 'Sign in';
+          return;
+        }
+        // If the user is on a forced rotation, send them to /change-password.
+        // Otherwise, honor any ?next=... we were sent here with.
+        const next = new URLSearchParams(window.location.search).get('next') || '/';
+        window.location.href = data.mustChangePw ? '/change-password?forced=1' : next;
+      } catch (err) {
+        showErr(err.message || 'Network error.');
+        btn.disabled = false;
+        btn.textContent = 'Sign in';
+      }
+    });
+  </script>
+</body>
+</html>

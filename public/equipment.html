@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Equipment - ServiceOps Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    /* Equipment page — inherits theme vars from /css/styles.css, with fallbacks */
+    :root {
+      --eq-surface: var(--surface, #14161c);
+      --eq-surface2: var(--surface2, #1c1f27);
+      --eq-border: var(--border, #2a2e39);
+      --eq-muted: var(--muted, #8b93a7);
+      --eq-text: var(--text, #e9edf5);
+      --eq-accent: var(--accent, #c41230);
+      --eq-accent2: var(--accent2, #e8a838);
+      --eq-accent3: var(--accent3, #5b8cc9);
+      --eq-danger: var(--danger, #ff4757);
+      --eq-ok: #4caf50;
+      --eq-fdisplay: var(--font-display, 'Space Grotesk', sans-serif);
+      --eq-fmono: var(--font-mono, 'JetBrains Mono', monospace);
+    }
+    .eq-tabs { display:flex; gap:4px; margin-bottom:24px; flex-wrap:wrap; }
+    .eq-tab { background:var(--eq-surface2); border:1px solid var(--eq-border); color:var(--eq-muted);
+      font-family:var(--eq-fdisplay); font-weight:700; font-size:13px; padding:10px 20px; border-radius:10px;
+      cursor:pointer; transition:all .2s; }
+    .eq-tab:hover { color:var(--eq-text); border-color:var(--eq-accent3); }
+    .eq-tab.active { color:#fff; background:rgba(196,18,48,0.15); border-color:var(--eq-accent); }
+    .eq-section { display:none; }
+    .eq-section.active { display:block; }
+
+    .eq-grid { display:grid; grid-template-columns: 1.1fr 0.9fr; gap:20px; align-items:start; }
+    @media (max-width: 900px){ .eq-grid { grid-template-columns:1fr; } }
+
+    .card { background:var(--eq-surface); border:1px solid var(--eq-border); border-radius:16px; padding:20px; margin-bottom:20px; }
+    .card h2 { font-family:var(--eq-fdisplay); font-size:15px; margin:0 0 4px; color:var(--eq-text); }
+    .card .sub { color:var(--eq-muted); font-size:12px; margin:0 0 16px; font-family:var(--eq-fmono); }
+    .step-num { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px;
+      border-radius:50%; background:var(--eq-accent); color:#fff; font-size:11px; font-weight:800; margin-right:8px; }
+
+    label.fld { display:block; color:var(--eq-muted); font-family:var(--eq-fmono); font-size:11px;
+      text-transform:uppercase; letter-spacing:1px; margin:14px 0 6px; }
+    label.fld .req { color:var(--eq-accent2); }
+    input.eq, select.eq { width:100%; box-sizing:border-box; background:var(--eq-surface2);
+      border:1px solid var(--eq-border); color:var(--eq-text); font-family:var(--eq-fmono); font-size:13px;
+      padding:10px 12px; border-radius:8px; outline:none; }
+    input.eq:focus, select.eq:focus { border-color:var(--eq-accent); }
+    .field-help { color:var(--eq-muted); font-size:10px; margin-top:4px; font-family:var(--eq-fmono); }
+    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+    .btn { background:var(--eq-accent); color:#fff; border:none; font-family:var(--eq-fdisplay); font-weight:700;
+      font-size:13px; padding:11px 20px; border-radius:9px; cursor:pointer; transition:all .2s; }
+    .btn:hover { filter:brightness(1.1); }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .btn-secondary { background:var(--eq-surface2); color:var(--eq-text); border:1px solid var(--eq-border);
+      font-family:var(--eq-fdisplay); font-weight:700; font-size:12px; padding:9px 16px; border-radius:8px; cursor:pointer; }
+    .btn-secondary:hover { border-color:var(--eq-accent3); color:var(--eq-accent3); }
+
+    .cust-result { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 12px;
+      border:1px solid var(--eq-border); border-radius:8px; margin-top:8px; cursor:pointer; transition:all .15s; }
+    .cust-result:hover { border-color:var(--eq-accent3); background:rgba(91,140,201,0.06); }
+    .cust-result.selected { border-color:var(--eq-ok); background:rgba(76,175,80,0.08); }
+    .cust-name { font-weight:700; font-size:13px; color:var(--eq-text); }
+    .cust-meta { color:var(--eq-muted); font-size:11px; font-family:var(--eq-fmono); }
+    .badge { font-size:10px; font-family:var(--eq-fmono); padding:2px 8px; border-radius:6px;
+      background:var(--eq-surface2); border:1px solid var(--eq-border); color:var(--eq-muted); }
+
+    .pill { display:inline-block; font-family:var(--eq-fmono); font-size:11px; padding:3px 10px; border-radius:20px;
+      background:var(--eq-surface2); border:1px solid var(--eq-border); color:var(--eq-text); }
+    .decode-line { margin-top:6px; font-family:var(--eq-fmono); font-size:12px; }
+    .decode-ok { color:var(--eq-accent3); }
+    .decode-bad { color:var(--eq-danger); }
+    .warn { color:var(--eq-accent2); font-family:var(--eq-fmono); font-size:12px; margin-top:6px; }
+
+    .kv { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px dashed var(--eq-border);
+      font-size:12px; }
+    .kv:last-child { border-bottom:none; }
+    .kv .k { color:var(--eq-muted); font-family:var(--eq-fmono); }
+    .kv .v { color:var(--eq-text); font-weight:600; text-align:right; }
+
+    .empty { color:var(--eq-muted); font-family:var(--eq-fmono); font-size:12px; padding:8px 0; }
+    .toast { position:fixed; right:20px; bottom:20px; max-width:380px; padding:14px 18px; border-radius:10px;
+      font-size:13px; z-index:50; box-shadow:0 8px 24px rgba(0,0,0,.4); display:none; }
+    .toast.ok { background:rgba(76,175,80,0.15); border:1px solid var(--eq-ok); color:#cdeecf; }
+    .toast.bad { background:rgba(255,71,87,0.15); border:1px solid var(--eq-danger); color:#ffd5d9; }
+
+    .proportal-bar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .count-big { font-size:28px; font-weight:800; color:var(--eq-accent2); font-family:var(--eq-fdisplay); }
+
+    table.recent { width:100%; border-collapse:collapse; font-size:12px; font-family:var(--eq-fmono); margin-top:8px; }
+    table.recent th { text-align:left; color:var(--eq-muted); font-weight:500; text-transform:uppercase; font-size:10px;
+      letter-spacing:1px; padding:8px 10px; border-bottom:1px solid var(--eq-border); }
+    table.recent td { padding:7px 10px; border-bottom:1px solid var(--eq-border); color:var(--eq-text); }
+    .st-created { color:var(--eq-ok); }
+    .st-failed { color:var(--eq-danger); }
+  </style>
+</head>
+<body>
+
+<!-- Nav: built by /js/shared.js — do not hand-edit, it gets wiped on load. -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+
+  <div class="page-header">
+    <div>
+      <h1>Equipment <span class="accent">Registration</span></h1>
+      <p>Record installed equipment on a customer's ServiceTitan location — Rinnai tankless registrations, and American Standard warranty imports straight from the registration PDF.</p>
+    </div>
+    <div class="status-bar"><span class="status-dot"></span> ServiceTitan connected</div>
+  </div>
+
+  <!-- Tabs (built from /api/equipment/types) -->
+  <div class="eq-tabs" id="eq-tabs"></div>
+
+  <!-- One section per equipment type is rendered here -->
+  <div id="eq-sections"></div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var state = {
+    types: [],
+    activeTypeId: null,
+    customer: null,     // {id,name}
+    locations: [],      // [{id,name,address}]
+    location: null,     // {id,address}
+    locCollapse: null,  // location id to collapse the list to (address auto-match)
+  };
+
+  // ── helpers ────────────────────────────────────────────────────────────────
+  function el(tag, attrs, children) {
+    var e = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      if (k === "class") e.className = attrs[k];
+      else if (k === "html") e.innerHTML = attrs[k];
+      else if (k.indexOf("on") === 0 && typeof attrs[k] === "function") e.addEventListener(k.slice(2), attrs[k]);
+      else e.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) { if (c != null) e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+    return e;
+  }
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function toast(msg, kind) {
+    var t = document.getElementById("toast");
+    t.className = "toast " + (kind || "ok");
+    t.textContent = msg;
+    t.style.display = "block";
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.style.display = "none"; }, 5000);
+  }
+  function api(path, opts) {
+    opts = opts || {};
+    return fetch(path, {
+      method: opts.method || "GET",
+      headers: opts.body ? { "Content-Type": "application/json" } : undefined,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    }).then(function (r) { return r.json(); });
+  }
+  function debounce(fn, ms) {
+    var t; return function () { var a = arguments, c = this; clearTimeout(t); t = setTimeout(function () { fn.apply(c, a); }, ms); };
+  }
+  function activeType() { return state.types.filter(function (t) { return t.id === state.activeTypeId; })[0]; }
+
+  // ── boot ───────────────────────────────────────────────────────────────────
+  api("/api/equipment/types").then(function (res) {
+    if (!res.ok || !res.types.length) { document.getElementById("eq-sections").innerHTML = '<div class="card"><div class="empty">No equipment types configured.</div></div>'; return; }
+    state.types = res.types;
+    state.activeTypeId = res.types[0].id;
+    buildTabs();
+    // Build a section for EVERY type (tabs just toggle which one is visible).
+    state.types.forEach(function (t) { buildSection(t); });
+    selectTab(res.types[0].id);
+    refreshPending();
+    loadRecent();
+  });
+
+  function buildTabs() {
+    var wrap = document.getElementById("eq-tabs");
+    wrap.innerHTML = "";
+    state.types.forEach(function (t) {
+      wrap.appendChild(el("button", {
+        class: "eq-tab" + (t.id === state.activeTypeId ? " active" : ""),
+        "data-id": t.id,
+        onclick: function () { selectTab(t.id); },
+      }, [t.tabTitle || t.label]));
+    });
+  }
+
+  function selectTab(id) {
+    state.activeTypeId = id;
+    Array.prototype.forEach.call(document.querySelectorAll(".eq-tab"), function (b) {
+      b.classList.toggle("active", b.getAttribute("data-id") === id);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".eq-section"), function (s) {
+      s.classList.toggle("active", s.getAttribute("data-id") === id);
+    });
+    refreshPending();
+    loadRecent();
+  }
+
+  // ── section (one per type) ───────────────────────────────────────────────────
+  function buildSection(type) {
+    var sections = document.getElementById("eq-sections");
+    var sec = el("div", { class: "eq-section", "data-id": type.id });
+
+    // ── left column: the workflow ──
+    var left = el("div", {});
+
+    // Step 1 — customer
+    var custResults = el("div", { id: "cust-results-" + type.id });
+    var custInput = el("input", { class: "eq", id: "cust-q-" + type.id, placeholder: "Customer name, ID, or address…", autocomplete: "off" });
+    custInput.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); doSearch(type); } });
+    left.appendChild(el("div", { class: "card" }, [
+      el("h2", {}, [el("span", { class: "step-num" }, ["1"]), "Find the customer"]),
+      el("div", { class: "sub" }, ["Search ServiceTitan by name, customer ID, or street address."]),
+      el("div", { class: "row2", style: "grid-template-columns: 1fr auto;" }, [
+        custInput,
+        el("button", { class: "btn", onclick: function () { doSearch(type); } }, ["Search"]),
+      ]),
+      custResults,
+    ]));
+
+    // Step 2 — location
+    left.appendChild(el("div", { class: "card", id: "loc-card-" + type.id, style: "display:none;" }, [
+      el("h2", {}, [el("span", { class: "step-num" }, ["2"]), "Confirm the location"]),
+      el("div", { class: "sub" }, ["If the customer has more than one address, pick the right one."]),
+      el("div", { id: "loc-list-" + type.id }),
+    ]));
+
+    // Step 3 — equipment details. PDF-driven types (American Standard) get an
+    // upload + multi-unit editor; everything else gets the generic single-unit form.
+    if (type.inputMode === "pdf" || type.inputMode === "image") {
+      left.appendChild(buildAsUploadCard(type));
+    } else {
+      var fieldsWrap = el("div", { id: "fields-" + type.id });
+      type.fields.forEach(function (f) { fieldsWrap.appendChild(renderField(type, f)); });
+      left.appendChild(el("div", { class: "card", id: "form-card-" + type.id, style: "display:none;" }, [
+        el("h2", {}, [el("span", { class: "step-num" }, ["3"]), type.tabTitle + " details"]),
+        el("div", { class: "sub" }, ["The serial's first two letters decode the manufacture date automatically."]),
+        fieldsWrap,
+        el("div", { style: "margin-top:18px; display:flex; gap:10px;" }, [
+          el("button", { class: "btn", id: "preview-btn-" + type.id, onclick: function () { doPreview(type); } }, ["Preview →"]),
+          el("button", { class: "btn-secondary", onclick: function () { resetForm(type); } }, ["Clear"]),
+        ]),
+      ]));
+    }
+
+    // ── right column: preview + proportal + recent ──
+    var right = el("div", {});
+    right.appendChild(el("div", { class: "card", id: "preview-card-" + type.id }, [
+      el("h2", {}, ["Confirm before writing"]),
+      el("div", { class: "sub" }, ["Review the decoded date, warranty, and destination, then register."]),
+      el("div", { id: "preview-body-" + type.id }, [el("div", { class: "empty" }, ["Fill in the details and hit Preview."])]),
+    ]));
+
+    if (type.hasProPortal) {
+      right.appendChild(el("div", { class: "card" }, [
+        el("h2", {}, ["Rinnai ProPortal file"]),
+        el("div", { class: "sub" }, ["Entries queue here. Download the CSV and upload it to ProPortal."]),
+        el("div", { class: "proportal-bar" }, [
+          el("div", {}, [
+            el("span", { class: "count-big", id: "pending-" + type.id }, ["0"]),
+            el("span", { class: "cust-meta" }, [" units queued"]),
+          ]),
+          el("button", { class: "btn-secondary", id: "export-btn-" + type.id, onclick: function () { doExport(type); } }, ["Download CSV"]),
+        ]),
+      ]));
+    }
+
+    right.appendChild(el("div", { class: "card" }, [
+      el("h2", {}, ["Recent entries"]),
+      el("div", { id: "recent-" + type.id }, [el("div", { class: "empty" }, ["Nothing yet."])]),
+    ]));
+
+    sec.appendChild(el("div", { class: "eq-grid" }, [left, right]));
+    sections.appendChild(sec);
+  }
+
+  function renderField(type, f) {
+    var id = "f-" + type.id + "-" + f.key;
+    var control;
+    if (f.type === "select") {
+      control = el("select", { class: "eq", id: id, "data-key": f.key });
+      (f.options || []).forEach(function (opt) {
+        var o = el("option", { value: opt }, [opt]);
+        if (f.default === opt) o.selected = true;
+        control.appendChild(o);
+      });
+    } else if (f.type === "model") {
+      control = el("input", { class: "eq", id: id, "data-key": f.key, list: "models-" + type.id, placeholder: "e.g. RU199iN", autocomplete: "off" });
+      var dl = el("datalist", { id: "models-" + type.id });
+      (type.models || []).forEach(function (m) { dl.appendChild(el("option", { value: m })); });
+      var wrap = el("div", {}, [
+        el("label", { class: "fld" }, [f.label, f.required ? el("span", { class: "req" }, [" *"]) : ""]),
+        control, dl,
+        f.help ? el("div", { class: "field-help" }, [f.help]) : null,
+      ]);
+      return wrap;
+    } else {
+      control = el("input", { class: "eq", id: id, "data-key": f.key, type: f.type === "date" ? "date" : "text", autocomplete: "off" });
+      if (f.default) control.value = f.default;
+    }
+
+    // Live serial decode
+    if (f.key === "serialNumber") {
+      control.addEventListener("input", debounce(function () { decodeSerial(type); }, 300));
+    }
+    if (f.key === "installedOn") {
+      control.addEventListener("change", function () { decodeSerial(type); });
+    }
+
+    return el("div", {}, [
+      el("label", { class: "fld" }, [f.label, f.required ? el("span", { class: "req" }, [" *"]) : ""]),
+      control,
+      f.key === "serialNumber" ? el("div", { class: "decode-line", id: "decode-" + type.id }, []) : null,
+      f.help ? el("div", { class: "field-help" }, [f.help]) : null,
+    ]);
+  }
+
+  function readForm(type) {
+    var data = {};
+    type.fields.forEach(function (f) {
+      var c = document.getElementById("f-" + type.id + "-" + f.key);
+      if (c) data[f.key] = c.value.trim();
+    });
+    return data;
+  }
+  function resetForm(type) {
+    type.fields.forEach(function (f) {
+      var c = document.getElementById("f-" + type.id + "-" + f.key);
+      if (c) c.value = (f.type === "select" || f.default) ? (f.default || (f.options ? f.options[0] : "")) : "";
+    });
+    var d = document.getElementById("decode-" + type.id); if (d) d.innerHTML = "";
+    var pb = document.getElementById("preview-body-" + type.id);
+    if (pb) pb.innerHTML = '<div class="empty">Fill in the details and hit Preview.</div>';
+  }
+
+  // ── step 1: customer search ──────────────────────────────────────────────────
+  function doSearch(type) {
+    var q = document.getElementById("cust-q-" + type.id).value.trim();
+    var box = document.getElementById("cust-results-" + type.id);
+    if (q.length < 2) { box.innerHTML = '<div class="empty">Type at least 2 characters.</div>'; return; }
+    box.innerHTML = '<div class="empty">Searching…</div>';
+    api("/api/equipment/customers?q=" + encodeURIComponent(q)).then(function (res) {
+      box.innerHTML = "";
+      if (!res.ok || !res.results.length) { box.innerHTML = '<div class="empty">No matching customers.</div>'; return; }
+      res.results.forEach(function (c) {
+        box.appendChild(el("div", { class: "cust-result", onclick: function () { pickCustomer(type, c, box); } }, [
+          el("div", {}, [
+            el("div", { class: "cust-name" }, [c.name]),
+            el("div", { class: "cust-meta" }, [(c.address || "no address on file")]),
+          ]),
+          el("span", { class: "badge" }, ["#" + c.id + (c.type ? " · " + c.type : "")]),
+        ]));
+      });
+    }).catch(function () { box.innerHTML = '<div class="empty">Search failed.</div>'; });
+  }
+
+  function pickCustomer(type, c, box) {
+    state.customer = c;
+    state.location = null;
+    state.locCollapse = null;
+    Array.prototype.forEach.call(box.querySelectorAll(".cust-result"), function (r) { r.classList.remove("selected"); });
+    // mark selected
+    Array.prototype.forEach.call(box.querySelectorAll(".cust-result"), function (r) {
+      if (r.querySelector(".cust-name").textContent === c.name) r.classList.add("selected");
+    });
+    // fetch locations
+    var locCard = document.getElementById("loc-card-" + type.id);
+    var locList = document.getElementById("loc-list-" + type.id);
+    locCard.style.display = "block";
+
+    // Address match: we already know the exact location from the search result,
+    // so confirm it IMMEDIATELY — independent of the full location list (which
+    // can be long / truncated for big commercial accounts). Then load the full
+    // list in the background just to power the "Show all" toggle.
+    if (c.locationId) {
+      var matchedLoc = { id: c.locationId, address: c.address || "", name: "" };
+      state.locations = [matchedLoc];
+      state.locCollapse = c.locationId;
+      pickLocation(type, matchedLoc);
+      api("/api/equipment/locations?customerId=" + c.id).then(function (res) {
+        var all = (res.ok && res.locations) ? res.locations : [];
+        if (!all.some(function (l) { return String(l.id) === String(c.locationId); })) all.unshift(matchedLoc);
+        state.locations = all;
+        renderLocations(type, locList, state.locCollapse);
+      }).catch(function () { /* keep the single matched location */ });
+      return;
+    }
+
+    // Name / ID match: fetch the list and pick as before.
+    locList.innerHTML = '<div class="empty">Loading locations…</div>';
+    api("/api/equipment/locations?customerId=" + c.id).then(function (res) {
+      locList.innerHTML = "";
+      state.locations = (res.ok && res.locations) ? res.locations : [];
+      if (!state.locations.length) { locList.innerHTML = '<div class="empty">No active locations for this customer.</div>'; return; }
+      if (state.locations.length === 1) {
+        renderLocations(type, locList);
+        pickLocation(type, state.locations[0]);
+      } else {
+        renderLocations(type, locList);
+      }
+    });
+  }
+
+  function renderLocations(type, locList, collapseToId) {
+    locList.innerHTML = "";
+    var locs = state.locations || [];
+    var collapsed = collapseToId != null && locs.length > 1;
+    var shown = collapsed ? locs.filter(function (l) { return String(l.id) === String(collapseToId); }) : locs;
+    // Scroll long location lists instead of pushing the form way down the page.
+    if (!collapsed && shown.length > 5) {
+      locList.style.maxHeight = "320px"; locList.style.overflowY = "auto"; locList.style.paddingRight = "4px";
+    } else {
+      locList.style.maxHeight = ""; locList.style.overflowY = ""; locList.style.paddingRight = "";
+    }
+    shown.forEach(function (l) {
+      var selected = state.location && state.location.id === l.id;
+      locList.appendChild(el("div", { class: "cust-result" + (selected ? " selected" : ""), onclick: function () { pickLocation(type, l); } }, [
+        el("div", {}, [
+          el("div", { class: "cust-name" }, [l.address || l.name || ("Location #" + l.id)]),
+          l.name && l.address ? el("div", { class: "cust-meta" }, [l.name]) : null,
+        ]),
+        el("span", { class: "badge" }, ["#" + l.id]),
+      ]));
+    });
+    if (collapsed) {
+      locList.appendChild(el("div", { class: "field-help", style: "margin-top:6px;" }, ["Auto-selected from the address you searched."]));
+      locList.appendChild(el("button", { class: "btn-secondary", style: "margin-top:6px;", onclick: function () { state.locCollapse = null; renderLocations(type, locList); } }, ["Show all " + locs.length + " locations"]));
+    }
+  }
+
+  function pickLocation(type, l) {
+    state.location = l;
+    renderLocations(type, document.getElementById("loc-list-" + type.id), state.locCollapse);
+    document.getElementById("form-card-" + type.id).style.display = "block";
+  }
+
+  // ── step 3: live serial decode ───────────────────────────────────────────────
+  function decodeSerial(type) {
+    var serialEl = document.getElementById("f-" + type.id + "-serialNumber");
+    var instEl = document.getElementById("f-" + type.id + "-installedOn");
+    var line = document.getElementById("decode-" + type.id);
+    if (!serialEl || !line) return;
+    var serial = serialEl.value.trim();
+    if (!serial) { line.innerHTML = ""; return; }
+    api("/api/equipment/decode-serial", { method: "POST", body: { serial: serial, installedOn: instEl ? instEl.value : null } })
+      .then(function (res) {
+        var d = res.decoded || {};
+        if (d.ok) {
+          line.innerHTML = '<span class="decode-ok">✓ Manufactured ' + d.label + '</span>'
+            + (res.warning ? '<div class="warn">⚠ ' + res.warning + '</div>' : "");
+        } else {
+          line.innerHTML = '<span class="decode-bad">✗ ' + (d.error || "Could not decode serial") + '</span>';
+        }
+      });
+  }
+
+  // ── step 4: preview ──────────────────────────────────────────────────────────
+  function doPreview(type) {
+    if (!state.customer || !state.location) { toast("Pick a customer and location first.", "bad"); return; }
+    var body = { equipmentTypeId: type.id, customerId: state.customer.id, locationId: state.location.id, formData: readForm(type) };
+    var panel = document.getElementById("preview-body-" + type.id);
+    panel.innerHTML = '<div class="empty">Building preview…</div>';
+    api("/api/equipment/preview", { method: "POST", body: body }).then(function (p) {
+      if (!p.ok) { panel.innerHTML = '<div class="warn">' + (p.error || "Preview failed") + '</div>'; return; }
+      renderPreview(type, p);
+    });
+  }
+
+  function renderPreview(type, p) {
+    var panel = document.getElementById("preview-body-" + type.id);
+    panel.innerHTML = "";
+    var w = p.warranty || {};
+    var kvs = [
+      ["Customer", p.customer.name + " (#" + p.customer.id + ")"],
+      ["Location", p.location.address],
+      ["Model", p.stPayload.model || "—"],
+      ["Serial", p.stPayload.serialNumber || "—"],
+      ["Manufactured", p.decoded && p.decoded.ok ? p.decoded.label : "unknown"],
+      ["Installed", (p.stPayload.installedOn || "").slice(0, 10) || "—"],
+      ["HX warranty", (w.manufacturerWarrantyStart || "") + " → " + (w.manufacturerWarrantyEnd || "") + " (" + (w.heatExchangerYears || "?") + " yr)"],
+      ["Parts / Labor", (w.partsYears || "?") + " yr parts · 1→" + (w.laborYearsRegistered || "?") + " yr labor (registered)"],
+    ];
+    kvs.forEach(function (kv) { panel.appendChild(el("div", { class: "kv" }, [el("span", { class: "k" }, [kv[0]]), el("span", { class: "v" }, [kv[1]])])); });
+
+    (p.warnings || []).forEach(function (wn) { panel.appendChild(el("div", { class: "warn" }, ["⚠ " + wn])); });
+
+    if (p.proPortalRow) {
+      panel.appendChild(el("div", { style: "margin-top:12px;" }, [el("span", { class: "pill" }, ["+ 1 row will queue for Rinnai ProPortal"])]));
+    }
+
+    panel.appendChild(el("div", { style: "margin-top:16px; display:flex; gap:10px;" }, [
+      el("button", { class: "btn", id: "confirm-btn-" + type.id, onclick: function () { doSubmit(type); } }, ["Confirm & Register"]),
+    ]));
+  }
+
+  // ── step 5: submit ───────────────────────────────────────────────────────────
+  function doSubmit(type) {
+    var btn = document.getElementById("confirm-btn-" + type.id);
+    if (btn) { btn.disabled = true; btn.textContent = "Registering…"; }
+    var body = { equipmentTypeId: type.id, customerId: state.customer.id, locationId: state.location.id, formData: readForm(type) };
+    api("/api/equipment/submit", { method: "POST", body: body }).then(function (r) {
+      if (r.ok) {
+        toast("Registered in ServiceTitan (equipment #" + (r.stInstalledEquipmentId || "?") + ") and queued for ProPortal.", "ok");
+        resetForm(type);
+        document.getElementById("preview-body-" + type.id).innerHTML = '<div class="empty">Registered. Enter the next unit.</div>';
+      } else if (r.stWriteStatus === "failed") {
+        toast("Saved for ProPortal, but the ServiceTitan write failed: " + (r.stError || "unknown"), "bad");
+      } else {
+        toast(r.error || "Submit failed.", "bad");
+        if (btn) { btn.disabled = false; btn.textContent = "Confirm & Register"; }
+      }
+      refreshPending();
+      loadRecent();
+    }).catch(function () {
+      toast("Submit failed (network).", "bad");
+      if (btn) { btn.disabled = false; btn.textContent = "Confirm & Register"; }
+    });
+  }
+
+  // ── ProPortal ────────────────────────────────────────────────────────────────
+  function refreshPending() {
+    var type = activeType();
+    if (!type || !type.hasProPortal) return;
+    api("/api/equipment/proportal/pending?typeId=" + type.id).then(function (r) {
+      var elc = document.getElementById("pending-" + type.id);
+      if (elc) elc.textContent = r.ok ? r.count : "0";
+    });
+  }
+
+  function doExport(type) {
+    api("/api/equipment/proportal/export", { method: "POST", body: { typeId: type.id } }).then(function (r) {
+      if (!r.ok) { toast(r.error || "Export failed.", "bad"); return; }
+      if (!r.count) { toast("Nothing queued to export.", "bad"); return; }
+      var blob = new Blob([r.csv], { type: "text/csv;charset=utf-8;" });
+      var url = URL.createObjectURL(blob);
+      var a = el("a", { href: url, download: r.filename });
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast("Exported " + r.count + " unit(s) to " + r.filename, "ok");
+      refreshPending();
+    });
+  }
+
+  // ── recent ─────────────────────────────────────────────────────────────────
+  function loadRecent() {
+    var type = activeType();
+    if (!type) return;
+    api("/api/equipment/recent?limit=15").then(function (r) {
+      var box = document.getElementById("recent-" + type.id);
+      if (!box) return;
+      var rows = (r.ok ? r.rows : []).filter(function (x) { return x.equipment_type_id === type.id; });
+      if (!rows.length) { box.innerHTML = '<div class="empty">Nothing yet.</div>'; return; }
+      var tbl = el("table", { class: "recent" }, [
+        el("thead", {}, [el("tr", {}, [
+          el("th", {}, ["Serial"]), el("th", {}, ["Customer"]), el("th", {}, ["Installed"]), el("th", {}, ["ST"]),
+        ])]),
+      ]);
+      var tb = el("tbody", {});
+      rows.forEach(function (x) {
+        tb.appendChild(el("tr", {}, [
+          el("td", {}, [x.serial_number || "—"]),
+          el("td", {}, [x.st_customer_name || "—"]),
+          el("td", {}, [x.installed_on || "—"]),
+          el("td", { class: x.st_write_status === "created" ? "st-created" : "st-failed" }, [x.st_write_status === "created" ? "✓ #" + (x.st_installed_equipment_id || "") : "✗ failed"]),
+        ]));
+      });
+      tbl.appendChild(tb);
+      box.innerHTML = ""; box.appendChild(tbl);
+    });
+  }
+
+  // ── American Standard (inputMode "pdf") ──────────────────────────────────────
+  // Upload the warranty PDF → parse every unit → edit → write all to ServiceTitan.
+  // Works for a full system (AC + Coil + Furnace) or a single piece. No CSV.
+  var FP_RE = /functional\s*parts/i;
+  var HX_RE = /heat\s*exchanger/i;
+
+  function ensureAsState(type) {
+    state.as = state.as || {};
+    state.as[type.id] = state.as[type.id] ||
+      { warrantyNumber: null, parsedCustomer: null, dealer: null, units: [], applyLaborWarranty: true, createMembership: true, attachPdf: true };
+    return state.as[type.id];
+  }
+  function asWholeSystem(type) { return ensureAsState(type).units.length >= 2; }
+  function covEnd(unit, re) {
+    var c = (unit.coverages || []).filter(function (x) { return re.test(x.name || ""); })[0];
+    return c ? (c.endDate || "") : "";
+  }
+  function setCov(unit, name, re, endDate) {
+    unit.coverages = (unit.coverages || []).filter(function (c) { return !re.test(c.name || ""); });
+    if (endDate) unit.coverages.push({ name: name, endDate: endDate });
+  }
+  // Decode American Standard / Trane manufacture date: pos 1-2 = year, 3-4 = week.
+  function asDecodeSerial(serial) {
+    var c = String(serial == null ? "" : serial).replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    if (c.length < 4 || !/^\d{4}/.test(c)) return { ok: false };
+    var year = 2000 + Number(c.slice(0, 2));
+    var week = Number(c.slice(2, 4));
+    if (week < 1 || week > 53) return { ok: false };
+    var approx = new Date(Date.UTC(year, 0, 1) + (week - 1) * 7 * 86400000);
+    var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    return { ok: true, date: approx.toISOString().slice(0, 10), year: year, week: week,
+      label: "Week " + week + ", " + year + " (~" + months[approx.getUTCMonth()] + " " + year + ")" };
+  }
+
+  // Step-3 card for a PDF-driven type.
+  function buildAsUploadCard(type) {
+    var s = ensureAsState(type);
+    var fileInput = el("input", { class: "eq", id: "as-file-" + type.id, type: "file", accept: type.uploadAccept || "application/pdf" });
+
+    // Attach-to-job block: type the job number for this install and confirm it.
+    var attachChk = el("input", { type: "checkbox" });
+    attachChk.checked = s.attachPdf !== false;
+    attachChk.style.marginRight = "8px";
+    attachChk.addEventListener("change", function () { s.attachPdf = attachChk.checked; });
+    var jobInput = el("input", { class: "eq", id: "as-jobnum-" + type.id, placeholder: "Job number, e.g. 2602739", autocomplete: "off" });
+    jobInput.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); confirmAsJob(type); } });
+    jobInput.addEventListener("input", function () {
+      var st = ensureAsState(type);
+      st.jobConfirmed = false; st.jobId = null;
+      var sEl = document.getElementById("as-job-status-" + type.id); if (sEl) sEl.innerHTML = "";
+    });
+    var docWord = type.inputMode === "image" ? "screenshot" : "PDF";
+    var attachBlock = el("div", { style: "margin-top:14px; padding:12px; border:1px solid var(--eq-border); border-radius:10px;" }, [
+      el("label", { style: "display:flex; align-items:center; cursor:pointer; color:var(--eq-text); font-size:13px;" }, [attachChk, "Attach the " + docWord + " to a ServiceTitan job"]),
+      el("div", { class: "field-help", style: "margin:6px 0 8px;" }, ["Type the job number for this install and confirm it."]),
+      el("div", { class: "row2", style: "grid-template-columns:1fr auto;" }, [
+        jobInput,
+        el("button", { class: "btn-secondary", onclick: function () { confirmAsJob(type); } }, ["Confirm job"]),
+      ]),
+      el("div", { class: "decode-line", id: "as-job-status-" + type.id, style: "margin-top:6px;" }, []),
+    ]);
+
+    // Optional link to the manufacturer's registration site.
+    var regLink = type.registrationUrl
+      ? el("div", { style: "margin-top:10px;" }, [
+          el("a", { href: type.registrationUrl, target: "_blank", rel: "noopener",
+            style: "color:var(--eq-accent3); font-size:12px; font-family:var(--eq-fmono); text-decoration:none;" },
+            [type.registrationLabel || "Register on the manufacturer site →"]),
+        ])
+      : null;
+
+    return el("div", { class: "card", id: "form-card-" + type.id }, [
+      el("h2", {}, [el("span", { class: "step-num" }, ["3"]), type.uploadTitle || "Import the warranty"]),
+      el("div", { class: "sub" }, [type.uploadHint || ""]),
+      regLink,
+      fileInput,
+      el("div", { style: "margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;" }, [
+        el("button", { class: "btn", onclick: function () { doAsParse(type); } }, [type.parseLabel || "Parse file"]),
+        el("button", { class: "btn-secondary", onclick: function () { addAsUnit(type); } }, ["+ Add unit manually"]),
+      ]),
+      el("div", { id: "as-parsed-" + type.id }),
+      el("div", { id: "as-units-" + type.id, style: "margin-top:8px;" }),
+      attachBlock,
+    ]);
+  }
+
+  // Confirm a typed job number exists (resolves it to an internal job ID).
+  function confirmAsJob(type) {
+    var input = document.getElementById("as-jobnum-" + type.id);
+    var num = input && input.value.trim();
+    var statusEl = document.getElementById("as-job-status-" + type.id);
+    var s = ensureAsState(type);
+    s.jobConfirmed = false; s.jobId = null; s.jobNumber = num || null;
+    if (!num) { if (statusEl) statusEl.innerHTML = '<span class="decode-bad">Enter a job number.</span>'; return; }
+    if (statusEl) statusEl.innerHTML = '<span class="cust-meta">Checking…</span>';
+    api("/api/equipment/" + type.apiBase + "/job-lookup?jobNumber=" + encodeURIComponent(num)).then(function (r) {
+      if (r.ok) {
+        s.jobConfirmed = true; s.jobId = r.jobId; s.jobNumber = r.jobNumber || num;
+        if (statusEl) statusEl.innerHTML = '<span class="decode-ok">✓ Job #' + (r.jobNumber || num) + ' confirmed</span>';
+      } else {
+        if (statusEl) statusEl.innerHTML = '<span class="decode-bad">✗ ' + (r.error || "Job not found") + '</span>';
+      }
+    }).catch(function () { if (statusEl) statusEl.innerHTML = '<span class="decode-bad">Lookup failed.</span>'; });
+  }
+
+  // Attach the uploaded warranty PDF to the confirmed job (after the units write).
+  function attachAsPdf(type) {
+    var fileEl = document.getElementById("as-file-" + type.id);
+    var f = fileEl && fileEl.files && fileEl.files[0];
+    if (!f) return; // manual entry — no PDF to attach
+    var s = ensureAsState(type);
+    if (!s.jobId) { toast("PDF not attached — enter a job number and click Confirm job.", "bad"); return; }
+    var fd = new FormData();
+    fd.append("warrantyPdf", f);
+    fd.append("jobId", s.jobId);
+    if (s.jobNumber) fd.append("jobNumber", s.jobNumber);
+    if (s.warrantyNumber) fd.append("warrantyNumber", s.warrantyNumber);
+    fetch("/api/equipment/" + type.apiBase + "/attach-pdf", { method: "POST", body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res.ok) toast("Attached to job #" + (s.jobNumber || "") + ".", "ok");
+        else toast("Couldn't attach the file: " + (res.error || "unknown"), "bad");
+      })
+      .catch(function () { toast("Couldn't attach the file (network).", "bad"); });
+  }
+
+  function doAsParse(type) {
+    var docWord = type.inputMode === "image" ? "screenshot" : "PDF";
+    var fileEl = document.getElementById("as-file-" + type.id);
+    var f = fileEl && fileEl.files && fileEl.files[0];
+    if (!f) { toast("Choose a " + docWord + " first.", "bad"); return; }
+    var fd = new FormData();
+    fd.append("warrantyPdf", f);
+    toast("Reading the " + docWord + "…", "ok");
+    fetch("/api/equipment/" + type.apiBase + "/parse", { method: "POST", body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!res.ok) { toast(res.error || "Parse failed.", "bad"); return; }
+        var s = ensureAsState(type);
+        s.warrantyNumber = res.warrantyNumber || s.warrantyNumber;
+        s.parsedCustomer = res.customer || s.parsedCustomer;
+        s.dealer = res.dealer || s.dealer;
+        (res.units || []).forEach(function (u) { s.units.push(u); });
+        renderAsParsedInfo(type);
+        renderAsUnits(type);
+        if (res.note) toast(res.note, "bad");
+        else toast("Read " + (res.units || []).length + " unit(s) from the " + docWord + ".", "ok");
+        // Pre-fill + auto-search the ST customer from the parsed name, if present.
+        if (res.customer && res.customer.name && !state.customer) {
+          var q = document.getElementById("cust-q-" + type.id);
+          if (q) { q.value = res.customer.name; doSearch(type); }
+        }
+      })
+      .catch(function () { toast("Parse failed (network).", "bad"); });
+  }
+
+  function renderAsParsedInfo(type) {
+    var box = document.getElementById("as-parsed-" + type.id);
+    if (!box) return;
+    var s = ensureAsState(type);
+    box.innerHTML = "";
+    if (!s.warrantyNumber && !s.parsedCustomer) return;
+    var wrap = el("div", { style: "margin-top:10px; padding:10px; border:1px dashed var(--eq-border); border-radius:8px;" }, [
+      el("div", { style: "font-family:var(--eq-fmono); font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--eq-muted); margin-bottom:4px;" },
+        ["From the PDF — confirm it matches the ServiceTitan customer above"]),
+    ]);
+    var lines = [];
+    if (s.warrantyNumber) lines.push(["Warranty #", s.warrantyNumber]);
+    if (s.parsedCustomer) {
+      lines.push(["Registered to", s.parsedCustomer.name || "—"]);
+      if (s.parsedCustomer.address) lines.push(["Address", s.parsedCustomer.address]);
+    }
+    lines.forEach(function (kv) {
+      wrap.appendChild(el("div", { class: "kv" }, [el("span", { class: "k" }, [kv[0]]), el("span", { class: "v" }, [kv[1]])]));
+    });
+    box.appendChild(wrap);
+  }
+
+  function addAsUnit(type) {
+    var s = ensureAsState(type);
+    s.units.push({
+      equipmentName: (type.equipmentNameOptions || ["Air Conditioner"])[0],
+      model: "", serialNumber: "", installedOn: "", coverages: [], _manual: true,
+    });
+    renderAsUnits(type);
+  }
+  function removeAsUnit(type, unit) {
+    var s = ensureAsState(type);
+    s.units = s.units.filter(function (u) { return u !== unit; });
+    renderAsUnits(type);
+  }
+
+  function renderAsUnits(type) {
+    var wrap = document.getElementById("as-units-" + type.id);
+    if (!wrap) return;
+    var s = ensureAsState(type);
+    wrap.innerHTML = "";
+    if (!s.units.length) {
+      wrap.appendChild(el("div", { class: "empty" }, ["No units yet — parse a PDF or add one manually."]));
+      return;
+    }
+    s.units.forEach(function (unit, idx) { wrap.appendChild(renderAsUnitEditor(type, unit, idx)); });
+    wrap.appendChild(renderAsExtras(type));
+    wrap.appendChild(el("div", { style: "margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;" }, [
+      el("button", { class: "btn", onclick: function () { doAsPreview(type); } }, ["Review " + s.units.length + " unit(s) →"]),
+      el("button", { class: "btn-secondary", onclick: function () { addAsUnit(type); } }, ["+ Add unit"]),
+    ]));
+  }
+
+  // Whole-system install extras (5-yr labor warranty + free membership).
+  // Only offered for a whole system (2+ units) — single-piece swaps don't qualify.
+  function renderAsExtras(type) {
+    var s = ensureAsState(type);
+    var box = el("div", { style: "margin-top:14px; padding:12px; border:1px solid var(--eq-border); border-radius:10px; background:rgba(232,168,56,0.06);" }, [
+      el("div", { style: "font-family:var(--eq-fmono); font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--eq-accent2); margin-bottom:8px;" }, ["Whole-system install extras"]),
+    ]);
+    if (s.units.length < 2) {
+      box.appendChild(el("div", { class: "field-help" }, ["Applies to a whole system (2+ units). Add another unit to include the 5-yr labor warranty and free membership."]));
+      return box;
+    }
+    function chk(labelText, key, help) {
+      var input = el("input", { type: "checkbox" });
+      input.checked = !!s[key];
+      input.style.marginRight = "8px";
+      input.addEventListener("change", function () { s[key] = input.checked; });
+      return el("div", {}, [
+        el("label", { style: "display:flex; align-items:center; cursor:pointer; color:var(--eq-text); font-size:13px; margin-top:6px;" }, [input, labelText]),
+        help ? el("div", { class: "field-help", style: "margin-left:22px;" }, [help]) : null,
+      ]);
+    }
+    box.appendChild(chk("Add Grounded 5-year labor warranty", "applyLaborWarranty",
+      "Sets the ServiceTitan dealer (service-provider) warranty to 5 years from install on each unit, and notes it in the memo."));
+    box.appendChild(chk("Add free 1-year membership", "createMembership",
+      "Adds a complimentary 12-month Ground Club - Annual membership for the customer in ServiceTitan."));
+    return box;
+  }
+
+  function renderAsUnitEditor(type, unit, idx) {
+    function mkField(label, value, inputType, oninput, help) {
+      var inp = el("input", { class: "eq", type: inputType || "text" });
+      inp.value = value || "";
+      inp.addEventListener("input", function () { oninput(inp.value); });
+      inp.addEventListener("change", function () { oninput(inp.value); });
+      return el("div", {}, [el("label", { class: "fld" }, [label]), inp, help ? el("div", { class: "field-help" }, [help]) : null]);
+    }
+    var sel = el("select", { class: "eq" });
+    var opts = (type.equipmentNameOptions || []).slice();
+    if (unit.equipmentName && opts.indexOf(unit.equipmentName) < 0) opts.unshift(unit.equipmentName);
+    opts.forEach(function (o) { var op = el("option", { value: o }, [o]); if (o === unit.equipmentName) op.selected = true; sel.appendChild(op); });
+    sel.addEventListener("change", function () { unit.equipmentName = sel.value; });
+
+    var card = el("div", { style: "margin-top:12px; padding:12px; border:1px solid var(--eq-border); border-radius:10px; background:var(--eq-surface2);" });
+    card.appendChild(el("div", { style: "display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;" }, [
+      el("span", { style: "font-family:var(--eq-fmono); font-size:11px; color:var(--eq-muted);" }, ["UNIT " + (idx + 1) + (unit._manual ? " · manual" : "")]),
+      el("button", { class: "btn-secondary", style: "padding:4px 10px;", onclick: function () { removeAsUnit(type, unit); } }, ["Remove"]),
+    ]));
+    card.appendChild(el("div", {}, [el("label", { class: "fld" }, ["Equipment"]), sel]));
+    var mfgLine = el("div", { class: "field-help", style: "margin-top:4px; color:var(--eq-accent3);" }, []);
+    function refreshMfg() {
+      if (type.serialFormat === "trane") {
+        var d = asDecodeSerial(unit.serialNumber);
+        unit.manufacture = d.ok ? { date: d.date, label: d.label, year: d.year, week: d.week } : null;
+        mfgLine.textContent = d.ok ? ("Manufactured: " + d.label) : "";
+      } else {
+        mfgLine.textContent = (unit.manufacture && unit.manufacture.label) ? ("Manufactured: " + unit.manufacture.label) : "";
+      }
+    }
+    card.appendChild(el("div", { class: "row2" }, [
+      mkField("Model #", unit.model, "text", function (v) { unit.model = v; }),
+      mkField("Serial #", unit.serialNumber, "text", function (v) { unit.serialNumber = v; refreshMfg(); }),
+    ]));
+    card.appendChild(mfgLine);
+    refreshMfg();
+
+    // Optional extra text fields (e.g. water-heater Type).
+    (type.extraUnitFields || []).forEach(function (ef) {
+      card.appendChild(mkField(ef.label, unit[ef.key], ef.type || "text", function (v) { unit[ef.key] = v; }, ef.help || null));
+    });
+
+    // Install date + per-type coverage date inputs (two per row).
+    var covFields = (type.coverageFields && type.coverageFields.length) ? type.coverageFields
+      : [{ name: "Functional Parts", label: "Functional Parts End", match: "functional\\s*parts", help: "Goes in the ST warranty field." },
+         { name: "Heat Exchanger", label: "Heat Exchanger End", match: "heat\\s*exchanger", help: "Noted in the memo." }];
+    var covRes = covFields.map(function (cf) { return new RegExp(cf.match, "i"); });
+    var covInputs = [mkField("Install Date", unit.installedOn, "date", function (v) { unit.installedOn = v; }, "Blank = derived from warranty end.")];
+    covFields.forEach(function (cf, i) {
+      var re = covRes[i];
+      covInputs.push(mkField(cf.label, covEnd(unit, re), "date", function (v) { setCov(unit, cf.name, re, v); }, cf.help || null));
+    });
+    for (var ci = 0; ci < covInputs.length; ci += 2) {
+      card.appendChild(el("div", { class: "row2" }, [covInputs[ci], covInputs[ci + 1] || el("div", {})]));
+    }
+
+    // Any coverages not represented by a field above → read-only pills.
+    var extras = (unit.coverages || []).filter(function (c) { return !covRes.some(function (re) { return re.test(c.name || ""); }); });
+    if (extras.length) {
+      card.appendChild(el("div", { style: "margin-top:8px;" }, extras.map(function (c) {
+        return el("span", { class: "pill", style: "margin-right:6px;" }, [c.name + ": " + (c.endDateUS || c.endDate || "")]);
+      })));
+    }
+    return card;
+  }
+
+  function doAsPreview(type) {
+    if (!state.customer || !state.location) { toast("Pick a customer and location first.", "bad"); return; }
+    var s = ensureAsState(type);
+    if (!s.units.length) { toast("Read a file or add at least one unit.", "bad"); return; }
+    var panel = document.getElementById("preview-body-" + type.id);
+    panel.innerHTML = '<div class="empty">Building preview…</div>';
+    fetch("/api/equipment/" + type.apiBase + "/preview", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        locationId: state.location.id, units: s.units, warrantyNumber: s.warrantyNumber,
+        applyLaborWarranty: asWholeSystem(type) && s.applyLaborWarranty,
+      }),
+    }).then(function (r) { return r.json(); }).then(function (p) {
+      if (!p.ok) { panel.innerHTML = '<div class="warn">' + (p.error || "Preview failed") + "</div>"; return; }
+      renderAsPreview(type, p.items);
+    }).catch(function () { panel.innerHTML = '<div class="warn">Preview failed (network).</div>'; });
+  }
+
+  function renderAsPreview(type, items) {
+    var panel = document.getElementById("preview-body-" + type.id);
+    panel.innerHTML = "";
+    panel.appendChild(el("div", { class: "kv" }, [el("span", { class: "k" }, ["Customer"]), el("span", { class: "v" }, [state.customer.name + " (#" + state.customer.id + ")"])]));
+    panel.appendChild(el("div", { class: "kv" }, [el("span", { class: "k" }, ["Location"]), el("span", { class: "v" }, [state.location.address || ("#" + state.location.id)])]));
+    var anyWarn = false;
+    items.forEach(function (it, idx) {
+      var u = it.unit;
+      var box = el("div", { style: "margin-top:12px; padding:10px; border:1px solid var(--eq-border); border-radius:8px;" });
+      box.appendChild(el("div", { style: "font-weight:700; color:var(--eq-text); margin-bottom:6px;" }, [(idx + 1) + ". " + (u.equipmentName || "Unit")]));
+      var rows = [["Model", u.model || "—"], ["Serial", u.serialNumber || "—"],
+        ["Manufactured", (u.manufacture && u.manufacture.label) || "—"], ["Installed", u.installedOn || "—"],
+        ["Warranty end", (u.warrantyEnd || "—") + (u.headlineCoverage ? " (" + u.headlineCoverage + ")" : "")]];
+      var sp = it.stPayload && it.stPayload.serviceProviderWarrantyEnd;
+      if (sp) rows.push(["Labor warranty", (it.stPayload.serviceProviderWarrantyStart || "").slice(0, 10) + " → " + sp.slice(0, 10) + " (Grounded)"]);
+      rows.forEach(function (kv) {
+        box.appendChild(el("div", { class: "kv" }, [el("span", { class: "k" }, [kv[0]]), el("span", { class: "v" }, [kv[1]])]));
+      });
+      (it.warnings || []).forEach(function (w) { anyWarn = true; box.appendChild(el("div", { class: "warn" }, ["⚠ " + w])); });
+      panel.appendChild(box);
+    });
+    var s = ensureAsState(type);
+    if (asWholeSystem(type) && s.createMembership) {
+      panel.appendChild(el("div", { style: "margin-top:12px;" }, [
+        el("span", { class: "pill" }, ["+ Free 1-yr membership (Ground Club - Annual) will be added"]),
+      ]));
+    }
+    panel.appendChild(el("div", { style: "margin-top:16px;" }, [
+      el("button", { class: "btn", id: "as-confirm-" + type.id, onclick: function () { doAsSubmit(type); } },
+        ["Confirm & write " + items.length + " to ServiceTitan"]),
+    ]));
+    if (anyWarn) panel.appendChild(el("div", { class: "field-help", style: "margin-top:8px;" }, ["Warnings won't block the write — review them first."]));
+  }
+
+  function doAsSubmit(type) {
+    var btn = document.getElementById("as-confirm-" + type.id);
+    if (btn) { btn.disabled = true; btn.textContent = "Writing…"; }
+    var s = ensureAsState(type);
+    fetch("/api/equipment/" + type.apiBase + "/submit", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerId: state.customer.id, locationId: state.location.id,
+        customerName: state.customer.name, locationAddress: state.location.address,
+        units: s.units, warrantyNumber: s.warrantyNumber,
+        applyLaborWarranty: asWholeSystem(type) && s.applyLaborWarranty,
+        createMembership: asWholeSystem(type) && s.createMembership,
+      }),
+    }).then(function (r) { return r.json(); }).then(function (r) {
+      // Attach the warranty PDF to the chosen job whenever anything was written
+      // (do this before resetAs clears the file input).
+      if ((r.ok || r.created > 0) && ensureAsState(type).attachPdf) attachAsPdf(type);
+      if (r.ok) {
+        var extra = "";
+        if (r.laborWarrantyApplied) extra += " + " + (r.laborWarrantyYears || 5) + "-yr labor warranty";
+        if (r.membership && r.membership.ok) extra += (r.membership.method === "membership" ? " + membership created" : " + membership flagged");
+        toast("Wrote " + r.created + " unit(s) to ServiceTitan" + extra + ".", "ok");
+        if (r.membership && !r.membership.ok && r.membership.method !== "none") {
+          setTimeout(function () { toast("Heads up: the membership step didn't complete — " + (r.membership.error || "unknown") + ".", "bad"); }, 800);
+        }
+        resetAs(type);
+      } else if (r.created > 0) {
+        toast("Wrote " + r.created + ", but " + r.failed + " failed — see details.", "bad");
+        renderAsResults(type, r.results);
+        if (btn) { btn.disabled = false; btn.textContent = "Retry remaining"; }
+      } else {
+        toast(r.error || "All writes failed.", "bad");
+        if (r.results) renderAsResults(type, r.results);
+        if (btn) { btn.disabled = false; btn.textContent = "Confirm & write to ServiceTitan"; }
+      }
+      loadRecent();
+    }).catch(function () {
+      toast("Submit failed (network).", "bad");
+      if (btn) { btn.disabled = false; btn.textContent = "Confirm & write to ServiceTitan"; }
+    });
+  }
+
+  function renderAsResults(type, results) {
+    var panel = document.getElementById("preview-body-" + type.id);
+    panel.innerHTML = "";
+    (results || []).forEach(function (r) {
+      var ok = r.stWriteStatus === "created";
+      panel.appendChild(el("div", { class: "kv" }, [
+        el("span", { class: "k" }, [(r.equipmentName || "Unit") + " · " + (r.serialNumber || "—")]),
+        el("span", { class: "v " + (ok ? "st-created" : "st-failed") }, [ok ? "✓ #" + (r.stInstalledEquipmentId || "") : "✗ " + (r.stError || "failed")]),
+      ]));
+    });
+  }
+
+  function resetAs(type) {
+    var s = ensureAsState(type);
+    s.units = [];
+    s.warrantyNumber = null;
+    s.parsedCustomer = null;
+    s.dealer = null;
+    s.jobNumber = null; s.jobId = null; s.jobConfirmed = false;
+    var fileEl = document.getElementById("as-file-" + type.id); if (fileEl) fileEl.value = "";
+    var jobEl = document.getElementById("as-jobnum-" + type.id); if (jobEl) jobEl.value = "";
+    var jobStatusEl = document.getElementById("as-job-status-" + type.id); if (jobStatusEl) jobStatusEl.innerHTML = "";
+    renderAsParsedInfo(type);
+    renderAsUnits(type);
+    var pb = document.getElementById("preview-body-" + type.id);
+    if (pb) pb.innerHTML = '<div class="empty">Registered. Upload the next ' + (type.inputMode === "image" ? "screenshot" : "file") + '.</div>';
+  }
+
+})();
+</script>
+</body>
+</html>

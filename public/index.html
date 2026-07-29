@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard - ServiceOps Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    /* ── Hero row: Call Review (2/3) + Time Clock (1/3) ──────────────── */
+    .hero-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 860px) { .hero-row { grid-template-columns: 1fr; } }
+
+    /* Call Review hero — one big, honest number the whole team can read. */
+    .hero-calls {
+      display: flex; flex-direction: column; justify-content: center;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
+        var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 26px 28px;
+      text-decoration: none; color: inherit;
+      transition: border-color .18s, transform .15s;
+    }
+    .hero-calls:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+    .hc-label {
+      font-size: 12px; letter-spacing: .05em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 10px;
+    }
+    .hc-number {
+      font-family: var(--font-display);
+      font-size: 60px; font-weight: 700; line-height: 1;
+      letter-spacing: -0.03em; color: var(--ok);
+    }
+    .hc-number.has { color: var(--accent2); }   /* amber when calls are waiting */
+    .hc-sub { font-size: 13.5px; color: var(--muted); margin-top: 12px; }
+    .hc-cta { margin-top: 18px; font-size: 13px; font-weight: 600; color: var(--accent3); }
+
+    /* Time Clock card */
+    .clock-card {
+      display: flex; flex-direction: column; gap: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 22px 24px;
+    }
+    .clock-head {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 12px; letter-spacing: .05em; text-transform: uppercase;
+      color: var(--muted);
+    }
+    .clock-link {
+      font-size: 11px; letter-spacing: 0; text-transform: none;
+      color: var(--accent3); text-decoration: none; font-weight: 500;
+    }
+    .clock-link:hover { text-decoration: underline; }
+    .clock-timer {
+      font-family: var(--font-mono);
+      font-size: 36px; font-weight: 600; letter-spacing: -0.01em;
+      color: var(--text); line-height: 1;
+    }
+    .clock-state { font-size: 13px; color: var(--muted); }
+    .clock-state .dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      margin-right: 6px; vertical-align: middle;
+    }
+    .clock-state .dot.on  { background: var(--ok);    box-shadow: 0 0 8px var(--ok); }
+    .clock-state .dot.off { background: var(--muted); }
+    .clock-sub { font-size: 12px; color: var(--muted); }
+    .clock-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+    .clock-btn {
+      flex: 1; min-width: 96px; cursor: pointer;
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      border-radius: var(--r-sm); padding: 10px 12px;
+      border: 1px solid var(--border-strong);
+      background: rgba(255,255,255,0.04); color: var(--text);
+      transition: background .15s, border-color .15s, filter .15s;
+    }
+    .clock-btn:hover { background: rgba(255,255,255,0.08); }
+    .clock-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .clock-btn.primary:hover { filter: brightness(1.08); }
+    .clock-btn.ghost { background: transparent; }
+    .clock-btn:disabled { opacity: .5; cursor: default; }
+
+    /* ── Featured action buttons ─────────────────────────────────────── */
+    .featured-row {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+      margin-bottom: 30px;
+    }
+    @media (max-width: 860px) { .featured-row { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 480px) { .featured-row { grid-template-columns: 1fr; } }
+    .featured-btn {
+      display: flex; align-items: center; gap: 13px;
+      text-decoration: none; color: inherit;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 16px 18px;
+      transition: border-color .18s, transform .15s, background .18s;
+    }
+    .featured-btn:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+    .fb-icon { font-size: 22px; flex-shrink: 0; }
+    .fb-text { font-family: var(--font-sans); font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
+    .fb-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* ── "Jump To" launcher grid — everything one click from home ────── */
+    .launch-wrap {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+      margin-bottom: 32px;
+    }
+    @media (max-width: 980px) { .launch-wrap { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 520px) { .launch-wrap { grid-template-columns: 1fr; } }
+    .launch-group {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 14px 16px;
+    }
+    .launch-group h3 {
+      margin: 0 0 10px;
+      font-family: var(--font-display);
+      font-size: 11.5px; letter-spacing: .07em; text-transform: uppercase;
+      color: var(--muted); font-weight: 600;
+    }
+    .launch-group a {
+      display: block; padding: 7px 9px; border-radius: 6px;
+      text-decoration: none; color: var(--text); font-size: 13px;
+      transition: background .12s, color .12s;
+    }
+    .launch-group a:hover { background: rgba(255,255,255,0.05); color: #fff; }
+
+    /* ── Action Center rows (unchanged from before) ──────────────────── */
+    .attn-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 32px; }
+    .attn-row {
+      display: flex; align-items: center; gap: 14px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
+        var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 14px 18px;
+      text-decoration: none; color: inherit;
+      transition: border-color .18s, transform .15s, background .18s;
+    }
+    .attn-row:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+    .attn-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 8px currentColor;
+    }
+    .attn-dot.red    { background: var(--accent);  color: var(--accent);  }
+    .attn-dot.yellow { background: var(--accent2); color: var(--accent2); }
+    .attn-body { flex: 1; min-width: 0; }
+    .attn-title {
+      font-family: var(--font-sans);
+      font-weight: 600; font-size: 14px;
+      color: var(--text);
+      letter-spacing: -0.01em;
+      margin-bottom: 2px;
+    }
+    .attn-sub { font-size: 11.5px; color: var(--muted); }
+    .attn-count {
+      font-family: var(--font-display);
+      font-size: 22px; font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-right: 6px;
+    }
+    .attn-count.red    { color: var(--accent);  }
+    .attn-count.yellow { color: var(--accent2); }
+    .attn-arrow { color: var(--muted); font-size: 16px; }
+
+    .attn-empty {
+      text-align: center;
+      padding: 32px 18px;
+      color: var(--muted);
+      background: var(--surface2);
+      border: 1px dashed var(--border);
+      border-radius: var(--r-md);
+      font-size: 13px;
+    }
+    .attn-empty .attn-empty-icon {
+      font-size: 24px; display: block; margin-bottom: 6px;
+    }
+
+    /* Slim live-counts row (non-actionable awareness) */
+    .live-row {
+      display: flex; flex-wrap: wrap; gap: 18px;
+      padding: 12px 18px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      margin-bottom: 32px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .live-row .live-item { display: flex; align-items: baseline; gap: 6px; }
+    .live-row .live-item strong {
+      font-family: var(--font-display);
+      font-size: 16px;
+      color: var(--text);
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Navigation Bar ───────────────────────────────────────────────── -->
+<!-- Nav: built by /js/shared.js — do not hand-edit, it gets wiped on load. -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+
+  <div class="page-header">
+    <div>
+      <h1>Command <span class="accent">Center</span></h1>
+      <p>Your day at a glance — punch in, see what's waiting, and jump anywhere.</p>
+    </div>
+    <div class="status-bar"><span class="status-dot"></span> All systems operational</div>
+  </div>
+
+  <!-- ── Hero row: Call Review (2/3) + Time Clock (1/3) ───────────────── -->
+  <div class="hero-row">
+
+    <a class="hero-calls" href="/calls" title="Open the call review queue">
+      <div class="hc-label">Call Review</div>
+      <div class="hc-number" id="hc-number">—</div>
+      <div class="hc-sub" id="hc-sub">Checking the queue…</div>
+      <div class="hc-cta" id="hc-cta">Open the call queue →</div>
+    </a>
+
+    <div class="clock-card">
+      <div class="clock-head">
+        <span>Time Clock</span>
+        <a href="/timesheet" class="clock-link">Timesheet →</a>
+      </div>
+      <div class="clock-timer" id="clock-timer">00:00:00</div>
+      <div class="clock-state" id="clock-state"><span class="dot off"></span> Loading…</div>
+      <div class="clock-sub" id="clock-sub">&nbsp;</div>
+      <div class="clock-actions" id="clock-actions"></div>
+    </div>
+
+  </div>
+
+  <!-- ── Featured action buttons ──────────────────────────────────────── -->
+  <div class="featured-row">
+    <a class="featured-btn" href="/scoreboard">
+      <span class="fb-icon">🔎</span>
+      <div><div class="fb-text">Get Job Details</div><div class="fb-desc">Look up a job by number</div></div>
+    </a>
+    <a class="featured-btn" href="/pdf-parser">
+      <span class="fb-icon">📄</span>
+      <div><div class="fb-text">Get Info from PDF</div><div class="fb-desc">Parse a PDF document</div></div>
+    </a>
+    <a class="featured-btn" href="/fleet">
+      <span class="fb-icon">🚚</span>
+      <div><div class="fb-text">Fleet Review</div><div class="fb-desc">Vehicle tracking</div></div>
+    </a>
+    <a class="featured-btn" href="/equipment">
+      <span class="fb-icon">🔧</span>
+      <div><div class="fb-text">Register Equipment</div><div class="fb-desc">Add installed units + Rinnai</div></div>
+    </a>
+    <a class="featured-btn" href="/install-tracker">
+      <span class="fb-icon">✅</span>
+      <div><div class="fb-text">Install Tracker</div><div class="fb-desc">Warranty + ST equipment status</div></div>
+    </a>
+    <a class="featured-btn" href="/videos">
+      <span class="fb-icon">▶️</span>
+      <div><div class="fb-text">Upload to YouTube</div><div class="fb-desc">Job videos</div></div>
+    </a>
+  </div>
+
+  <!-- ── This Month — slim 4-tile health check ────────────────────────── -->
+  <div class="section-label" style="display:flex; align-items:center; justify-content:space-between;">
+    <span>This Month <span id="mr-widget-period" style="color:var(--muted); font-weight:400; margin-left:8px;"></span></span>
+    <a href="/monthly-review" style="font-size:11px; color:var(--accent3); text-decoration:none;">Full review →</a>
+  </div>
+  <div id="mr-widget" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px;">
+    <div class="kpi-mini-card">
+      <div class="kpi-mini-label">Billed (completed)</div>
+      <div class="kpi-mini-value accent" id="mrw-billed">—</div>
+      <div style="font-size:10px; color:var(--muted); margin-top:4px;" id="mrw-billed-sub">&nbsp;</div>
+    </div>
+    <div class="kpi-mini-card">
+      <div class="kpi-mini-label">Gross Margin</div>
+      <div class="kpi-mini-value info" id="mrw-gm">—</div>
+      <div style="font-size:10px; color:var(--muted); margin-top:4px;" id="mrw-gm-sub">&nbsp;</div>
+    </div>
+    <div class="kpi-mini-card">
+      <div class="kpi-mini-label">Completed Jobs</div>
+      <div class="kpi-mini-value warn" id="mrw-completed">—</div>
+      <div style="font-size:10px; color:var(--muted); margin-top:4px;" id="mrw-wip-sub">&nbsp;</div>
+    </div>
+    <div class="kpi-mini-card">
+      <div class="kpi-mini-label">7AM On-Time</div>
+      <div class="kpi-mini-value warn" id="mrw-ontime">—</div>
+      <div style="font-size:10px; color:var(--muted); margin-top:4px;" id="mrw-ontime-sub">&nbsp;</div>
+    </div>
+  </div>
+
+  <!-- ── Live counts (small, non-actionable awareness) ────────────────── -->
+  <div class="live-row" id="live-row">
+    <div class="live-item">
+      <strong id="live-memberships">—</strong>
+      <span>active memberships</span>
+    </div>
+    <div class="live-item">
+      <strong id="live-construction">—</strong>
+      <span>construction hrs this month</span>
+    </div>
+    <div class="live-item">
+      <strong id="live-util">—</strong>
+      <span>service utilization</span>
+    </div>
+  </div>
+
+  <!-- ── Jump To — full launcher grid (everything one click from home) ── -->
+  <div class="section-label">Jump To</div>
+  <div class="launch-wrap">
+    <div class="launch-group">
+      <h3>Operations</h3>
+      <a href="/open-jobs">Open Jobs</a>
+      <a href="/install-tracker">Install Tracker</a>
+      <a href="/calls">Call Reviews</a>
+      <a href="/scoreboard">Job Lookup</a>
+      <a href="/fleet">Fleet</a>
+      <a href="/videos">Job Videos</a>
+      <a href="/timesheet">Timesheet</a>
+      <a href="/equipment">Equipment</a>
+    </div>
+    <div class="launch-group">
+      <h3>Customers</h3>
+      <a href="/memberships">Memberships</a>
+      <a href="/reviews">Review Requests</a>
+      <a href="/customer-review">Customer Review</a>
+      <a href="/backflow">Backflow</a>
+    </div>
+    <div class="launch-group">
+      <h3>Financials</h3>
+      <a href="/monthly-review">Monthly Review</a>
+      <a href="/fy-review">FY Review</a>
+      <a href="/invoices">Supplier Invoices</a>
+      <a href="/pricebook">Pricebook</a>
+    </div>
+    <div class="launch-group">
+      <h3>Audits &amp; Tools</h3>
+      <a href="/address">Address Audit</a>
+      <a href="/contract-compare">Contract Compare</a>
+      <a href="/pdf-parser">PDF Parser</a>
+    </div>
+  </div>
+
+  <!-- ── Needs Attention (exceptions worth a look) ────────────────────── -->
+  <div class="section-label">Needs Attention</div>
+  <div id="attn-list" class="attn-list">
+
+    <a href="/calls" class="attn-row" id="attn-calls-pending" style="display:none;">
+      <span class="attn-dot yellow" id="attn-calls-pending-dot"></span>
+      <div class="attn-body">
+        <div class="attn-title">Calls flagged for review</div>
+        <div class="attn-sub">Recordings tagged by the classifier — open the call queue to action.</div>
+      </div>
+      <span class="attn-count yellow" id="attn-calls-pending-count">0</span>
+      <span class="attn-arrow">→</span>
+    </a>
+
+    <a href="/calls" class="attn-row" id="attn-calls-queue" style="display:none;">
+      <span class="attn-dot red" id="attn-calls-queue-dot"></span>
+      <div class="attn-body">
+        <div class="attn-title">Calls stuck in processing</div>
+        <div class="attn-sub">Queue depth above zero — recordings haven't finished classifying.</div>
+      </div>
+      <span class="attn-count red" id="attn-calls-queue-count">0</span>
+      <span class="attn-arrow">→</span>
+    </a>
+
+    <a href="/pricebook#duplicates" class="attn-row" id="attn-pricebook-dupes" style="display:none;">
+      <span class="attn-dot yellow"></span>
+      <div class="attn-body">
+        <div class="attn-title">Pricebook duplicates</div>
+        <div class="attn-sub">Records sharing the same code — merge or rename to keep the catalog clean.</div>
+      </div>
+      <span class="attn-count yellow" id="attn-pricebook-dupes-count">0</span>
+      <span class="attn-arrow">→</span>
+    </a>
+
+    <!-- Empty state — shown when no rows are visible -->
+    <div class="attn-empty" id="attn-empty">
+      <span class="attn-empty-icon">✓</span>
+      All clear — nothing waiting on you right now.
+    </div>
+  </div>
+
+  <!-- ── Quick Actions ────────────────────────────────────────────────── -->
+  <div class="section-label">Quick Actions</div>
+  <div class="actions-grid">
+
+    <button class="action-card blue" onclick="syncReturnVisits(this)">
+      <span class="action-icon">↩️</span>
+      <div class="action-title">Sync Return Visits</div>
+      <div class="action-desc">Find jobs with multiple appointments and push return visit contacts to GHL</div>
+      <div class="action-status" id="status-returns"></div>
+    </button>
+
+    <button class="action-card orange" onclick="processHappyReviews(this)">
+      <span class="action-icon">⭐</span>
+      <div class="action-title">Process Happy Reviews</div>
+      <div class="action-desc">Process last hour's Happy Review submissions and push to GHL workflow</div>
+      <div class="action-status" id="status-happy"></div>
+    </button>
+
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+
+  // ── Call Review hero — "new since the team last reviewed" ──────────
+  async function loadReviewSince() {
+    try {
+      const r = await fetch('/api/calls/review-since');
+      const d = await r.json();
+      const n = d.count || 0;
+      const numEl = $('hc-number');
+      numEl.textContent = n;
+      numEl.className = 'hc-number' + (n > 0 ? ' has' : '');
+      if (n > 0) {
+        $('hc-sub').textContent = (n === 1 ? 'call' : 'calls') + ' in since the team last reviewed';
+      } else {
+        $('hc-sub').textContent = "You're all caught up — no new calls to review.";
+      }
+    } catch (e) { console.warn('[review-since]', e.message); }
+  }
+
+  // ── Time Clock card ─────────────────────────────────────────────────
+  // Reads the logged-in user's active punch + this period's punches, then
+  // ticks a live worked-time timer. serverNow lets us correct for any drift
+  // between the browser clock and the server.
+  const clockState = { active: null, punches: [], driftMs: 0 };
+
+  const pad2 = n => String(n).padStart(2, '0');
+  function fmtHMS(totalSec) {
+    totalSec = Math.max(0, Math.floor(totalSec));
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+  }
+  function serverNowMs() { return Date.now() + clockState.driftMs; }
+  function localDateKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+  function workedSecondsNow() {
+    const a = clockState.active;
+    if (!a) return 0;
+    const inMs = Date.parse(a.clockIn);
+    // While on break, worked time is frozen at the moment the break began.
+    const endMs = a.onBreak ? Date.parse(a.breakStartedAt) : serverNowMs();
+    return (endMs - inMs) / 1000 - (a.breakSeconds || 0);
+  }
+
+  function renderClock() {
+    const a = clockState.active;
+    const worked = workedSecondsNow();
+    $('clock-timer').textContent = fmtHMS(worked);
+
+    // Today's total = closed punches for today + the live one (if any).
+    const todayKey = a ? a.workDate : localDateKey();
+    let todaySec = clockState.punches
+      .filter(p => p.status === 'closed' && p.workDate === todayKey)
+      .reduce((s, p) => s + (p.hours || 0) * 3600, 0);
+    if (a) todaySec += worked;
+    const todayHrs = (todaySec / 3600);
+    $('clock-sub').textContent =
+      (Math.round(todayHrs * 100) / 100).toString().replace(/\.0+$/, '') + ' hrs today';
+
+    const stateEl = $('clock-state');
+    const actionsEl = $('clock-actions');
+    if (!a) {
+      stateEl.innerHTML = '<span class="dot off"></span> Clocked out';
+      actionsEl.innerHTML =
+        '<button class="clock-btn primary" onclick="clockAction(\'in\', this)">Clock In</button>';
+    } else if (a.onBreak) {
+      stateEl.innerHTML = '<span class="dot off"></span> On break';
+      actionsEl.innerHTML =
+        '<button class="clock-btn primary" onclick="clockAction(\'break/end\', this)">End Break</button>' +
+        '<button class="clock-btn ghost" onclick="clockAction(\'out\', this)">Clock Out</button>';
+    } else {
+      stateEl.innerHTML = '<span class="dot on"></span> Clocked in';
+      actionsEl.innerHTML =
+        '<button class="clock-btn primary" onclick="clockAction(\'out\', this)">Clock Out</button>' +
+        '<button class="clock-btn ghost" onclick="clockAction(\'break/start\', this)">Start Break</button>';
+    }
+  }
+
+  async function loadClock() {
+    try {
+      const r = await fetch('/api/timesheet/clock');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      clockState.active = d.active || null;
+      clockState.punches = d.punches || [];
+      clockState.driftMs = d.serverNow ? (Date.parse(d.serverNow) - Date.now()) : 0;
+      renderClock();
+    } catch (e) {
+      console.warn('[clock]', e.message);
+      $('clock-state').innerHTML = '<span class="dot off"></span> Clock unavailable';
+      $('clock-actions').innerHTML =
+        '<a class="clock-btn ghost" style="text-align:center;text-decoration:none;" href="/timesheet">Open Timesheet</a>';
+    }
+  }
+
+  async function clockAction(pathTail, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      const r = await fetch('/api/timesheet/clock/' + pathTail, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.ok === false) throw new Error(d.error || ('HTTP ' + r.status));
+      await loadClock();
+      const label = pathTail === 'in' ? 'Clocked in'
+        : pathTail === 'out' ? 'Clocked out'
+        : pathTail === 'break/start' ? 'Break started'
+        : 'Break ended';
+      showToast('🕒 ' + label);
+    } catch (e) {
+      showToast('Clock error: ' + e.message, { type: 'error' });
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  // ── Needs Attention loader ─────────────────────────────────────────
+  async function loadAttention() {
+    let visibleCount = 0;
+
+    const showRow = (rowId, count, opts = {}) => {
+      const row = document.getElementById(rowId);
+      const countEl = document.getElementById(rowId + '-count');
+      if (!row) return;
+      if (!count || count <= 0) { row.style.display = 'none'; return; }
+      countEl.textContent = count;
+      if (opts.severity) {
+        const dot = document.getElementById(rowId + '-dot');
+        if (dot) dot.className = 'attn-dot ' + opts.severity;
+        countEl.className = 'attn-count ' + opts.severity;
+      }
+      row.style.display = 'flex';
+      visibleCount++;
+    };
+
+    try {
+      const r = await fetch('/api/calls/stats');
+      const d = await r.json();
+      const pending = d.totals?.pending || 0;
+      showRow('attn-calls-pending', pending, { severity: pending >= 10 ? 'red' : 'yellow' });
+    } catch (e) { console.warn('[attn] calls/stats:', e.message); }
+
+    try {
+      const r = await fetch('/api/calls/queue');
+      const d = await r.json();
+      showRow('attn-calls-queue', d.queueDepth || 0, { severity: 'red' });
+    } catch (e) { console.warn('[attn] calls/queue:', e.message); }
+
+    try {
+      const r = await fetch('/api/pricebook/duplicates?count=true&rule=code&type=all&activeOnly=true');
+      const d = await r.json();
+      if (d.ok) showRow('attn-pricebook-dupes', d.records || 0);
+    } catch (e) { console.warn('[attn] pricebook/duplicates:', e.message); }
+
+    document.getElementById('attn-empty').style.display = visibleCount === 0 ? 'block' : 'none';
+  }
+
+  // ── This Month KPIs (live) ──────────────────────────────────────────
+  async function loadMonthlyWidget() {
+    try {
+      const r = await fetch('/api/monthly-review/current');
+      if (!r.ok) return;
+      const data = await r.json();
+      const h = data.headline || {};
+
+      const now = new Date();
+      const monthName = ['January','February','March','April','May','June','July','August','September','October','November','December'][now.getMonth()];
+      $('mr-widget-period').textContent = `${monthName} ${now.getFullYear()} — through ${monthName.slice(0,3)} ${now.getDate()}`;
+
+      $('mrw-billed').textContent     = '$' + Math.round(h.billing || 0).toLocaleString();
+      $('mrw-billed-sub').textContent = `${h.completedJobs || 0} completed jobs`;
+      $('mrw-gm').textContent         = '$' + Math.round(h.grossProfit || 0).toLocaleString();
+      $('mrw-gm-sub').textContent     = `${(h.grossMarginPct || 0).toFixed(1)}% margin`;
+      $('mrw-completed').textContent  = h.completedJobs || 0;
+      $('mrw-wip-sub').textContent    = `${h.inProgressJobs || 0} in progress`;
+
+      if (h.sevenAmJobs && h.sevenAmJobs > 0) {
+        $('mrw-ontime').textContent     = (h.sevenAmOnTimePct || 0).toFixed(1) + '%';
+        $('mrw-ontime-sub').textContent = `${h.sevenAmJobs} 7am jobs · avg arrival ${h.sevenAmAvgArrival || '—'}`;
+      } else {
+        $('mrw-ontime').textContent     = '—';
+        $('mrw-ontime-sub').textContent = 'no 7am jobs yet this month';
+      }
+
+      $('live-construction').textContent = Math.round(h.constructionHours || 0).toLocaleString();
+      $('live-util').textContent         = (h.serviceUtilizationAdjusted || 0).toFixed(1) + '%';
+    } catch (e) {
+      console.warn('[MonthlyWidget]', e.message);
+    }
+  }
+
+  // ── Live Memberships ────────────────────────────────────────────────
+  async function loadLiveCounts() {
+    try {
+      const r = await fetch('/api/fanclubs/preview?activeOnly=true');
+      const d = await r.json();
+      document.getElementById('live-memberships').textContent = (d.total || 0).toLocaleString();
+    } catch (e) { console.warn('[live] memberships:', e.message); }
+  }
+
+  // ── Quick Action handlers (unchanged) ──────────────────────────────
+  async function syncReturnVisits(card) {
+    setStatus('status-returns', 'Starting sync...');
+    card.classList.add('loading');
+    try {
+      await fetch('/api/analytics/sync-return-visits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days: 30 })
+      });
+      setStatus('status-returns', `✓ Syncing last 30 days to GHL`);
+      showToast('↩️ Return visit sync started — pushing to GHL');
+    } catch (err) {
+      setStatus('status-returns', '✗ ' + err.message, 'error');
+    }
+    card.classList.remove('loading');
+  }
+
+  async function processHappyReviews(card) {
+    setStatus('status-happy', 'Checking submissions...');
+    card.classList.add('loading');
+    try {
+      const checkRes = await fetch('/api/forms/recent?hours=1');
+      const checkData = await checkRes.json();
+      if (checkData.count === 0) {
+        setStatus('status-happy', 'No submissions in the last hour', 'warn');
+        card.classList.remove('loading');
+        return;
+      }
+      const confirmed = confirm(`Found ${checkData.count} Happy Review submission(s) in the last hour.\n\nSend them all to GoHighLevel now?`);
+      if (!confirmed) {
+        setStatus('status-happy', '');
+        card.classList.remove('loading');
+        return;
+      }
+      await fetch('/api/forms/process-happy-reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hours: 1 })
+      });
+      setStatus('status-happy', `✓ Sending ${checkData.count} submission(s) to GHL`);
+      showToast(`⭐ Processing ${checkData.count} Happy Review(s) — sent to GHL!`);
+    } catch (err) {
+      setStatus('status-happy', '✗ ' + err.message, 'error');
+    }
+    card.classList.remove('loading');
+  }
+
+  // ── Initial load + refresh cadence ─────────────────────────────────
+  loadReviewSince();
+  loadClock();
+  loadAttention();
+  loadMonthlyWidget();
+  loadLiveCounts();
+
+  // The clock timer ticks locally every second so worked-time counts up live.
+  setInterval(renderClock,        1000);
+  setInterval(loadClock,          60 * 1000);        // resync punch state
+  setInterval(loadReviewSince,    30 * 1000);
+  setInterval(loadAttention,      30 * 1000);
+  setInterval(loadLiveCounts,     60 * 1000);
+  setInterval(loadMonthlyWidget,  5 * 60 * 1000);
+</script>
+
+</body>
+</html>

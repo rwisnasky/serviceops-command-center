@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fiscal Year Review — ServiceOps Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/styles.css" />
+<style>
+  .fy-controls { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin-bottom:24px; }
+  .fy-controls select {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 10px 14px; font-family: var(--font-sans);
+    font-size: 13px; cursor: pointer;
+  }
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:32px; }
+  .kpi-card { background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg); padding: 20px; }
+  .kpi-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+  .kpi-card .value { font-family: var(--font-display); font-size: 30px; font-weight: 700; color: var(--text); }
+  .kpi-card .value.accent { color: var(--accent); }
+  .kpi-card .value.info   { color: var(--accent3); }
+  .kpi-card .value.ok     { color: var(--ok); }
+  .kpi-card .sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .fy-section-title { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--text); margin: 28px 0 12px; }
+  .fy-section-title .sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 10px; }
+  table.fy-table { width:100%; border-collapse: collapse; background: var(--surface); border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--border); }
+  table.fy-table th { text-align: left; padding: 11px 14px; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+  table.fy-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); }
+  table.fy-table tr:last-child td { border-bottom: 0; }
+  table.fy-table tr.total td { background: var(--surface2); font-weight: 600; border-top: 1px solid var(--border-strong); }
+  table.fy-table td.num, table.fy-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.fy-table td.muted { color: var(--muted); }
+  table.fy-table tr.no-data td { color: var(--muted); font-style: italic; }
+  table.fy-table tr.cur-month td { background: rgba(196,18,48,0.05); }
+
+  /* Info tooltip — same pattern as Monthly Review page */
+  .info-tip {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); font-size: 9px; font-weight: 700;
+    margin-left: 5px; cursor: help; position: relative; user-select: none;
+    vertical-align: middle; line-height: 1;
+  }
+  .info-tip:hover, .info-tip:focus { background: var(--accent3); border-color: var(--accent3); color: white; outline: none; }
+  .info-tip .info-tip-body {
+    visibility: hidden; opacity: 0; position: absolute;
+    bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    width: 280px; background: #f7f7f7; color: #1a1a1a;
+    border: 1px solid rgba(0,0,0,0.15); border-radius: 8px;
+    padding: 10px 12px; font-size: 11.5px; font-weight: 400;
+    line-height: 1.45; text-align: left; text-transform: none;
+    letter-spacing: 0; box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    z-index: 100; pointer-events: none; transition: opacity 0.15s ease;
+  }
+  .info-tip:hover .info-tip-body, .info-tip:focus .info-tip-body { visibility: visible; opacity: 1; }
+  .info-tip .info-tip-body::after {
+    content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: #f7f7f7;
+  }
+  .info-tip .info-tip-body b { color: #1f3a5f; }
+  .info-tip.tip-left .info-tip-body { left: 0; transform: none; }
+  .info-tip.tip-left .info-tip-body::after { left: 14px; transform: none; }
+
+  .fy-toolbar-btn {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 10px 14px; font-size: 13px; cursor: pointer;
+    margin-left: auto;
+  }
+  .fy-toolbar-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Print styles — clean light-on-white layout for handing out on paper */
+  @media print {
+    @page { size: letter; margin: 0.5in; }
+    body { background: #fff !important; color: #111 !important; }
+    body::before { display: none; }
+    .nav-bar, .fy-controls, .no-print, button { display: none !important; }
+    .kpi-card, table.fy-table, table.fy-table th, table.fy-table td,
+    [style*="background: var(--surface)"], [style*="background:var(--surface)"],
+    [style*="background: var(--surface2)"], [style*="background:var(--surface2)"] {
+      background: #fff !important; color: #111 !important; border-color: #888 !important;
+      box-shadow: none !important;
+    }
+    table.fy-table th { background: #e8e8e8 !important; color: #111 !important; }
+    table.fy-table tr:nth-child(even) td { background: #f8f8f8 !important; }
+    table.fy-table tr.total td { background: #eaeaea !important; }
+    h1, h2, h3, .fy-section-title { color: #111 !important; }
+    .accent { color: #c41230 !important; }
+    .value, .value.accent, .value.info, .value.ok { color: #111 !important; }
+    .label, .sub, .muted, td.muted, .fy-section-title .sub { color: #555 !important; }
+    .kpi-card, table.fy-table, .kpi-grid { page-break-inside: avoid; }
+    .fy-section-title { page-break-after: avoid; margin-top: 16px; }
+    .app { padding: 0 !important; }
+    .page-header h1 { font-size: 22px !important; }
+    .kpi-card .value { font-size: 22px !important; }
+    .status-bar { display: none; }
+    .print-header { display: block !important; }
+  }
+  .print-header { display: none; }
+</style>
+</head>
+<body>
+<nav class="nav-bar">
+  <div class="nav-container">
+    <a href="/" class="nav-logo"><div><div><span class="nav-logo-service">SERVICE</span><span class="nav-logo-ops">OPS</span></div><div class="nav-logo-sub">Command Center</div></div></a>
+    <div class="nav-tabs">
+      <a href="/" class="nav-tab">Dashboard</a>
+      <a href="/memberships" class="nav-tab">Memberships</a>
+      <a href="/calls" class="nav-tab">Calls</a>
+      <a href="/videos" class="nav-tab">Videos</a>
+      <a href="/reviews" class="nav-tab">Reviews</a>
+      <a href="/fleet" class="nav-tab">Fleet</a>
+      <a href="/invoices" class="nav-tab">Invoices</a>
+      <a href="/pricebook" class="nav-tab">Pricebook</a>
+      <a href="/monthly-review" class="nav-tab">Monthly Review</a>
+      <a href="/fy-review" class="nav-tab active">FY Review</a>
+    </div>
+  </div>
+</nav>
+
+<div class="app">
+  <div class="page-header">
+    <div>
+      <h1>Fiscal <span class="accent">Year</span> Review</h1>
+      <p>Annual rollup with month-by-month detail. Fiscal year runs October 1 – September 30.</p>
+    </div>
+  </div>
+
+  <!-- Print-only header banner -->
+  <div class="print-header" style="border-bottom:2px solid #c41230; padding-bottom:8px; margin-bottom:16px;">
+    <div style="font-size:18px; font-weight:700; color:#1f3a5f;">Fiscal Year Review — <span id="print-fy">…</span></div>
+    <div style="font-size:11px; color:#555;">Grounded Home Services · Generated <span id="print-date"></span> · Source: ServiceTitan + cached monthly data</div>
+  </div>
+
+  <div class="fy-controls">
+    <div>
+      <label style="font-size:11px; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:4px;">Fiscal Year</label>
+      <select id="fy-picker">
+        <option value="FY26">FY26 (Oct 2025 – Sep 2026)</option>
+        <option value="FY27">FY27 (Oct 2026 – Sep 2027)</option>
+      </select>
+    </div>
+    <button id="print-btn" class="fy-toolbar-btn no-print" title="Print this report or save as PDF">🖨 Print / Save as PDF</button>
+  </div>
+
+  <div id="fy-content"><div style="text-align:center; padding:40px; color:var(--muted);">Loading…</div></div>
+</div>
+
+<script src="/js/shared.js"></script>
+<script>
+const fmt$ = n => "$" + Math.round(Number(n) || 0).toLocaleString();
+const fmtN = (n, d=0) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d });
+const fmtPct = (n, d=1) => `${(Number(n) || 0).toFixed(d)}%`;
+function escapeHtml(s) { return String(s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function infoTip(bodyHtml, leftAlign = false) {
+  return `<span class="info-tip${leftAlign ? ' tip-left' : ''}" tabindex="0">?<span class="info-tip-body">${bodyHtml}</span></span>`;
+}
+
+// Default FY based on current date
+function currentFY() {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth() + 1;
+  const fyEndYear = m >= 10 ? y + 1 : y;
+  return `FY${String(fyEndYear).slice(-2)}`;
+}
+
+async function loadFY(label) {
+  const c = document.getElementById("fy-content");
+  c.innerHTML = `<div style="text-align:center; padding:40px; color:var(--muted);">Loading ${escapeHtml(label)}…</div>`;
+  try {
+    const r = await fetch(`/api/monthly-review/fy/${encodeURIComponent(label)}`);
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      c.innerHTML = `<div style="text-align:center; padding:40px; color:var(--accent);">${escapeHtml(e.error || r.statusText)}</div>`;
+      return;
+    }
+    render(await r.json());
+  } catch (e) {
+    c.innerHTML = `<div style="text-align:center; padding:40px; color:var(--accent);">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function render(d) {
+  const t = d.totals;
+  const c = document.getElementById("fy-content");
+  let html = "";
+
+  // Headline
+  html += `<div class="kpi-grid">
+    <div class="kpi-card"><div class="label">${escapeHtml(d.fyLabel)} Customer Billing${infoTip(`<b>FY Customer Billing</b> — total customer revenue across every cached month in this fiscal year (Oct–Sep). Sum of completed-job revenue from each month.`)}</div><div class="value">${fmt$(t.reportedBilling)}</div><div class="sub">${fmtN(t.completedJobs)} completed jobs</div></div>
+    <div class="kpi-card"><div class="label">Operational GM${infoTip(`<b>Operational GM</b> — gross margin on jobs <b>created AND completed in the same period</b> (full cost data attached). Excludes carry-overs whose costs were absorbed in earlier months.<br/><br/>This is the <b>honest "did we price the work right?"</b> number — what to compare across FYs.`, true)}</div><div class="value ok">${fmtPct(t.operationalGrossMarginPct)}</div><div class="sub">${fmt$(t.operationalGrossProfit)} on ${fmtN(t.operationalJobCount)} matched jobs</div></div>
+    <div class="kpi-card"><div class="label">Reported GM${infoTip(`<b>Reported GM</b> — gross margin on <b>all jobs completed</b> in this FY, regardless of when they were created. Matches the fiscal-year P&amp;L view.<br/><br/>Higher than Operational because carry-over jobs only contribute revenue to this FY (their costs were absorbed in prior FYs).`)}</div><div class="value info">${fmtPct(t.reportedGrossMarginPct)}</div><div class="sub">${fmt$(t.reportedGrossProfit)} (FY P&amp;L view)</div></div>
+    <div class="kpi-card"><div class="label">Service Utilization${infoTip(`<b>Service Utilization</b> = wrench hours ÷ paid service hours, fleet-wide.<br/><br/>How much of the time we pay service techs is spent actively working on jobs (vs driving, idle, training, etc.). Industry healthy range: <b>65–75%</b>; top quartile 70%+.`)}</div><div class="value accent">${fmtPct(t.serviceUtilization)}</div><div class="sub">${fmtN(t.serviceWrenchHours)} wrench / ${fmtN(t.paidServiceHours)} paid hrs</div></div>
+  </div>`;
+
+  html += `<div class="kpi-grid">
+    <div class="kpi-card"><div class="label">Materials Cost${infoTip(`<b>Materials Cost</b> — total parts, equipment, and PO/bill costs across all completed jobs this FY. Pulled directly from the WIP report's "Materials + Equip + PO/Bill Costs" column.`)}</div><div class="value">${fmt$(t.materials)}</div><div class="sub">parts, equipment, PO/bill</div></div>
+    <div class="kpi-card"><div class="label">Labor Cost${infoTip(`<b>Labor Cost</b> — total burdened technician labor cost across all completed jobs. Calculated by ServiceTitan as hours worked × each tech's burdened rate (base wage + payroll taxes + workers comp + insurance + benefits).<br/><br/>Fleet average: <b>$${t.laborCostPerWrenchHour}/wrench hour</b>.`)}</div><div class="value">${fmt$(t.labor)}</div><div class="sub">${fmt$(t.laborCostPerWrenchHour)}/hr fleet avg</div></div>
+    <div class="kpi-card"><div class="label">Construction Hours${infoTip(`<b>Construction Hours</b> — tech time logged against bid/construction projects (Mark's spreadsheet jobs), separated from service time.<br/><br/>This work is real but lives outside ServiceTitan's revenue tracking. It's pulled out of service utilization to give an honest read on the service business specifically.`)}</div><div class="value info">${fmtN(t.constructionHours)}</div><div class="sub">tracked separately from service</div></div>
+    <div class="kpi-card"><div class="label">$ / Paid Hour${infoTip(`<b>$ / Paid Hour</b> = customer billing ÷ total paid service hours.<br/><br/>The <b>all-in productivity</b> number: every hour we pay a tech (wrenching, driving, idle, training) generates this much revenue. Compare to your loaded labor cost (~$98–127/hr) to gauge true profitability.`)}</div><div class="value accent">${fmt$(t.dollarsPerPaidHour)}</div><div class="sub">all-in productivity</div></div>
+  </div>`;
+
+  // Carry-over caveat
+  if (t.carryoverRevenue > 0) {
+    html += `<div style="background:rgba(91,140,201,0.08); border:1px solid rgba(91,140,201,0.30); border-radius:var(--r-md); padding:10px 14px; margin-bottom:18px; font-size:12px; color:var(--text);">
+      ${fmt$(t.carryoverRevenue)} of revenue across ${escapeHtml(d.fyLabel)} comes from carry-over jobs (created in prior FY, completed in this FY). Their costs were absorbed in prior periods, which is why Reported GM is higher than Operational GM.
+    </div>`;
+  }
+
+  // Month-by-month table
+  html += `<div class="fy-section-title">Month by month <span class="sub">${d.monthsWithData} of 12 months have cached data</span></div>`;
+  html += `<table class="fy-table"><thead><tr>
+    <th>Month</th>
+    <th class="num">Billing</th>
+    <th class="num">Op GM %</th>
+    <th class="num">Op GM $</th>
+    <th class="num">Rep GM %</th>
+    <th class="num">Rep GM $</th>
+    <th class="num">Completed Jobs</th>
+    <th class="num">Wrench Hrs</th>
+    <th class="num">Util %</th>
+    <th class="num">$/Paid Hr</th>
+  </tr></thead><tbody>`;
+
+  for (const m of d.months) {
+    if (!m.hasData) {
+      html += `<tr class="no-data">
+        <td>${escapeHtml(m.label + ' ' + m.year)}</td>
+        <td class="num" colspan="9">— no cached data for this month —</td>
+      </tr>`;
+      continue;
+    }
+    const h = m.headline;
+    html += `<tr>
+      <td><b>${escapeHtml(m.label + ' ' + m.year)}</b></td>
+      <td class="num">${fmt$(h.reportedBilling)}</td>
+      <td class="num">${fmtPct(h.operationalGrossMarginPct)}</td>
+      <td class="num">${fmt$(h.operationalGrossProfit)}</td>
+      <td class="num">${fmtPct(h.reportedGrossMarginPct)}</td>
+      <td class="num">${fmt$(h.reportedGrossProfit)}</td>
+      <td class="num">${fmtN(h.completedJobs)}</td>
+      <td class="num">${fmtN(h.serviceWrenchHours, 1)}</td>
+      <td class="num">${fmtPct(h.serviceUtilization)}</td>
+      <td class="num">${fmt$(h.dollarsPerPaidHour)}</td>
+    </tr>`;
+  }
+
+  html += `<tr class="total">
+    <td>${escapeHtml(d.fyLabel)} Total</td>
+    <td class="num">${fmt$(t.reportedBilling)}</td>
+    <td class="num">${fmtPct(t.operationalGrossMarginPct)}</td>
+    <td class="num">${fmt$(t.operationalGrossProfit)}</td>
+    <td class="num">${fmtPct(t.reportedGrossMarginPct)}</td>
+    <td class="num">${fmt$(t.reportedGrossProfit)}</td>
+    <td class="num">${fmtN(t.completedJobs)}</td>
+    <td class="num">${fmtN(t.serviceWrenchHours, 1)}</td>
+    <td class="num">${fmtPct(t.serviceUtilization)}</td>
+    <td class="num">${fmt$(t.dollarsPerPaidHour)}</td>
+  </tr>`;
+  html += `</tbody></table>`;
+
+  c.innerHTML = html;
+}
+
+// Initialize
+const params = new URLSearchParams(window.location.search);
+const initialFY = params.get("fy") || currentFY();
+const picker = document.getElementById("fy-picker");
+if (picker.querySelector(`option[value="${initialFY}"]`)) picker.value = initialFY;
+picker.addEventListener("change", () => {
+  loadFY(picker.value);
+  document.getElementById("print-fy").textContent = picker.value;
+});
+document.getElementById("print-fy").textContent = picker.value;
+document.getElementById("print-date").textContent = new Date().toLocaleString();
+
+document.getElementById("print-btn").addEventListener("click", () => {
+  document.getElementById("print-date").textContent = new Date().toLocaleString();
+  document.getElementById("print-fy").textContent = picker.value;
+  setTimeout(() => window.print(), 80);
+});
+
+loadFY(picker.value);
+</script>
+</body>
+</html>

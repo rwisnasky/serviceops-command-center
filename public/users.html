@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Users — ServiceOps Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    .users-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow-md); }
+    .users-table { width: 100%; border-collapse: collapse; }
+    .users-table thead th { text-align: left; padding: 12px 14px; font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); background: var(--surface2); border-bottom: 1px solid var(--border-strong); }
+    .users-table tbody td { padding: 14px; border-top: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+    .users-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+    .users-table .email { font-weight: 500; color: var(--text); }
+    .users-table .me-pill { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-full); background: var(--accent3-tint); color: var(--accent3); font-size: 10px; font-weight: 600; letter-spacing: 0.4px; }
+    .users-table .admin-pill { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-full); background: var(--accent-tint); color: var(--accent); font-size: 10px; font-weight: 600; letter-spacing: 0.4px; }
+    .users-table .name-cell { display: flex; align-items: center; gap: 8px; }
+    .users-table .name-cell .edit-name { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 4px; line-height: 1; }
+    .users-table .name-cell .edit-name:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+    .users-table .status { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: var(--r-full); font-size: 11px; font-weight: 500; }
+    .status.active { background: rgba(63,174,106,0.10); color: #b1e9c5; }
+    .status.inactive { background: rgba(124,133,153,0.12); color: var(--muted); }
+    .status.pending { background: rgba(232,168,56,0.10); color: #f6d28b; }
+
+    .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .row-actions .btn-small { padding: 5px 10px; font-size: 11px; }
+    .danger { background: transparent; color: var(--danger); border: 1px solid rgba(239,68,85,0.45); border-radius: var(--r-sm); padding: 5px 10px; font-size: 11px; cursor: pointer; font-family: inherit; }
+    .danger:hover { background: rgba(239,68,85,0.10); }
+
+    .add-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 22px; box-shadow: var(--shadow-md); margin-bottom: 24px; }
+    .add-card h3 { font-family: var(--font-display); font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .add-card .hint { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
+    .add-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr auto; gap: 10px; align-items: end; }
+    @media (max-width: 760px) { .add-grid { grid-template-columns: 1fr; } }
+    .add-grid label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 4px; }
+    .add-grid input { width: 100%; background: var(--surface2); border: 1px solid var(--border-strong); border-radius: var(--r-sm); color: var(--text); padding: 9px 11px; font-size: 13px; font-family: var(--font-sans); outline: none; }
+    .add-grid input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
+    .add-grid .btn { padding: 10px 18px; height: 38px; }
+
+    .empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
+
+    /* Modal for password resets */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 1000; }
+    .modal-backdrop.show { display: flex; }
+    .modal { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-lg); padding: 24px; max-width: 420px; width: 92%; box-shadow: var(--shadow-lg); }
+    .modal h3 { font-family: var(--font-display); margin-bottom: 6px; }
+    .modal .modal-hint { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
+    .modal label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 4px; }
+    .modal input { width: 100%; background: var(--surface2); border: 1px solid var(--border-strong); border-radius: var(--r-sm); color: var(--text); padding: 10px 12px; font-size: 13px; font-family: var(--font-sans); outline: none; margin-bottom: 14px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  </style>
+</head>
+<body>
+
+<!-- ── Navigation Bar ───────────────────────────────────────────────── -->
+<!-- Nav: built by /js/shared.js — do not hand-edit, it gets wiped on load. -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+
+  <div class="page-header">
+    <div>
+      <h1>User <span class="accent">Management</span></h1>
+      <p>Add, deactivate, and reset passwords for everyone with dashboard access.</p>
+    </div>
+    <div class="status-bar"><span class="status-dot"></span> <span id="user-count">—</span></div>
+  </div>
+
+  <!-- ── Add user form ─────────────────────────────────────── -->
+  <div class="section-label">Add a user</div>
+  <div class="add-card">
+    <h3>Invite a new dashboard user</h3>
+    <div class="hint">They'll be created with a starter password and forced to rotate it on their first sign-in. Make sure they get the password through a secure channel.</div>
+    <form id="add-form">
+      <div class="add-grid">
+        <div>
+          <label for="add-email">Email</label>
+          <input id="add-email" type="email" required autocomplete="off" placeholder="name@groundedhs.example" />
+        </div>
+        <div>
+          <label for="add-first">First name</label>
+          <input id="add-first" type="text" autocomplete="off" placeholder="Mark" />
+        </div>
+        <div>
+          <label for="add-last">Last name</label>
+          <input id="add-last" type="text" autocomplete="off" placeholder="Vasilenko" />
+        </div>
+        <div>
+          <label for="add-password">Starter password</label>
+          <input id="add-password" type="text" required minlength="8" autocomplete="off" placeholder="min 8 chars" />
+        </div>
+        <button type="submit" class="btn" id="add-submit">Add user</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ── User list ─────────────────────────────────────────── -->
+  <div class="section-label">All users</div>
+  <div class="users-table-wrap">
+    <table class="users-table" id="users-table">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Name</th>
+          <th>Status</th>
+          <th>Role</th>
+          <th>Last login</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="users-tbody">
+        <tr><td colspan="6" class="empty">Loading users…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- ── Reset-password modal ──────────────────────────────────── -->
+<div class="modal-backdrop" id="reset-modal">
+  <div class="modal">
+    <h3>Reset password</h3>
+    <div class="modal-hint" id="reset-hint">Set a new starter password for this user. They'll be forced to rotate it on next sign-in.</div>
+    <label for="reset-pw">New starter password</label>
+    <input id="reset-pw" type="text" minlength="8" placeholder="min 8 chars" />
+    <div class="modal-actions">
+      <button class="btn-secondary" id="reset-cancel" type="button">Cancel</button>
+      <button class="btn" id="reset-confirm" type="button">Reset password</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+  let currentUserId = null;
+  let users = [];
+
+  function fmtLogin(ts) {
+    if (!ts) return '<span style="color:var(--muted);">never</span>';
+    return fmtTs(ts);
+  }
+
+  function statusBadge(u) {
+    if (!u.active) return `<span class="status inactive">● inactive</span>`;
+    if (u.must_change_pw) return `<span class="status pending">● awaiting first login</span>`;
+    return `<span class="status active">● active</span>`;
+  }
+
+  function rowFor(u) {
+    const isMe = u.id === currentUserId;
+    const me = isMe ? `<span class="me-pill">YOU</span>` : '';
+    const actions = [];
+
+    actions.push(`<button class="btn-secondary btn-small" data-act="reset" data-id="${u.id}" data-email="${escHtml(u.email)}">Reset password</button>`);
+
+    if (!isMe) {
+      if (u.is_admin) {
+        actions.push(`<button class="btn-secondary btn-small" data-act="demote" data-id="${u.id}" data-email="${escHtml(u.email)}">Make non-admin</button>`);
+      } else {
+        actions.push(`<button class="btn-secondary btn-small" data-act="promote" data-id="${u.id}" data-email="${escHtml(u.email)}">Make admin</button>`);
+      }
+      if (u.active) {
+        actions.push(`<button class="btn-secondary btn-small" data-act="deactivate" data-id="${u.id}" data-email="${escHtml(u.email)}">Deactivate</button>`);
+      } else {
+        actions.push(`<button class="btn-secondary btn-small" data-act="activate" data-id="${u.id}" data-email="${escHtml(u.email)}">Reactivate</button>`);
+      }
+      actions.push(`<button class="danger" data-act="delete" data-id="${u.id}" data-email="${escHtml(u.email)}">Delete</button>`);
+    }
+
+    const roleBadge = u.is_admin
+      ? `<span class="status active" style="background:rgba(196,18,48,0.10);color:#ffb1bb;">● admin</span>`
+      : `<span class="status inactive">user</span>`;
+
+    return `
+      <tr>
+        <td><span class="email">${escHtml(u.email)}</span>${me}${u.is_admin ? '<span class="admin-pill">ADMIN</span>' : ''}</td>
+        <td>
+          <div class="name-cell">
+            <span>${escHtml([u.first_name, u.last_name].filter(Boolean).join(' ') || u.display_name || '—')}</span>
+            <button class="edit-name" data-act="edit-name" data-id="${u.id}" data-email="${escHtml(u.email)}" data-first="${escHtml(u.first_name || '')}" data-last="${escHtml(u.last_name || '')}" title="Edit name">✎</button>
+          </div>
+        </td>
+        <td>${statusBadge(u)}</td>
+        <td>${roleBadge}</td>
+        <td>${fmtLogin(u.last_login_at)}</td>
+        <td><div class="row-actions" style="justify-content:flex-end;">${actions.join('')}</div></td>
+      </tr>
+    `;
+  }
+
+  async function loadUsers() {
+    try {
+      const r = await fetch('/api/users');
+      const data = await r.json();
+      if (!r.ok || !data.ok) {
+        showToast(data.error || 'Failed to load users.', { type: 'error' });
+        return;
+      }
+      users = data.users;
+      currentUserId = data.currentUserId;
+      const tbody = document.getElementById('users-tbody');
+      if (!users.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">No users yet.</td></tr>';
+      } else {
+        tbody.innerHTML = users.map(rowFor).join('');
+      }
+      const adminCount = users.filter(u => u.is_admin && u.active).length;
+      document.getElementById('user-count').textContent =
+        `${users.length} user${users.length === 1 ? '' : 's'} · ${users.filter(u => u.active).length} active · ${adminCount} admin${adminCount === 1 ? '' : 's'}`;
+    } catch (err) {
+      showToast(err.message || 'Network error.', { type: 'error' });
+    }
+  }
+
+  // ── Add user ──────────────────────────────────────────────
+  document.getElementById('add-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('add-email').value.trim();
+    const firstName = document.getElementById('add-first').value.trim();
+    const lastName = document.getElementById('add-last').value.trim();
+    const password = document.getElementById('add-password').value;
+    if (!email || !password) return;
+    if (password.length < 8) {
+      showToast('Password must be at least 8 characters.', { type: 'warn' });
+      return;
+    }
+    const btn = document.getElementById('add-submit');
+    btn.disabled = true;
+    btn.textContent = 'Adding…';
+    try {
+      const r = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, firstName, lastName, password }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.ok) {
+        showToast(data.error || 'Failed to add user.', { type: 'error' });
+        btn.disabled = false; btn.textContent = 'Add user';
+        return;
+      }
+      showToast(`✓ Added ${email}. Share the starter password with them through a secure channel.`);
+      document.getElementById('add-form').reset();
+      loadUsers();
+    } catch (err) {
+      showToast(err.message || 'Network error.', { type: 'error' });
+    } finally {
+      btn.disabled = false; btn.textContent = 'Add user';
+    }
+  });
+
+  // ── Row action delegation ─────────────────────────────────
+  document.getElementById('users-tbody').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const act = btn.dataset.act;
+    const id = btn.dataset.id;
+    const email = btn.dataset.email;
+
+    if (act === 'reset') {
+      openResetModal(id, email);
+      return;
+    }
+    if (act === 'edit-name') {
+      const curFirst = btn.dataset.first || '';
+      const curLast = btn.dataset.last || '';
+      const first = prompt(`First name for ${email}\n\n(Also used as their nav display name. Leave blank to clear.)`, curFirst);
+      if (first === null) return; // cancelled
+      const last = prompt(`Last name for ${email}\n\nLeave blank to clear.`, curLast);
+      if (last === null) return; // cancelled
+      try {
+        const r = await fetch(`/api/users/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firstName: first.trim(), lastName: last.trim() }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data.ok) {
+          showToast(data.error || 'Update failed.', { type: 'error' });
+          return;
+        }
+        showToast('✓ Name updated.');
+        loadUsers();
+      } catch (err) {
+        showToast(err.message || 'Network error.', { type: 'error' });
+      }
+      return;
+    }
+    if (act === 'promote') {
+      if (!confirm(`Make ${email} an admin?\n\nAdmins can add, remove, and reset other users.`)) return;
+      patchUser(id, { isAdmin: true }, `${email} is now an admin`);
+      return;
+    }
+    if (act === 'demote') {
+      if (!confirm(`Remove admin access from ${email}?\n\nThey'll keep their dashboard access but lose the ability to manage users.`)) return;
+      patchUser(id, { isAdmin: false }, `${email} is no longer an admin`);
+      return;
+    }
+    if (act === 'deactivate') {
+      if (!confirm(`Deactivate ${email}?\n\nThey won't be able to sign in. You can reactivate them later.`)) return;
+      doSimple(`/api/users/${id}/deactivate`, 'POST', `Deactivated ${email}`);
+      return;
+    }
+    if (act === 'activate') {
+      doSimple(`/api/users/${id}/activate`, 'POST', `Reactivated ${email}`);
+      return;
+    }
+    if (act === 'delete') {
+      if (!confirm(`Permanently delete ${email}?\n\nThis cannot be undone. If you might want them back, deactivate instead.`)) return;
+      doSimple(`/api/users/${id}`, 'DELETE', `Deleted ${email}`);
+      return;
+    }
+  });
+
+  async function patchUser(id, patch, okMsg) {
+    try {
+      const r = await fetch(`/api/users/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.ok) {
+        showToast(data.error || 'Update failed.', { type: 'error' });
+        return;
+      }
+      showToast('✓ ' + okMsg);
+      loadUsers();
+    } catch (err) {
+      showToast(err.message || 'Network error.', { type: 'error' });
+    }
+  }
+
+  async function doSimple(url, method, okMsg) {
+    try {
+      const r = await fetch(url, { method });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.ok) {
+        showToast(data.error || 'Action failed.', { type: 'error' });
+        return;
+      }
+      showToast('✓ ' + okMsg);
+      loadUsers();
+    } catch (err) {
+      showToast(err.message || 'Network error.', { type: 'error' });
+    }
+  }
+
+  // ── Reset password modal ──────────────────────────────────
+  let resetTargetId = null;
+  function openResetModal(id, email) {
+    resetTargetId = id;
+    document.getElementById('reset-hint').textContent =
+      `New starter password for ${email}. They'll be forced to rotate it on next sign-in.`;
+    document.getElementById('reset-pw').value = '';
+    document.getElementById('reset-modal').classList.add('show');
+    setTimeout(() => document.getElementById('reset-pw').focus(), 50);
+  }
+  function closeResetModal() {
+    resetTargetId = null;
+    document.getElementById('reset-modal').classList.remove('show');
+  }
+  document.getElementById('reset-cancel').addEventListener('click', closeResetModal);
+  document.getElementById('reset-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'reset-modal') closeResetModal();
+  });
+  document.getElementById('reset-confirm').addEventListener('click', async () => {
+    const newPassword = document.getElementById('reset-pw').value;
+    if (!newPassword || newPassword.length < 8) {
+      showToast('Password must be at least 8 characters.', { type: 'warn' });
+      return;
+    }
+    try {
+      const r = await fetch(`/api/users/${resetTargetId}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.ok) {
+        showToast(data.error || 'Reset failed.', { type: 'error' });
+        return;
+      }
+      showToast('✓ Password reset. Share the new starter through a secure channel.');
+      closeResetModal();
+      loadUsers();
+    } catch (err) {
+      showToast(err.message || 'Network error.', { type: 'error' });
+    }
+  });
+
+  loadUsers();
+</script>
+
+</body>
+</html>

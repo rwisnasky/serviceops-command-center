@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Resolved Jobs — ServiceOps Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/styles.css" />
+<style>
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:24px; }
+  .kpi-card { background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg); padding: 18px; }
+  .kpi-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+  .kpi-card .value { font-family: var(--font-display); font-size: 28px; font-weight: 700; color: var(--text); }
+  .kpi-card .value.ok     { color: var(--ok); }
+  .kpi-card .value.warn   { color: var(--accent2); }
+
+  .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .toolbar .label-strip { font-size:11px; text-transform:uppercase; color:var(--muted); }
+  .toolbar .btn {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 8px 14px; font-size: 12px; cursor: pointer;
+  }
+  .toolbar .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .toolbar .btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .toolbar .btn.primary:hover { filter: brightness(1.05); color: white; }
+  .toolbar .btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+  .row-card {
+    background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg);
+    padding: 16px 18px; margin-bottom: 12px;
+  }
+  .row-card.synced { opacity: 0.65; }
+  .row-card.synced .sync-badge { background: rgba(63,174,106,0.18); color: var(--ok); }
+  .row-card .row-head {
+    display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: 10px;
+  }
+  .row-card .row-head .job-number {
+    font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--text);
+  }
+  .row-card .row-head .reviewed-by { font-size: 11px; color: var(--muted); }
+
+  .sync-badge {
+    display:inline-block; padding: 3px 9px; border-radius: 999px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+    background: rgba(243,176,15,0.18); color: var(--accent2);
+  }
+
+  .correction-grid {
+    display:grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px;
+  }
+  .field-block {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px 12px;
+  }
+  .field-block .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
+  .field-block .value { font-size: 13px; color: var(--text); }
+  .field-block .arrow { color: var(--muted); margin: 0 6px; }
+  .field-block .from { color: var(--muted); text-decoration: line-through; }
+  .field-block .to { color: var(--accent); font-weight: 600; }
+  .field-block .sync-line { font-size: 10px; margin-top: 6px; color: var(--muted); }
+  .field-block .sync-line.ok { color: var(--ok); }
+  .field-block .sync-line.err { color: var(--accent); }
+
+  .notes-block { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 12px; }
+  .notes-block .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
+  .notes-block .note-entry { font-size: 12px; padding: 6px 0; border-bottom: 1px dashed var(--border); }
+  .notes-block .note-entry:last-child { border-bottom: 0; }
+  .notes-block .note-entry .meta { color: var(--muted); font-size: 10px; margin-bottom: 2px; }
+  .notes-block .note-entry .meta .pending { color: var(--accent2); }
+  .notes-block .note-entry .meta .synced  { color: var(--ok); }
+  .notes-block .note-entry .meta .err     { color: var(--accent); }
+
+  .row-actions { display:flex; gap: 8px; justify-content: flex-end; }
+  .row-actions .push-btn {
+    background: var(--accent); color: white; border: 1px solid var(--accent);
+    border-radius: var(--r-md); padding: 7px 14px; font-size: 12px; cursor: pointer;
+  }
+  .row-actions .push-btn:hover { filter: brightness(1.07); }
+  .row-actions .push-btn[disabled] { opacity: 0.4; cursor: not-allowed; filter: none; }
+
+  .empty-state {
+    background: var(--surface); border: 1px dashed var(--border); border-radius: var(--r-lg);
+    padding: 40px; text-align: center; color: var(--muted);
+  }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+    padding: 14px 18px; font-size: 13px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    z-index: 9999; max-width: 420px;
+  }
+  .toast.ok  { border-color: var(--ok); }
+  .toast.err { border-color: var(--accent); }
+</style>
+</head>
+<body>
+<nav class="nav-bar">
+  <div class="nav-container">
+    <a href="/" class="nav-logo"><div><div><span class="nav-logo-service">SERVICE</span><span class="nav-logo-ops">OPS</span></div><div class="nav-logo-sub">Command Center</div></div></a>
+    <div class="nav-tabs">
+      <a href="/" class="nav-tab">Dashboard</a>
+      <a href="/monthly-review" class="nav-tab">Monthly Review</a>
+      <a href="/fy-review" class="nav-tab">FY Review</a>
+      <a href="/open-jobs" class="nav-tab">Open Jobs</a>
+      <a href="/resolved-jobs" class="nav-tab active">Resolved</a>
+    </div>
+  </div>
+</nav>
+
+<div class="app">
+  <div class="page-header">
+    <h1>Resolved Jobs</h1>
+    <p class="page-sub">Corrections + notes that are queued for ServiceTitan. Push them in a batch once you've reviewed.</p>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="label">Resolved</div><div class="value" id="kpi-total">—</div><div class="sub" id="kpi-total-sub"></div></div>
+    <div class="kpi-card"><div class="label">Pending push</div><div class="value warn" id="kpi-pending">—</div><div class="sub">Has unsynced corrections or notes</div></div>
+    <div class="kpi-card"><div class="label">Fully synced</div><div class="value ok" id="kpi-synced">—</div><div class="sub">Already in ServiceTitan</div></div>
+  </div>
+
+  <div class="toolbar">
+    <span class="label-strip">Filter:</span>
+    <button class="btn" id="filter-all" data-filter="all">All resolved</button>
+    <button class="btn" id="filter-pending" data-filter="pending">Pending push only</button>
+    <div style="flex:1"></div>
+    <button class="btn primary" id="btn-push-all">↑ Push all changes to ServiceTitan</button>
+  </div>
+
+  <div id="rows"></div>
+</div>
+
+<div id="toast-host"></div>
+
+<script>
+const state = {
+  rows: [],
+  filter: "pending",   // default to "things that need attention"
+};
+
+async function load() {
+  const onlyUnsynced = state.filter === "pending" ? "?onlyUnsynced=1" : "";
+  const r = await fetch(`/api/monthly-review/resolved${onlyUnsynced}`);
+  if (!r.ok) {
+    document.getElementById("rows").innerHTML = `<div class="empty-state">Failed to load resolved jobs (${r.status}).</div>`;
+    return;
+  }
+  const data = await r.json();
+  state.rows = data.rows || [];
+
+  // KPIs come from the unfiltered list; if we filtered server-side we
+  // still want totals to reflect the whole resolved set.
+  if (state.filter !== "all") {
+    const all = await fetch(`/api/monthly-review/resolved`).then(r => r.json()).catch(() => ({}));
+    renderKpis(all.rows || []);
+  } else {
+    renderKpis(state.rows);
+  }
+  renderRows();
+  renderToolbar();
+}
+
+function renderKpis(allRows) {
+  const total = allRows.length;
+  const pending = allRows.filter(r => r.pendingPush).length;
+  document.getElementById("kpi-total").textContent = total;
+  document.getElementById("kpi-pending").textContent = pending;
+  document.getElementById("kpi-synced").textContent = total - pending;
+  document.getElementById("kpi-total-sub").textContent =
+    total === 1 ? "1 job marked resolved" : `${total} jobs marked resolved`;
+  document.getElementById("btn-push-all").disabled = pending === 0;
+}
+
+function renderToolbar() {
+  for (const b of document.querySelectorAll(".toolbar .btn[data-filter]")) {
+    b.classList.toggle("primary", b.dataset.filter === state.filter);
+  }
+}
+
+function renderRows() {
+  const host = document.getElementById("rows");
+  if (state.rows.length === 0) {
+    host.innerHTML = `<div class="empty-state">No resolved jobs ${state.filter === "pending" ? "with pending pushes" : "yet"}.</div>`;
+    return;
+  }
+  host.innerHTML = state.rows.map(rowHtml).join("");
+  for (const btn of host.querySelectorAll("[data-push]")) {
+    btn.addEventListener("click", () => pushOne(btn.dataset.push));
+  }
+}
+
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function rowHtml(row) {
+  const corrected = !!(row.corrected_status || row.corrected_job_type);
+  const pending = row.pendingPush;
+  return `
+    <div class="row-card ${pending ? "" : "synced"}">
+      <div class="row-head">
+        <div>
+          <span class="job-number">Job ${esc(row.job_number)}</span>
+          <span class="sync-badge">${pending ? "Pending push" : "Synced"}</span>
+        </div>
+        <div class="reviewed-by">
+          Resolved ${row.reviewed_by ? "by " + esc(row.reviewed_by) : ""} • ${esc(row.updated_at || "")}
+        </div>
+      </div>
+
+      ${corrected ? `<div class="correction-grid">
+        ${fieldBlock("Status correction", row.corrected_status, row.status_synced_value, row.status_synced_at, row.status_sync_error, row.pendingStatus)}
+        ${fieldBlock("Job type correction", row.corrected_job_type, row.job_type_synced_value, row.job_type_synced_at, row.job_type_sync_error, row.pendingJobType)}
+      </div>` : ""}
+
+      ${row.notesLog && row.notesLog.length ? `<div class="notes-block">
+        <div class="label">Notes (${row.notesLog.length})</div>
+        ${row.notesLog.map(noteHtml).join("")}
+      </div>` : ""}
+
+      ${row.notes ? `<div class="notes-block"><div class="label">Legacy review note</div><div style="font-size:12px">${esc(row.notes)}</div></div>` : ""}
+
+      <div class="row-actions">
+        <button class="push-btn" data-push="${esc(row.job_number)}" ${pending ? "" : "disabled"}>
+          ${pending ? "Push to ServiceTitan" : "Synced ✓"}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function fieldBlock(label, corrected, syncedValue, syncedAt, error, pending) {
+  if (!corrected) {
+    return `<div class="field-block"><div class="label">${esc(label)}</div><div class="value" style="color:var(--muted);">No correction</div></div>`;
+  }
+  let sync;
+  if (error) {
+    sync = `<div class="sync-line err">⚠ Sync error: ${esc(error)}</div>`;
+  } else if (syncedAt && syncedValue === corrected) {
+    sync = `<div class="sync-line ok">✓ Synced to ST ${esc(syncedAt)}</div>`;
+  } else if (pending) {
+    sync = `<div class="sync-line">Pending push</div>`;
+  } else {
+    sync = "";
+  }
+  return `<div class="field-block">
+    <div class="label">${esc(label)}</div>
+    <div class="value">
+      <span class="to">${esc(corrected)}</span>
+    </div>
+    ${sync}
+  </div>`;
+}
+
+function noteHtml(n) {
+  let meta;
+  if (n.st_note_error) {
+    meta = `<span class="err">⚠ Sync error: ${esc(n.st_note_error)}</span>`;
+  } else if (n.st_note_synced_at) {
+    meta = `<span class="synced">✓ Synced ${esc(n.st_note_synced_at)}</span>`;
+  } else {
+    meta = `<span class="pending">Pending push</span>`;
+  }
+  return `<div class="note-entry">
+    <div class="meta">${n.author ? esc(n.author) + " • " : ""}${esc(n.added_at)} • ${meta}</div>
+    <div>${esc(n.text)}</div>
+  </div>`;
+}
+
+async function pushOne(jobNumber) {
+  toast(`Pushing job ${jobNumber}…`, "ok", 3000);
+  try {
+    const r = await fetch(`/api/monthly-review/resolved/${encodeURIComponent(jobNumber)}/push-to-st`, { method: "POST" });
+    const j = await r.json();
+    if (j.ok) toast(`Job ${jobNumber} pushed to ServiceTitan.`, "ok");
+    else toast(`Job ${jobNumber}: ${j.result?.error || "push failed"}`, "err");
+  } catch (e) {
+    toast(`Push failed: ${e.message}`, "err");
+  }
+  await load();
+}
+
+async function pushAll() {
+  document.getElementById("btn-push-all").disabled = true;
+  toast(`Pushing all pending changes to ServiceTitan…`, "ok", 5000);
+  try {
+    const r = await fetch(`/api/monthly-review/resolved/push-to-st`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const j = await r.json();
+    const s = j.summary || {};
+    if (s.attempted === 0) {
+      toast(`Nothing to push.`, "ok");
+    } else if (s.failed > 0 || s.partial > 0) {
+      toast(`Pushed ${s.fullySynced}/${s.attempted}. ${s.partial} partial, ${s.failed} failed. Open each row to see details.`, "err", 8000);
+    } else {
+      toast(`Pushed ${s.fullySynced} jobs to ServiceTitan.`, "ok");
+    }
+  } catch (e) {
+    toast(`Batch push failed: ${e.message}`, "err");
+  }
+  await load();
+}
+
+function toast(msg, kind = "ok", ttl = 4000) {
+  const host = document.getElementById("toast-host");
+  const el = document.createElement("div");
+  el.className = `toast ${kind}`;
+  el.textContent = msg;
+  host.appendChild(el);
+  setTimeout(() => el.remove(), ttl);
+}
+
+// Wire up filter buttons
+for (const b of document.querySelectorAll(".toolbar .btn[data-filter]")) {
+  b.addEventListener("click", () => {
+    state.filter = b.dataset.filter;
+    load();
+  });
+}
+document.getElementById("btn-push-all").addEventListener("click", pushAll);
+
+load();
+</script>
+</body>
+</html>

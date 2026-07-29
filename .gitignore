@@ -1,0 +1,26 @@
+node_modules/
+.env
+*.log
+.DS_Store
+*.bak
+
+# Local databases. In demo mode these are regenerated from the seed on boot,
+# so there is never a reason to commit one.
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+data/backups/
+
+# Generated at boot by src/demo/monthlyCache.js — several MB of derived JSON,
+# fully reproducible from DEMO_SEED, so it doesn't belong in git.
+data/monthly-cache/
+
+# Scratch dirs the upload / parse / transcription pipelines write to
+tmp/
+uploads/
+recordings/
+
+# Operator-supplied real employee phone roster. Never committed.
+data/employee-roster.json

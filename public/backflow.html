@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Backflow Details — ServiceOps Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/styles.css" />
+<style>
+  /* ── KPI strip (matches /open-jobs styling) ──────────────────────── */
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:24px; }
+  .kpi-card { background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg); padding: 18px; }
+  .kpi-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+  .kpi-card .value { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--text); }
+  .kpi-card .value.accent { color: var(--accent); }
+  .kpi-card .value.info   { color: var(--accent3); }
+  .kpi-card .value.ok     { color: var(--ok); }
+  .kpi-card .value.warn   { color: var(--accent2); }
+  .kpi-card .sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* ── Date-range bar ──────────────────────────────────────────────── */
+  .range-bar {
+    display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap;
+    background: var(--surface); border:1px solid var(--border);
+    border-radius: var(--r-lg); padding: 16px 18px; margin-bottom: 18px;
+  }
+  .range-bar .group { display:flex; flex-direction:column; gap:5px; }
+  .range-bar label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); font-weight: 600;
+  }
+  .range-bar input[type="date"] {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 8px 12px; font-size: 13px;
+    font-family: inherit; min-width: 150px;
+  }
+  .range-bar .preset {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 8px 12px; font-size: 12px; cursor:pointer;
+  }
+  .range-bar .preset:hover { border-color: var(--border-strong); }
+  .range-bar .run-btn {
+    background: var(--accent); color: #fff; border:none;
+    border-radius: var(--r-md); padding: 9px 18px; font-size: 13px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .range-bar .run-btn:hover { filter: brightness(1.08); }
+  .range-bar .run-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .range-bar .csv-btn {
+    background: transparent; color: var(--text); border:1px solid var(--border-strong);
+    border-radius: var(--r-md); padding: 9px 14px; font-size: 12px; cursor: pointer;
+    font-family: inherit; text-decoration: none;
+  }
+  .range-bar .csv-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .range-bar .spacer { flex: 1; }
+
+  /* ── Search + summary line ───────────────────────────────────────── */
+  .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .toolbar input {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 8px 12px; font-size: 12px; min-width: 260px;
+  }
+  .summary-line { font-size:12px; color:var(--muted); }
+
+  /* ── Table styling — mirrors /open-jobs so the look is consistent ── */
+  table.bf-table { width:100%; border-collapse: collapse; background: var(--surface); border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--border); }
+  table.bf-table th { text-align: left; padding: 11px 14px; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; }
+  table.bf-table th:hover { color: var(--text); }
+  table.bf-table th.sorted::after { content: ' ▼'; color: var(--accent); }
+  table.bf-table th.sorted.asc::after { content: ' ▲'; }
+  table.bf-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); vertical-align: top; }
+  table.bf-table tr:last-child td { border-bottom: 0; }
+  table.bf-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.bf-table td.muted { color: var(--muted); }
+  table.bf-table tr:hover td { background: var(--surface2); }
+  /* ── Notes column — collapsed preview + click-to-expand accordion ── */
+  table.bf-table td.notes-cell {
+    max-width: 260px;
+    cursor: pointer;
+    user-select: none;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  table.bf-table td.notes-cell .notes-preview {
+    display: flex; align-items: center; gap: 6px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  table.bf-table td.notes-cell .notes-chevron {
+    display: inline-block; width: 12px; flex-shrink: 0;
+    transition: transform .15s; color: var(--muted);
+  }
+  table.bf-table tr.notes-row td.notes-cell .notes-chevron { transform: rotate(90deg); color: var(--accent); }
+  table.bf-table td.notes-cell.empty { cursor: default; color: var(--muted); opacity: 0.5; }
+  table.bf-table tr:hover td.notes-cell:not(.empty) { color: var(--text); }
+  /* The accordion sub-row sits directly under the main row. */
+  table.bf-table tr.notes-detail-row td {
+    background: var(--surface2);
+    padding: 14px 18px;
+    border-top: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .notes-detail {
+    font-size: 13px; line-height: 1.55; color: var(--text);
+    white-space: pre-wrap; word-break: break-word;
+    max-height: 320px; overflow-y: auto;
+  }
+  .notes-detail .notes-label {
+    display: inline-block;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .empty { text-align:center; padding: 40px; color: var(--muted); background: var(--surface); border:1px dashed var(--border); border-radius: var(--r-lg); }
+  .loading { text-align:center; padding: 40px; color: var(--muted); }
+  .loading::before { content:'⏳'; display:block; font-size:22px; margin-bottom:8px; }
+
+  .totals-row td { background: var(--surface2) !important; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- Nav is built dynamically by /js/shared.js (Investigate dropdown will include "Backflow"). -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+  <div class="page-header">
+    <div>
+      <h1>Backflow <span class="accent">Details</span></h1>
+      <p>Every "Backflow Test" job completed in the selected date range — pulled live from ServiceTitan and shaped to match the daily backflow log.</p>
+    </div>
+    <div class="status-bar"><span class="status-dot"></span> <span id="bf-source">Pick a date range and run</span></div>
+  </div>
+
+  <!-- ── Date-range controls ────────────────────────────────────────── -->
+  <div class="range-bar">
+    <div class="group">
+      <label for="bf-from">From</label>
+      <input type="date" id="bf-from" />
+    </div>
+    <div class="group">
+      <label for="bf-to">To</label>
+      <input type="date" id="bf-to" />
+    </div>
+    <div class="group">
+      <label>Quick range</label>
+      <div style="display:flex;gap:6px;">
+        <button class="preset" data-preset="mtd">MTD</button>
+        <button class="preset" data-preset="last30">Last 30</button>
+        <button class="preset" data-preset="lastMonth">Last Month</button>
+        <button class="preset" data-preset="ytd">YTD</button>
+      </div>
+    </div>
+    <button class="run-btn" id="bf-run">Run report</button>
+    <span class="spacer"></span>
+    <a class="csv-btn" id="bf-csv" href="#" download>↓ CSV</a>
+  </div>
+
+  <div id="bf-kpi-row"></div>
+
+  <div class="toolbar">
+    <input id="bf-search" type="search" placeholder="Search customer, tech, job #, type, notes…" />
+    <span class="summary-line" id="bf-summary"></span>
+    <span style="font-size:11px; color:var(--muted); margin-left:auto;">Click any column header to sort</span>
+  </div>
+
+  <div id="bf-table-wrap"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+const fmt$ = n => "$" + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt$round = n => "$" + Math.round(Number(n) || 0).toLocaleString();
+const fmtN = (n, d=0) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d });
+
+// ── Date helpers (use local-date strings so the <input type=date> matches) ──
+function toIso(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function firstOfMonth(d = new Date()) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+function lastOfMonth(d = new Date()) { return new Date(d.getFullYear(), d.getMonth() + 1, 0); }
+function firstOfPrevMonth() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() - 1, 1); }
+function lastOfPrevMonth() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 0); }
+function startOfYear() { return new Date(new Date().getFullYear(), 0, 1); }
+function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d; }
+
+const fromEl = document.getElementById("bf-from");
+const toEl   = document.getElementById("bf-to");
+const runEl  = document.getElementById("bf-run");
+const csvEl  = document.getElementById("bf-csv");
+const searchEl = document.getElementById("bf-search");
+
+// Default: month-to-date.
+fromEl.value = toIso(firstOfMonth());
+toEl.value   = toIso(new Date());
+
+document.querySelectorAll(".preset").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const k = btn.getAttribute("data-preset");
+    if (k === "mtd")        { fromEl.value = toIso(firstOfMonth()); toEl.value = toIso(new Date()); }
+    else if (k === "last30"){ fromEl.value = toIso(daysAgo(30));    toEl.value = toIso(new Date()); }
+    else if (k === "lastMonth"){ fromEl.value = toIso(firstOfPrevMonth()); toEl.value = toIso(lastOfPrevMonth()); }
+    else if (k === "ytd")   { fromEl.value = toIso(startOfYear());  toEl.value = toIso(new Date()); }
+    refreshCsvHref();
+  });
+});
+
+let state = { data: null, search: "", sortKey: "compDate", sortAsc: false, loading: false, openNotes: new Set() };
+
+/**
+ * ST job summaries come back as HTML fragments (<div>, <b>, <br>, etc.).
+ * For the notes column we want readable text: strip tags, collapse whitespace,
+ * decode common entities. The full body still goes through escHtml when rendered.
+ */
+function cleanNotes(raw) {
+  if (!raw) return "";
+  let s = String(raw);
+  // <br> and </div> become line breaks.
+  s = s.replace(/<\s*br\s*\/?>/gi, "\n").replace(/<\/\s*(div|p)\s*>/gi, "\n");
+  // Strip remaining tags.
+  s = s.replace(/<[^>]+>/g, "");
+  // Decode common HTML entities.
+  s = s.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<")
+       .replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  // Collapse 3+ blank lines, trim each line.
+  s = s.split(/\n/).map(l => l.trim()).join("\n");
+  s = s.replace(/\n{3,}/g, "\n\n").trim();
+  return s;
+}
+function notesPreview(clean) {
+  if (!clean) return "";
+  // First non-blank line, truncated.
+  const firstLine = clean.split(/\n/).find(l => l.trim().length > 0) || "";
+  return firstLine.length > 80 ? firstLine.slice(0, 80) + "…" : firstLine;
+}
+
+function refreshCsvHref() {
+  const f = encodeURIComponent(fromEl.value);
+  const t = encodeURIComponent(toEl.value);
+  csvEl.href = `/api/backflow/list.csv?from=${f}&to=${t}`;
+}
+refreshCsvHref();
+fromEl.addEventListener("change", refreshCsvHref);
+toEl.addEventListener("change", refreshCsvHref);
+
+async function runReport() {
+  const from = fromEl.value;
+  const to   = toEl.value;
+  if (!from || !to) { showToast("Pick a from and to date.", { type:"warn" }); return; }
+  state.loading = true;
+  runEl.disabled = true;
+  runEl.textContent = "Running…";
+  document.getElementById("bf-source").textContent = "Pulling from ServiceTitan…";
+  document.getElementById("bf-table-wrap").innerHTML = `<div class="loading">Pulling backflow jobs from ServiceTitan…<br><span style="font-size:11px;">This walks every backflow-type job in the range, plus its appointment, invoice, and timesheet — give it a few seconds.</span></div>`;
+
+  try {
+    const r = await fetch(`/api/backflow/list?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+    const data = await r.json();
+    if (!r.ok || !data.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    state.data = data;
+    const partial = data.meta.partial || {};
+    const partialTotal = (partial.customerFails || 0) + (partial.invoiceFails || 0) + (partial.timesheetFails || 0) + (partial.apptFails || 0);
+    const matched = (data.meta.jobTypeMatched || []).join(", ") || "(none)";
+    let status = `Live — ${data.meta.jobsScanned} jobs · matched type(s): ${matched} · ${(data.meta.elapsedMs / 1000).toFixed(1)}s`;
+    if (data.meta.droppedNonBackflow > 0) {
+      status += ` · dropped ${data.meta.droppedNonBackflow} non-backflow rows`;
+    }
+    if (partialTotal > 0) {
+      status += ` · ⚠ ${partialTotal} ST calls failed (rate-limited or down) — some rows may be incomplete`;
+      showToast(`Heads up — ${partialTotal} ServiceTitan calls failed during this run. Most rows are good; a few may show 0 hours or missing prices.`, { type: "warn" });
+    }
+    document.getElementById("bf-source").textContent = status;
+    renderKpis();
+    renderTable();
+  } catch (err) {
+    document.getElementById("bf-table-wrap").innerHTML = `<div class="empty">Failed to load: ${escHtml(err.message)}</div>`;
+    document.getElementById("bf-source").textContent = "Error";
+    showToast("Backflow report failed: " + err.message, { type:"error" });
+  } finally {
+    state.loading = false;
+    runEl.disabled = false;
+    runEl.textContent = "Run report";
+  }
+}
+
+runEl.addEventListener("click", runReport);
+
+// ── KPIs (5 tiles — sized down to fit a compact strip) ─────────────────
+function renderKpis() {
+  const s = state.data.summary;
+  const html = `<div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="label">Jobs</div>
+      <div class="value">${s.jobCount}</div>
+      <div class="sub">${s.customers} unique customers</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Backflows Tested</div>
+      <div class="value info">${s.backflowCount}</div>
+      <div class="sub">${s.technicians} techs involved</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Total Hours</div>
+      <div class="value warn">${fmtN(s.totalHours, 1)}</div>
+      <div class="sub">avg ${s.jobCount ? (s.totalHours / s.jobCount).toFixed(2) : "0.00"} hr/job</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Revenue</div>
+      <div class="value accent">${fmt$round(s.totalPrice)}</div>
+      <div class="sub">avg ${fmt$round(s.avgPricePerJob)} / job</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">$ / Backflow</div>
+      <div class="value ok">${fmt$round(s.avgPricePerBackflow)}</div>
+      <div class="sub">across all devices tested</div>
+    </div>
+  </div>`;
+  document.getElementById("bf-kpi-row").innerHTML = html;
+}
+
+// ── Table ──────────────────────────────────────────────────────────────
+const COLUMNS = [
+  ["compDate",         "Comp Date",      "date"],
+  ["customer",         "Customer",       "text"],
+  ["totalHr",          "Total HR",       "num"],
+  ["priceCharged",     "Price Charged",  "money"],
+  ["pricePerTechTime", "Price/Tech Time","money"],
+  ["technician",       "Technician",     "text"],
+  ["dispatchedMin",    "Disp Min",       "num"],
+  ["workingMin",       "Work Min",       "num"],
+  ["jobNumber",        "Job #",          "text"],
+  ["numBackflows",     "# BF",           "num"],
+  ["jobType",          "Job Type",       "text"],
+  ["notes",            "Notes",          "notes"],
+];
+
+function applyFilter(rows) {
+  const q = state.search.trim().toLowerCase();
+  if (!q) return rows;
+  return rows.filter(r =>
+    (r.customer    || "").toLowerCase().includes(q) ||
+    (r.technician  || "").toLowerCase().includes(q) ||
+    String(r.jobNumber || "").toLowerCase().includes(q) ||
+    (r.jobType     || "").toLowerCase().includes(q) ||
+    (r.notes       || "").toLowerCase().includes(q)
+  );
+}
+
+function applySort(rows) {
+  const k = state.sortKey;
+  const asc = state.sortAsc ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    let va = a[k], vb = b[k];
+    if (va == null && vb == null) return 0;
+    if (va == null) return -asc;
+    if (vb == null) return asc;
+    if (typeof va === "string" || typeof vb === "string") {
+      va = String(va).toLowerCase(); vb = String(vb).toLowerCase();
+      return va < vb ? -asc : va > vb ? asc : 0;
+    }
+    return (Number(va) - Number(vb)) * asc;
+  });
+}
+
+function renderTable() {
+  if (!state.data) return;
+  const all  = state.data.rows;
+  const rows = applySort(applyFilter(all));
+  const wrap = document.getElementById("bf-table-wrap");
+  const sumEl = document.getElementById("bf-summary");
+
+  if (!rows.length) {
+    wrap.innerHTML = `<div class="empty">No backflow jobs in this range${state.search ? " match the search" : ""}.</div>`;
+    sumEl.textContent = "";
+    return;
+  }
+
+  // Totals for the visible rows (respect filter).
+  const totals = rows.reduce((acc, r) => {
+    acc.totalHr        += Number(r.totalHr) || 0;
+    acc.priceCharged   += Number(r.priceCharged) || 0;
+    acc.dispatchedMin  += Number(r.dispatchedMin) || 0;
+    acc.workingMin     += Number(r.workingMin) || 0;
+    acc.numBackflows   += Number(r.numBackflows) || 0;
+    return acc;
+  }, { totalHr:0, priceCharged:0, dispatchedMin:0, workingMin:0, numBackflows:0 });
+
+  sumEl.innerHTML =
+    `Showing <b>${rows.length}</b> jobs · <b>${totals.numBackflows}</b> backflows · ` +
+    `<b>${fmtN(totals.totalHr, 1)}</b> hrs · <b>${fmt$round(totals.priceCharged)}</b>`;
+
+  const arrow = k => state.sortKey === k ? (state.sortAsc ? " asc" : "") : "";
+  const ths = COLUMNS.map(([key, label, kind]) => {
+    const sortedClass = state.sortKey === key ? "sorted" + arrow(key) : "";
+    const align = (kind === "num" || kind === "money") ? "num" : "";
+    return `<th class="${sortedClass} ${align}" data-sort="${key}">${escHtml(label)}</th>`;
+  }).join("");
+
+  let html = `<table class="bf-table"><thead><tr>${ths}</tr></thead><tbody>`;
+  const colCount = COLUMNS.length;
+
+  for (const r of rows) {
+    const rowKey = `${r.jobNumber}-${r._jobId || ""}`;
+    const isOpen = state.openNotes.has(rowKey);
+    const cleanedNotes = cleanNotes(r.notes);
+    const preview = notesPreview(cleanedNotes);
+
+    html += `<tr${isOpen ? ' class="notes-row"' : ""}>` + COLUMNS.map(([key, , kind]) => {
+      const v = r[key];
+      if (kind === "money") return `<td class="num">${v == null ? '<span class="muted">—</span>' : fmt$(v)}</td>`;
+      if (kind === "num")   return `<td class="num">${v == null ? '<span class="muted">—</span>' : fmtN(v, key === "totalHr" ? 2 : 0)}</td>`;
+      if (kind === "date")  return `<td>${v ? fmtDate(v) : '<span class="muted">—</span>'}</td>`;
+      if (kind === "notes") {
+        if (!cleanedNotes) {
+          return `<td class="notes-cell empty"><span class="muted">—</span></td>`;
+        }
+        return `<td class="notes-cell" data-row-key="${escHtml(rowKey)}" title="Click to ${isOpen ? "collapse" : "expand"}">
+          <span class="notes-preview"><span class="notes-chevron">▸</span><span>${escHtml(preview)}</span></span>
+        </td>`;
+      }
+      if (key === "jobNumber") return `<td><b>${escHtml(v || "")}</b></td>`;
+      return `<td>${escHtml(v || "")}</td>`;
+    }).join("") + `</tr>`;
+
+    if (isOpen && cleanedNotes) {
+      html += `<tr class="notes-detail-row"><td colspan="${colCount}">
+        <div class="notes-label">Notes — Job #${escHtml(r.jobNumber)}</div>
+        <div class="notes-detail">${escHtml(cleanedNotes)}</div>
+      </td></tr>`;
+    }
+  }
+
+  // Footer totals row
+  html += `<tr class="totals-row">
+    <td colspan="2" class="muted">Totals (${rows.length} jobs)</td>
+    <td class="num">${fmtN(totals.totalHr, 1)}</td>
+    <td class="num">${fmt$round(totals.priceCharged)}</td>
+    <td></td>
+    <td></td>
+    <td class="num">${fmtN(totals.dispatchedMin, 0)}</td>
+    <td class="num">${fmtN(totals.workingMin, 0)}</td>
+    <td></td>
+    <td class="num">${totals.numBackflows}</td>
+    <td colspan="2"></td>
+  </tr>`;
+
+  html += `</tbody></table>`;
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll("th[data-sort]").forEach(th => {
+    th.addEventListener("click", () => {
+      const k = th.getAttribute("data-sort");
+      if (state.sortKey === k) state.sortAsc = !state.sortAsc;
+      else { state.sortKey = k; state.sortAsc = false; }
+      renderTable();
+    });
+  });
+
+  // Notes accordion — click the preview cell to toggle the detail sub-row.
+  wrap.querySelectorAll("td.notes-cell[data-row-key]").forEach(td => {
+    td.addEventListener("click", () => {
+      const k = td.getAttribute("data-row-key");
+      if (state.openNotes.has(k)) state.openNotes.delete(k);
+      else state.openNotes.add(k);
+      renderTable();
+    });
+  });
+}
+
+function fmtDate(iso) {
+  // iso here is YYYY-MM-DD; render as Mon DD, YYYY.
+  if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return escHtml(iso || "");
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (isNaN(dt)) return escHtml(iso);
+  return dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+searchEl.addEventListener("input", e => {
+  state.search = e.target.value;
+  renderTable();
+});
+
+// Allow Enter from inside the date inputs to run the report immediately.
+[fromEl, toEl].forEach(el => {
+  el.addEventListener("keydown", (e) => { if (e.key === "Enter") runReport(); });
+});
+
+// Auto-run on first load with the MTD default.
+runReport();
+</script>
+</body>
+</html>

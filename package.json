@@ -1,0 +1,40 @@
+{
+  "name": "serviceops-command-center",
+  "version": "1.1.0",
+  "description": "ServiceOps Command Center — an internal operations dashboard for a residential plumbing/HVAC contractor. Sits between a field-service system of record and a marketing CRM, and layers on call intelligence, profitability reporting, equipment registration and timesheets. Ships with a demo mode that runs the whole app against generated data with every external system mocked.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "demo:seed": "node src/demo/seed.js",
+    "demo:reseed": "node src/demo/seed.js --force",
+    "add-user": "node scripts/add-user.js",
+    "list-users": "node scripts/list-users.js",
+    "reset-password": "node scripts/reset-password.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.11.1",
+    "connect-sqlite3": "0.9.15",
+    "diff": "^5.2.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-session": "^1.18.0",
+    "googleapis": "^144.0.0",
+    "jszip": "^3.10.1",
+    "mammoth": "^1.7.2",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "openai": "^4.47.1",
+    "pdf-parse": "^1.1.1",
+    "pdfkit": "^0.15.2",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

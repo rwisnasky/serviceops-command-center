@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoices - ServiceOps Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+
+<!-- ── Navigation Bar ───────────────────────────────────────────────── -->
+<!-- Nav: built by /js/shared.js — do not hand-edit, it gets wiped on load. -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+
+  <div class="page-header">
+    <div>
+      <h1>Supplier <span class="accent">Invoices</span></h1>
+      <p>Drop a vendor invoice — we'll parse it, match the job and vendor in ServiceTitan, and let you confirm before the PO is created.</p>
+    </div>
+    <div class="status-bar"><span class="status-dot"></span> Parser ready</div>
+  </div>
+
+  <!-- ── Step 1: Upload & Parse ───────────────────────────────────── -->
+  <div class="section-label">Supplier Invoice → Purchase Order</div>
+  <div class="panel">
+    <div style="color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;margin-bottom:14px;line-height:1.6;">
+      Drop a supplier-invoice PDF. We'll parse it, show you the matched job &amp; vendor in ServiceTitan, and let you
+      <strong style="color:var(--text);">preview before we create the PO</strong>. If the invoice doesn't list a job #, enter one below.
+    </div>
+    <div class="search-row">
+      <input class="search-input" id="inv-job-number" placeholder="Job # override (optional — leave blank to use the one on the invoice)" />
+      <button class="btn" id="inv-parse-btn" onclick="parseInvoice()">Parse Invoice</button>
+    </div>
+    <div id="inv-drop-zone"
+         style="margin-top:12px;border:2px dashed var(--border);border-radius:12px;padding:28px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;"
+         onclick="document.getElementById('inv-file-input').click()">
+      <div id="inv-drop-label" style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--muted);pointer-events:none;">
+        Drag &amp; drop an invoice (.pdf, .png, .jpg), or <span style="color:var(--accent);text-decoration:underline;">click to browse</span>
+      </div>
+      <input type="file" id="inv-file-input" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
+             style="display:none;" onchange="handleInvFileSelect(this)" />
+    </div>
+    <div id="inv-parse-status" style="margin-top:8px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--muted);min-height:18px;"></div>
+  </div>
+
+  <!-- ── Step 2: Preview ──────────────────────────────────────────── -->
+  <div id="inv-preview-wrap" style="display:none;">
+    <div class="section-label" style="margin-top:28px;">Preview</div>
+    <div class="panel" id="inv-preview-panel"></div>
+  </div>
+
+  <!-- ── Recent imports ───────────────────────────────────────────── -->
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:28px;gap:12px;flex-wrap:wrap;">
+    <div class="section-label" style="margin:0;">Recent Imports</div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button class="btn" id="inv-clear-failed-btn"
+              style="background:var(--surface2);color:var(--text);padding:6px 14px;font-size:11px;"
+              onclick="clearRecentImports('failed')">
+        Clear Failed
+      </button>
+      <a href="#" id="inv-clear-all-link"
+         style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;color:var(--muted);text-decoration:underline;cursor:pointer;"
+         onclick="event.preventDefault(); clearRecentImports('all')">
+        clear all
+      </a>
+    </div>
+  </div>
+  <div class="panel" id="inv-recent-panel" style="min-height:60px;margin-top:12px;">
+    <div style="color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;">Loading…</div>
+  </div>
+
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+  let selectedInvoiceFile = null;
+  let currentPreview = null; // full preview payload, including previewId
+
+  // ── Drop zone ──────────────────────────────────────────────────────────────
+  (function initDropZone() {
+    const zone = document.getElementById('inv-drop-zone');
+    if (!zone) return;
+    zone.addEventListener('dragover', e => {
+      e.preventDefault();
+      zone.style.borderColor = 'var(--accent)';
+      zone.style.background = 'rgba(196,18,48,0.06)';
+    });
+    zone.addEventListener('dragleave', e => {
+      e.preventDefault();
+      zone.style.borderColor = 'var(--border)';
+      zone.style.background = '';
+    });
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.style.borderColor = 'var(--border)';
+      zone.style.background = '';
+      const file = e.dataTransfer.files[0];
+      if (file) setInvoiceFile(file);
+    });
+  })();
+
+  function handleInvFileSelect(input) {
+    if (input.files[0]) setInvoiceFile(input.files[0]);
+  }
+
+  function setInvoiceFile(file) {
+    selectedInvoiceFile = file;
+    const label = document.getElementById('inv-drop-label');
+    const sizeKB = (file.size / 1024).toFixed(0);
+    label.innerHTML = `<span style="color:var(--accent);">✓ ${escHtml(file.name)}</span> <span style="color:var(--muted);">(${sizeKB} KB)</span><br><span style="color:var(--muted);font-size:11px;">Click or drop again to change</span>`;
+  }
+
+  // ── Step 1 → Parse ─────────────────────────────────────────────────────────
+  async function parseInvoice() {
+    const btn = document.getElementById('inv-parse-btn');
+    const statusEl = document.getElementById('inv-parse-status');
+    const wrap = document.getElementById('inv-preview-wrap');
+
+    if (!selectedInvoiceFile) {
+      statusEl.textContent = 'Drop or select an invoice file first.';
+      statusEl.style.color = 'var(--accent2)';
+      return;
+    }
+
+    const jobNumber = document.getElementById('inv-job-number').value.trim();
+
+    btn.disabled = true;
+    btn.textContent = 'Parsing…';
+    statusEl.style.color = 'var(--accent3)';
+    statusEl.textContent = `Parsing ${selectedInvoiceFile.name}…`;
+    wrap.style.display = 'none';
+
+    const formData = new FormData();
+    formData.append('invoiceFile', selectedInvoiceFile);
+    if (jobNumber) formData.append('jobNumber', jobNumber);
+
+    try {
+      const res = await fetch('/api/invoices/parse', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Parse failed');
+
+      currentPreview = data;
+      renderPreview(data);
+      wrap.style.display = 'block';
+      statusEl.style.color = 'var(--accent)';
+      statusEl.textContent = `✓ Parsed. Review the preview below before creating the PO.`;
+    } catch (err) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '✗ ' + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Parse Invoice';
+    }
+  }
+
+  // ── Step 2 → Render preview ────────────────────────────────────────────────
+  function renderPreview(p) {
+    const panel = document.getElementById('inv-preview-panel');
+    const parsed = p.parsed;
+    const job = p.jobMatch || {};
+    const vendor = p.vendorMatch || {};
+
+    const jobBlock = job.jobId
+      ? `<span style="color:var(--accent);">✓ Job #${escHtml(job.jobNumber || parsed.usedJobNumber)}</span>
+         <span style="color:var(--muted);">(internal id ${escHtml(job.jobId)})</span>`
+      : `<span style="color:var(--danger);">✗ ${escHtml(job.error || 'No job match')}</span>`;
+
+    const vendorBlock = vendor.id
+      ? `<span style="color:var(--accent);">✓ ${escHtml(vendor.name)}</span>
+         <span style="color:var(--muted);">(id ${escHtml(vendor.id)})</span>`
+      : `<span style="color:var(--danger);">✗ ${escHtml(vendor.error || 'No vendor match')}</span>`;
+
+    // Show which label the parser pulled the job# from — helps catch
+    // cases where it grabbed "Order #" (supplier's #) instead of "Customer PO".
+    const labelNote = parsed.parsedJobNumber && parsed.parsedJobNumberLabel
+      ? `<div style="font-size:11px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono','DM Mono',monospace;">
+           Parser read from: <span style="color:var(--text);">"${escHtml(parsed.parsedJobNumberLabel)}"</span> → ${escHtml(parsed.parsedJobNumber)}
+         </div>`
+      : '';
+
+    const parsedJobNote = parsed.parsedJobNumber && parsed.parsedJobNumber !== parsed.usedJobNumber
+      ? `<div style="font-size:11px;color:var(--accent3);margin-top:4px;font-family:'JetBrains Mono','DM Mono',monospace;">
+           Overridden: invoice showed "${escHtml(parsed.parsedJobNumber)}" → using "${escHtml(parsed.usedJobNumber || '')}"
+         </div>`
+      : labelNote;
+
+    // Pricebook match cell — for each line, show either a green "matched"
+    // pill with the SKU name, or an editable add form. Inline-editable fields
+    // (friendly name, code, cost) are pre-filled from the parsed line so the
+    // user just clicks "Add N to Pricebook" after a quick scan.
+    const pbCellHtml = (it, idx) => {
+      const m = it.pricebookMatch || { status: 'unmatched' };
+      if (m.status === 'matched' && m.bestMatch) {
+        const method = m.method === 'exact-code' ? 'code' : 'fuzzy';
+        return `
+          <div style="display:flex;flex-direction:column;gap:3px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;">
+            <div>
+              <span style="background:rgba(63,174,106,0.18);color:var(--ok);padding:2px 7px;border-radius:999px;font-size:9px;font-weight:600;">IN PRICEBOOK</span>
+              <span style="color:var(--muted);font-size:9px;margin-left:4px;">${escHtml(method)}</span>
+            </div>
+            <div style="color:var(--text);">${escHtml(m.bestMatch.name || '(unnamed)')}</div>
+            <div style="color:var(--muted);font-size:10px;">${escHtml(m.bestMatch.code || '')} · $${fmtMoney(m.bestMatch.price || 0)}</div>
+          </div>`;
+      }
+      // Unmatched — render inline add form, pre-filled, checked by default
+      const defaultName = String(it.description || '').slice(0, 80).trim();
+      const defaultCode = String(it.sku || '').trim();
+      const defaultCost = Number(it.unitCost) || 0;
+      return `
+        <div class="pb-add-row" data-line-idx="${idx}" style="display:flex;flex-direction:column;gap:4px;font-family:'JetBrains Mono','DM Mono',monospace;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;">
+            <input type="checkbox" class="pb-add-check" checked onchange="recalcAddToPricebookButton()" />
+            <span style="background:rgba(232,168,56,0.18);color:var(--accent2);padding:2px 7px;border-radius:999px;font-size:9px;font-weight:600;">NEW — ADD?</span>
+          </label>
+          <input type="text" class="pb-add-name" value="${escHtml(defaultName)}"
+                 placeholder="Friendly name"
+                 style="padding:4px 8px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;" />
+          <div style="display:flex;gap:4px;">
+            <input type="text" class="pb-add-code" value="${escHtml(defaultCode)}"
+                   placeholder="Code / SKU"
+                   style="flex:1;padding:4px 8px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;" />
+            <input type="number" step="0.01" min="0" class="pb-add-cost" value="${defaultCost}"
+                   placeholder="Cost"
+                   style="width:70px;padding:4px 8px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;text-align:right;" />
+          </div>
+          ${!defaultCode ? `<div style="color:var(--danger);font-size:10px;">Supplier gave no SKU — fill a code before adding.</div>` : ''}
+        </div>`;
+    };
+
+    const lineRows = (parsed.lineItems || []).map((it, idx) => `
+      <tr data-line-row="${idx}">
+        <td style="padding:6px 10px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;vertical-align:top;">
+          ${escHtml(it.description || '')}
+          ${it.sku ? `<div style="color:var(--muted);font-size:10px;">SKU: ${escHtml(it.sku)}</div>` : ''}
+        </td>
+        <td style="padding:6px 10px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top;min-width:220px;">
+          ${pbCellHtml(it, idx)}
+        </td>
+        <td style="padding:6px 10px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;text-align:right;vertical-align:top;">${escHtml(it.quantity)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;text-align:right;vertical-align:top;">$${fmtMoney(it.unitCost)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;text-align:right;vertical-align:top;">$${fmtMoney(it.lineTotal)}</td>
+      </tr>
+    `).join('');
+
+    // Tally — how many lines are "new" (can be added to pricebook)
+    const pbCounts = parsed.pricebookMatchCounts || { matched: 0, unmatched: 0 };
+
+    panel.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:18px;">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:6px;">Vendor Match</div>
+          <div style="font-size:13px;">${vendorBlock}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono','DM Mono',monospace;">Parser read: "${escHtml(parsed.vendor || '—')}"</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:6px;">Job Match</div>
+          <div style="font-size:13px;">${jobBlock}</div>
+          ${parsedJobNote}
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:6px;">Invoice</div>
+          <div style="font-size:13px;"><strong>#${escHtml(parsed.invoiceNumber || '—')}</strong></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono','DM Mono',monospace;">
+            ${escHtml(parsed.invoiceDate || 'no date')} · Total $${fmtMoney(parsed.total)}
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+        <div style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;color:var(--muted);">
+          Pricebook match:
+          <span style="color:var(--ok);margin-left:4px;">${pbCounts.matched || 0} already in pricebook</span>
+          <span style="margin:0 6px;color:var(--border);">·</span>
+          <span style="color:var(--accent2);">${pbCounts.unmatched || 0} new</span>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:var(--surface2);">
+              <th style="text-align:left;padding:8px 10px;font-size:10px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--muted);letter-spacing:1px;border-bottom:1px solid var(--border);">DESCRIPTION</th>
+              <th style="text-align:left;padding:8px 10px;font-size:10px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--muted);letter-spacing:1px;border-bottom:1px solid var(--border);min-width:220px;">PRICEBOOK</th>
+              <th style="text-align:right;padding:8px 10px;font-size:10px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--muted);letter-spacing:1px;border-bottom:1px solid var(--border);">QTY</th>
+              <th style="text-align:right;padding:8px 10px;font-size:10px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--muted);letter-spacing:1px;border-bottom:1px solid var(--border);">UNIT COST</th>
+              <th style="text-align:right;padding:8px 10px;font-size:10px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--muted);letter-spacing:1px;border-bottom:1px solid var(--border);">LINE TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>${lineRows || `<tr><td colspan="5" style="padding:12px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;">No line items parsed.</td></tr>`}</tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3"></td>
+              <td style="padding:10px 10px;text-align:right;font-family:'JetBrains Mono','DM Mono',monospace;font-size:13px;font-weight:700;border-top:1px solid var(--border);">TOTAL <span style="color:var(--muted);font-weight:400;font-size:10px;">(inc. tax)</span></td>
+              <td style="padding:10px 10px;text-align:right;font-family:'JetBrains Mono','DM Mono',monospace;font-size:13px;font-weight:700;border-top:1px solid var(--border);">$${fmtMoney(parsed.total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;align-items:center;">
+        <button class="btn" id="inv-confirm-btn" onclick="confirmCreatePo()" ${p.ready ? '' : 'disabled'}>
+          Confirm &amp; Create PO
+        </button>
+        ${pbCounts.unmatched > 0 ? `
+          <button class="btn" id="inv-addpb-btn" type="button"
+                  style="background:var(--accent2);color:#1a0f00;"
+                  onclick="addSelectedToPricebook()">
+            Add ${pbCounts.unmatched} to Pricebook
+          </button>` : ''}
+        ${!vendor.id ? `<button class="btn" style="background:var(--surface2);color:var(--text);" onclick="reparseWithFreshVendors()">↻ Re-check Vendors</button>` : ''}
+        <button class="btn" style="background:var(--surface2);color:var(--text);" onclick="cancelPreview()">Cancel</button>
+        <div id="inv-create-status" style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--muted);flex:1;min-width:200px;"></div>
+      </div>
+      <div id="inv-addpb-result" style="margin-top:10px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;"></div>
+      ${!p.ready ? `
+        <div style="margin-top:12px;padding:10px 12px;background:rgba(196,18,48,0.08);border:1px solid var(--danger);border-radius:8px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;color:var(--danger);">
+          Fix the ✗ items above before creating the PO.
+          ${!vendor.id ? 'If the vendor is missing, create it in ServiceTitan, then click <strong>Re-check Vendors</strong> (bypasses the 10-min cache).' : ''}
+        </div>` : ''}
+    `;
+  }
+
+  // ── Re-parse using a fresh vendor cache (after creating missing vendor in ST)
+  async function reparseWithFreshVendors() {
+    if (!selectedInvoiceFile) {
+      showToast('File no longer in memory — drop the PDF again.');
+      return;
+    }
+    const statusEl = document.getElementById('inv-parse-status');
+    statusEl.style.color = 'var(--accent3)';
+    statusEl.textContent = 'Refreshing vendor list from ServiceTitan…';
+
+    const jobNumber = document.getElementById('inv-job-number').value.trim();
+    const formData = new FormData();
+    formData.append('invoiceFile', selectedInvoiceFile);
+    formData.append('refreshVendors', 'true');
+    if (jobNumber) formData.append('jobNumber', jobNumber);
+
+    try {
+      const res = await fetch('/api/invoices/parse', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Re-parse failed');
+      currentPreview = data;
+      renderPreview(data);
+      statusEl.style.color = data.vendorMatch.id ? 'var(--accent)' : 'var(--danger)';
+      statusEl.textContent = data.vendorMatch.id
+        ? `✓ Vendor matched: ${data.vendorMatch.name}`
+        : `✗ Still no vendor match. Confirm the vendor name in ServiceTitan exactly matches the invoice.`;
+    } catch (err) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '✗ ' + err.message;
+    }
+  }
+
+  // ── Step 3 → Confirm & create ─────────────────────────────────────────────
+  async function confirmCreatePo() {
+    if (!currentPreview?.previewId) return;
+    const btn = document.getElementById('inv-confirm-btn');
+    const statusEl = document.getElementById('inv-create-status');
+
+    btn.disabled = true;
+    btn.textContent = 'Creating PO…';
+    statusEl.style.color = 'var(--accent3)';
+    statusEl.textContent = 'Pushing to ServiceTitan…';
+
+    try {
+      const res = await fetch('/api/invoices/create-po', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          previewId: currentPreview.previewId,
+          preview: {
+            parsed: currentPreview.parsed,
+            jobMatch: currentPreview.jobMatch,
+            vendorMatch: currentPreview.vendorMatch,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'PO creation failed');
+
+      statusEl.style.color = 'var(--accent)';
+      statusEl.textContent = `✓ PO ${data.poNumber ? '#' + data.poNumber : ''} created on job ${data.jobNumber} — remember to mark it Sent and attach the PDF in ServiceTitan.`;
+      showToast('✓ Purchase order created');
+
+      // Reset for the next invoice
+      setTimeout(() => {
+        cancelPreview();
+        resetUploadForm();
+        loadRecentImports();
+      }, 1500);
+    } catch (err) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '✗ ' + err.message;
+      btn.disabled = false;
+      btn.textContent = 'Confirm & Create PO';
+    }
+  }
+
+  // ── Add-to-Pricebook helpers ──────────────────────────────────────────────
+  // Called from the checkbox's onchange — updates the button label so the
+  // user always sees how many items they're about to push into ST.
+  function recalcAddToPricebookButton() {
+    const btn = document.getElementById('inv-addpb-btn');
+    if (!btn) return;
+    const checked = document.querySelectorAll('.pb-add-row .pb-add-check:checked').length;
+    btn.textContent = `Add ${checked} to Pricebook`;
+    btn.disabled = checked === 0;
+    btn.style.opacity = checked === 0 ? '0.5' : '1';
+  }
+
+  // Collects each row's friendly name / code / cost, posts them, and renders
+  // a per-item result. Rows that succeed are flipped in-place to look like
+  // "already matched" pills so the user can see the enrichment stuck.
+  async function addSelectedToPricebook() {
+    const btn = document.getElementById('inv-addpb-btn');
+    const resultEl = document.getElementById('inv-addpb-result');
+    if (!btn) return;
+
+    const rows = Array.from(document.querySelectorAll('.pb-add-row'));
+    const selected = rows
+      .map(row => {
+        const check = row.querySelector('.pb-add-check');
+        if (!check || !check.checked) return null;
+        const name = (row.querySelector('.pb-add-name')?.value || '').trim();
+        const code = (row.querySelector('.pb-add-code')?.value || '').trim();
+        const cost = Number(row.querySelector('.pb-add-cost')?.value || 0) || 0;
+        return { row, displayName: name, code, cost };
+      })
+      .filter(Boolean);
+
+    if (selected.length === 0) {
+      resultEl.innerHTML = `<span style="color:var(--muted);">Nothing selected.</span>`;
+      return;
+    }
+
+    // Client-side pre-flight — catch empty code/name before we round-trip.
+    const missing = selected.filter(s => !s.code || !s.displayName);
+    if (missing.length) {
+      resultEl.innerHTML = `<span style="color:var(--danger);">✗ ${missing.length} row(s) missing a Code or Friendly Name — fill them in first.</span>`;
+      return;
+    }
+
+    btn.disabled = true;
+    const origLabel = btn.textContent;
+    btn.textContent = 'Adding…';
+    resultEl.innerHTML = `<span style="color:var(--accent3);">Creating ${selected.length} material(s) in ServiceTitan…</span>`;
+
+    try {
+      const res = await fetch('/api/invoices/add-to-pricebook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: selected.map(s => ({
+            code: s.code,
+            displayName: s.displayName,
+            cost: s.cost,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      // Walk the results back and flip the row to a success / failure state
+      // using the same visual language as the matched-pill.
+      const byCode = new Map((data.results || []).map(r => [r.code, r]));
+      for (const s of selected) {
+        const r = byCode.get(s.code);
+        if (!r) continue;
+        if (r.ok) {
+          s.row.outerHTML = `
+            <div style="display:flex;flex-direction:column;gap:3px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;">
+              <div>
+                <span style="background:rgba(63,174,106,0.18);color:var(--ok);padding:2px 7px;border-radius:999px;font-size:9px;font-weight:600;">ADDED TO PRICEBOOK</span>
+              </div>
+              <div style="color:var(--text);">${escHtml(s.displayName)}</div>
+              <div style="color:var(--muted);font-size:10px;">${escHtml(s.code)} · ST id ${escHtml(r.stId || '—')}</div>
+            </div>`;
+        } else {
+          // Append an inline error under the existing row rather than
+          // destroying the form — user might want to retry with edits.
+          let errNote = s.row.querySelector('.pb-add-err');
+          if (!errNote) {
+            errNote = document.createElement('div');
+            errNote.className = 'pb-add-err';
+            errNote.style.cssText = 'color:var(--danger);font-size:10px;';
+            s.row.appendChild(errNote);
+          }
+          errNote.textContent = `✗ ${r.error || 'Failed'}`;
+        }
+      }
+
+      const okCount = (data.results || []).filter(r => r.ok).length;
+      const failCount = (data.results || []).length - okCount;
+      resultEl.innerHTML = `
+        <span style="color:var(--ok);">✓ Added ${okCount}</span>
+        ${failCount ? `<span style="color:var(--danger);margin-left:10px;">✗ ${failCount} failed</span>` : ''}
+        <span style="color:var(--muted);margin-left:10px;">Future POs will match these automatically.</span>
+      `;
+      if (okCount > 0) showToast(`✓ Added ${okCount} material${okCount === 1 ? '' : 's'} to pricebook`);
+      recalcAddToPricebookButton();
+    } catch (err) {
+      resultEl.innerHTML = `<span style="color:var(--danger);">✗ ${escHtml(err.message)}</span>`;
+      btn.disabled = false;
+      btn.textContent = origLabel;
+    }
+  }
+
+  function cancelPreview() {
+    currentPreview = null;
+    document.getElementById('inv-preview-wrap').style.display = 'none';
+    document.getElementById('inv-preview-panel').innerHTML = '';
+  }
+
+  function resetUploadForm() {
+    selectedInvoiceFile = null;
+    document.getElementById('inv-file-input').value = '';
+    document.getElementById('inv-job-number').value = '';
+    document.getElementById('inv-drop-label').innerHTML =
+      'Drag &amp; drop an invoice (.pdf, .png, .jpg), or <span style="color:var(--accent);text-decoration:underline;">click to browse</span>';
+    document.getElementById('inv-parse-status').textContent = '';
+  }
+
+  // ── Recent imports ─────────────────────────────────────────────────────────
+  async function loadRecentImports() {
+    const panel = document.getElementById('inv-recent-panel');
+    try {
+      const res = await fetch('/api/invoices/recent?limit=25');
+      const data = await res.json();
+      const rows = data.imports || [];
+      if (!rows.length) {
+        panel.innerHTML = `<div style="color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;">No imports yet.</div>`;
+        return;
+      }
+      panel.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr;gap:10px;">
+          ${rows.map(r => {
+            const ok = r.status === 'created';
+            const statusBadge = ok
+              ? `<span style="color:var(--accent);font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;">✓ PO ${escHtml(r.po_number || r.po_id || '')}</span>`
+              : `<span style="color:var(--danger);font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;">✗ failed</span>`;
+            const partialErrs = []; // kept for future use; attach/send no longer attempted
+            return `
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:220px;">
+                  <div style="font-size:13px;font-weight:700;">${escHtml(r.vendor || '(unknown vendor)')}</div>
+                  <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-top:3px;">
+                    Invoice #${escHtml(r.invoice_number || '—')} · Job #${escHtml(r.job_number || '—')} · $${fmtMoney(r.total)} · ${escHtml(fmtTs(r.created_at))}
+                  </div>
+                  ${r.error ? `<div style="font-size:11px;color:var(--danger);font-family:'JetBrains Mono','DM Mono',monospace;margin-top:4px;">${escHtml(r.error)}</div>` : ''}
+                  ${partialErrs.length ? `<div style="font-size:11px;color:var(--accent2);font-family:'JetBrains Mono','DM Mono',monospace;margin-top:4px;white-space:pre-wrap;word-break:break-word;">${escHtml(partialErrs.join('\\n'))}</div>` : ''}
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;">${statusBadge}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    } catch (err) {
+      panel.innerHTML = `<div style="color:var(--danger);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;">Failed to load: ${escHtml(err.message)}</div>`;
+    }
+  }
+
+  function fmtMoney(v) {
+    const n = Number(v);
+    if (!isFinite(n)) return '0.00';
+    return n.toFixed(2);
+  }
+
+  async function clearRecentImports(scope) {
+    if (scope === 'all') {
+      if (!confirm('Delete ALL import history, including successful POs? This cannot be undone.')) return;
+    }
+    try {
+      const res = await fetch(`/api/invoices/recent?scope=${encodeURIComponent(scope)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Clear failed');
+      showToast(`✓ Removed ${data.deleted} ${scope === 'all' ? 'import' : 'failed'} row${data.deleted === 1 ? '' : 's'}`);
+      loadRecentImports();
+    } catch (err) {
+      showToast('✗ ' + err.message);
+    }
+  }
+
+  // Load on page open
+  loadRecentImports();
+</script>
+
+</body>
+</html>

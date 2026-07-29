@@ -1,0 +1,2498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pricebook - ServiceOps Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    /* ── Sub-tabs (item type switcher) ─────────────────────────── */
+    .pb-tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      padding: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      width: fit-content;
+    }
+    .pb-tab {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 8px 16px;
+      border-radius: var(--r-sm);
+      color: var(--muted);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .pb-tab:hover { color: var(--text); }
+    .pb-tab.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* ── Results list ───────────────────────────────────────────── */
+    .pb-results { display: flex; flex-direction: column; gap: 8px; }
+    .pb-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+    }
+    .pb-row:hover { border-color: var(--border-strong); }
+    .pb-row-title { font-weight: 600; color: var(--text); font-size: 13px; }
+    .pb-row-code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .pb-row-desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .pb-price {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 17px;
+      color: var(--text);
+      text-align: right;
+      min-width: 95px;
+    }
+    .pb-row-btn {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 7px 12px;
+      border-radius: var(--r-sm);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font-sans);
+      transition: background .15s, border-color .15s;
+    }
+    .pb-row-btn:hover { border-color: var(--border-strong); background: var(--surface2); }
+    .pb-row-btn.add { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .pb-row-btn.add:hover { background: #b40f2b; }
+
+    /* ── Cart drawer ───────────────────────────────────────────── */
+    .cart-dock {
+      position: sticky;
+      top: 16px;
+    }
+    .cart-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 18px;
+      box-shadow: var(--shadow-md);
+    }
+    .cart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .cart-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .cart-count {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .cart-items { display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow-y: auto; }
+    .cart-item {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      align-items: center;
+      font-size: 12px;
+      padding: 8px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+    }
+    .cart-item-name { font-weight: 600; font-size: 12px; }
+    .cart-item-meta { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+    .cart-qty {
+      width: 42px; padding: 3px 6px;
+      background: var(--surface); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: 11px; text-align: center;
+      font-family: var(--font-mono);
+    }
+    .cart-line-price {
+      font-family: var(--font-display); font-weight: 700; font-size: 13px; min-width: 62px; text-align: right;
+    }
+    .cart-remove {
+      background: transparent; border: none; color: var(--muted);
+      cursor: pointer; font-size: 14px; padding: 2px 4px;
+    }
+    .cart-remove:hover { color: var(--danger); }
+    .cart-total {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-top: 12px; padding-top: 10px;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-display); font-weight: 700; font-size: 16px;
+    }
+    .cart-total .amount { color: var(--accent); font-size: 22px; }
+    .cart-job-row { margin-top: 14px; }
+    .cart-job-row input {
+      width: 100%;
+      padding: 9px 11px;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .cart-job-row input:focus { outline: none; border-color: var(--accent); }
+    .cart-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .cart-actions .btn { flex: 1; font-size: 12px; padding: 10px 12px; }
+    .cart-status {
+      margin-top: 10px; min-height: 16px;
+      font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    }
+    .cart-empty {
+      text-align: center; padding: 28px 10px;
+      color: var(--muted); font-family: var(--font-mono); font-size: 12px;
+    }
+
+    /* ── Layout ───────────────────────────────────────────────── */
+    .pb-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 24px;
+      align-items: flex-start;
+    }
+    @media (max-width: 900px) {
+      .pb-grid { grid-template-columns: 1fr; }
+      .cart-dock { position: static; }
+    }
+
+    .pb-pager {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 14px;
+      font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    }
+    .pb-pager button {
+      background: var(--surface2); color: var(--text);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 6px 12px; font-size: 11px; cursor: pointer;
+      font-family: var(--font-sans); font-weight: 600;
+    }
+    .pb-pager button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ── Scope → Estimate ──────────────────────────────────────── */
+    .scope-drop {
+      border: 2px dashed var(--border);
+      border-radius: var(--r-md);
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .scope-drop:hover { border-color: var(--border-strong); }
+    .scope-drop.dragover { border-color: var(--accent); background: rgba(196,18,48,0.06); }
+    .scope-drop-label {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .scope-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px 18px;
+      padding: 12px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      margin-bottom: 12px;
+    }
+    .scope-meta-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .scope-meta-value { font-weight: 600; font-size: 13px; margin-top: 2px; }
+
+    .scope-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .scope-line {
+      display: grid;
+      grid-template-columns: 1.3fr 1.6fr 60px 90px 40px;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+    }
+    .scope-line.unmatched { border-color: rgba(239,68,85,0.45); background: rgba(239,68,85,0.05); }
+    .scope-line-desc { font-weight: 600; font-size: 12px; }
+    .scope-line-notes { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .scope-line-match {
+      font-size: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      cursor: pointer;
+      position: relative;
+    }
+    .scope-line-match:hover { border-color: var(--border-strong); }
+    .scope-line-match-name { font-weight: 600; font-size: 12px; }
+    .scope-line-match-meta { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    .conf-pill {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .conf-pill.high  { background: rgba(63,174,106,0.18); color: var(--ok); }
+    .conf-pill.mid   { background: rgba(232,168,56,0.18); color: var(--accent2); }
+    .conf-pill.low   { background: rgba(239,68,85,0.18);  color: var(--danger); }
+    .conf-pill.llm   { background: rgba(91,140,201,0.18); color: var(--accent3); }
+
+    .scope-line-qty {
+      width: 56px;
+      padding: 5px 8px;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      text-align: center;
+    }
+    .scope-line-total {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 13px;
+      text-align: right;
+    }
+    .scope-line-remove {
+      background: transparent; border: none; color: var(--muted);
+      cursor: pointer; font-size: 14px;
+    }
+    .scope-line-remove:hover { color: var(--danger); }
+
+    .scope-swap-popover {
+      position: absolute; top: 100%; left: 0; right: 0;
+      margin-top: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--r-sm);
+      box-shadow: var(--shadow-md);
+      z-index: 10;
+      max-height: 280px;
+      overflow-y: auto;
+      padding: 6px;
+    }
+    .scope-swap-popover input {
+      width: 100%;
+      padding: 7px 10px;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    .scope-swap-row {
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .scope-swap-row:hover { background: var(--surface2); }
+    .scope-swap-row .n { font-weight: 600; }
+    .scope-swap-row .m { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+
+    .scope-totals {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-top: 14px; padding-top: 12px;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-display); font-weight: 700; font-size: 16px;
+    }
+    .scope-totals .amount { color: var(--accent); font-size: 22px; }
+
+    .scope-submit-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .scope-submit-row input {
+      padding: 10px 12px;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .index-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      margin-bottom: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .index-bar .meta { display: flex; gap: 16px; }
+    .index-bar button {
+      background: var(--surface); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 5px 10px; font-size: 11px; font-family: var(--font-sans); cursor: pointer; font-weight: 600;
+    }
+    .index-bar button:hover { border-color: var(--border-strong); }
+
+    details.collapser > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 12px 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text);
+    }
+    details.collapser > summary::-webkit-details-marker { display: none; }
+    details.collapser > summary::after {
+      content: '▼'; float: right; color: var(--muted); font-size: 10px; transition: transform .15s;
+    }
+    details.collapser[open] > summary::after { transform: rotate(180deg); }
+    details.collapser > div { margin-top: 14px; }
+
+    /* ── Duplicates panel ──────────────────────────────────────── */
+    .dupe-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .dupe-controls .pb-tabs { margin-bottom: 0; }
+    .dupe-controls .group-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .dupe-group {
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      background: var(--surface2);
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .dupe-group > summary {
+      cursor: pointer;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      list-style: none;
+      font-size: 13px;
+    }
+    .dupe-group > summary::-webkit-details-marker { display: none; }
+    .dupe-group > summary::after {
+      content: '▼'; margin-left: auto; color: var(--muted); font-size: 10px; transition: transform .15s;
+    }
+    .dupe-group[open] > summary::after { transform: rotate(180deg); }
+    .dupe-group-key {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+      font-weight: 600;
+    }
+    .dupe-group-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.05em;
+      padding: 3px 8px;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      text-transform: uppercase;
+    }
+    .dupe-group-type {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .dupe-group-body {
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .dupe-record {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+    }
+    .dupe-record .type-chip {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--surface);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .dupe-record .name { font-weight: 600; font-size: 13px; color: var(--text); }
+    .dupe-record .code { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .dupe-record .st-id { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+    .dupe-record .price {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text);
+    }
+    .dupe-record.inactive { opacity: 0.5; }
+
+    /* Merge UI inside a duplicate group */
+    .dupe-record.canonical {
+      border-color: var(--accent, #5cb85c);
+      background: color-mix(in srgb, var(--accent, #5cb85c) 8%, var(--surface2));
+    }
+    .dupe-record.will-deactivate {
+      border-color: var(--warn, #f0ad4e);
+      background: color-mix(in srgb, var(--warn, #f0ad4e) 6%, var(--surface2));
+    }
+    .dupe-record .canonical-chip {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: var(--accent, #5cb85c);
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-left: 6px;
+    }
+    .dupe-merge-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      margin-top: 6px;
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      border-radius: var(--r-sm);
+      font-size: 12px;
+    }
+    .dupe-merge-bar label {
+      display: flex; gap: 6px; align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .dupe-merge-bar .spacer { flex: 1; }
+    .dupe-merge-bar .btn-merge {
+      background: var(--warn, #f0ad4e);
+      color: #000;
+      font-weight: 600;
+      border: none;
+      padding: 6px 14px;
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .dupe-merge-bar .btn-merge:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .dupe-merge-bar .btn-suggest {
+      background: transparent;
+      color: var(--info, #5bc0de);
+      border: 1px solid var(--border);
+      padding: 5px 10px;
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .dupe-merge-bar .btn-suggest:hover { border-color: var(--info, #5bc0de); }
+
+    .dupe-merge-status {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      padding: 4px 0 0 0;
+    }
+    .dupe-merge-status.ok { color: var(--accent, #5cb85c); }
+    .dupe-merge-status.err { color: var(--danger, #d9534f); }
+
+    /* Modal */
+    .merge-modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    }
+    .merge-modal-backdrop.show { display: flex; }
+    .merge-modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 18px 20px;
+      max-width: 520px;
+      width: 90%;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+    .merge-modal h3 { margin: 0 0 10px 0; font-size: 16px; }
+    .merge-modal p { font-size: 13px; color: var(--muted); margin: 6px 0; }
+    .merge-modal .keep-box, .merge-modal .drop-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 8px 10px;
+      margin: 6px 0;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .merge-modal .keep-box { border-left: 3px solid var(--accent, #5cb85c); }
+    .merge-modal .drop-box { border-left: 3px solid var(--warn, #f0ad4e); }
+    .merge-modal .modal-actions {
+      display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px;
+    }
+    .merge-modal .btn-cancel {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text); padding: 7px 14px; border-radius: var(--r-sm); cursor: pointer;
+    }
+    .merge-modal .btn-confirm {
+      background: var(--warn, #f0ad4e); color: #000; border: none;
+      padding: 7px 14px; border-radius: var(--r-sm); cursor: pointer; font-weight: 600;
+    }
+    .merge-modal .btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Merge log panel */
+    .merge-log-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      background: var(--surface2);
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+    .merge-log-row .log-time { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+    .merge-log-row .log-status {
+      font-family: var(--font-mono); font-size: 10px;
+      padding: 2px 6px; border-radius: 3px;
+      background: var(--surface); border: 1px solid var(--border);
+    }
+    .merge-log-row .log-status.ok { color: var(--accent, #5cb85c); border-color: var(--accent, #5cb85c); }
+    .merge-log-row .log-status.partial { color: var(--warn, #f0ad4e); border-color: var(--warn, #f0ad4e); }
+    .merge-log-row .log-status.failed { color: var(--danger, #d9534f); border-color: var(--danger, #d9534f); }
+    .merge-log-row .log-status.undone { color: var(--muted); }
+    .merge-log-row .btn-undo {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text); padding: 4px 10px; border-radius: var(--r-sm);
+      cursor: pointer; font-size: 11px;
+    }
+    .merge-log-row .btn-undo:hover { border-color: var(--info, #5bc0de); }
+    .merge-log-row .btn-undo:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    @media (max-width: 720px) {
+      .scope-line { grid-template-columns: 1fr; gap: 8px; }
+      .dupe-record { grid-template-columns: 1fr; }
+      .merge-log-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Navigation Bar ───────────────────────────────────────────────── -->
+<!-- Nav: built by /js/shared.js — do not hand-edit, it gets wiped on load. -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+
+  <div class="page-header">
+    <div>
+      <h1>Material <span class="accent">Rename</span></h1>
+      <p>Clean up cryptic manufacturer codes and ALL-CAPS supplier descriptions so techs and CSRs can actually find materials in ServiceTitan. Review one at a time — AI suggests, you approve.</p>
+    </div>
+    <div class="status-bar"><span class="status-dot"></span> Pricebook ready</div>
+  </div>
+
+  <!-- ── Pricebook index status bar ───────────────────────────── -->
+  <div class="index-bar" id="index-bar">
+    <div class="meta">
+      <span id="idx-counts">Loading index…</span>
+      <span id="idx-synced"></span>
+    </div>
+    <button onclick="refreshIndex()" id="idx-refresh-btn">Refresh index</button>
+  </div>
+
+  <!-- ── Material Rename primary flow ─────────────────────────── -->
+  <div class="section-label">Rename review queue</div>
+  <div class="panel" style="padding:18px;">
+    <div id="rename-progress" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+      <div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);">
+        <span id="rename-progress-text">Loading candidates…</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <label style="font-size:11px;color:var(--muted);display:flex;gap:6px;align-items:center;font-family:var(--font-mono);">
+          <input type="checkbox" id="rename-include-reviewed" onchange="loadRenameQueue()" />
+          Show already-reviewed
+        </label>
+        <button class="btn" style="background:var(--surface2);color:var(--text);padding:6px 14px;font-size:11px;" onclick="loadRenameQueue()">Reload queue</button>
+      </div>
+    </div>
+
+    <div id="rename-card" style="min-height:160px;">
+      <div class="cart-empty" style="padding:20px;">Loading…</div>
+    </div>
+  </div>
+
+  <!-- ── Recent rename activity ───────────────────────────────── -->
+  <div class="section-label" style="margin-top:22px;">Recent renames</div>
+  <div class="panel" id="recent-renames-panel" style="padding:14px;min-height:60px;">
+    <div class="cart-empty" style="padding:10px;">Loading…</div>
+  </div>
+
+  <!-- ── Scope → Estimate (collapsed — kept for legacy use) ───── -->
+  <details class="collapser" style="margin-top:22px;">
+    <summary>Scope → Estimate (legacy)</summary>
+    <div class="panel" style="padding:18px;">
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:10px;">
+        Drop a scope-of-work or competitor-quote PDF to auto-build a ServiceTitan estimate. Kept here for the occasional written scope we get.
+      </div>
+      <div class="scope-drop" id="scope-drop" onclick="document.getElementById('scope-file').click()">
+        <div class="scope-drop-label" id="scope-drop-label">
+          Drop PDF here, or click to browse. Up to 5 pages supported.
+        </div>
+        <input type="file" id="scope-file" accept="application/pdf,image/png,image/jpeg" style="display:none;" />
+      </div>
+
+      <div id="scope-parse-status"
+           style="margin-top:10px;font-family:var(--font-mono);font-size:12px;color:var(--muted);min-height:16px;"></div>
+
+      <div id="scope-preview" style="display:none;margin-top:16px;">
+        <!-- Preview payload injected here -->
+      </div>
+
+      <div class="section-label" style="margin-top:18px;">Recent scope-to-estimate runs</div>
+      <div id="recent-scope-panel" style="min-height:60px;">
+        <div class="cart-empty" style="padding:10px;">Loading…</div>
+      </div>
+    </div>
+  </details>
+
+  <!-- ── Pricebook Duplicates ─────────────────────────────────── -->
+  <div id="duplicates" class="section-label" style="margin-top:22px;">Pricebook duplicates</div>
+  <div class="panel" style="padding:16px;">
+    <div class="dupe-controls">
+      <div>
+        <div class="group-label">Match on</div>
+        <div class="pb-tabs" id="dupe-rule-tabs" style="margin-top:6px;">
+          <button class="pb-tab active" data-rule="code">Code</button>
+          <button class="pb-tab"        data-rule="name">Display name</button>
+        </div>
+      </div>
+      <div>
+        <div class="group-label">Scope</div>
+        <div class="pb-tabs" id="dupe-type-tabs" style="margin-top:6px;">
+          <button class="pb-tab active" data-type="all">All</button>
+          <button class="pb-tab"        data-type="Equipment">Equipment</button>
+          <button class="pb-tab"        data-type="Material">Materials</button>
+          <button class="pb-tab"        data-type="Service">Services</button>
+        </div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+        <label style="font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;">
+          <input type="checkbox" id="dupe-active-only" checked /> Active only
+        </label>
+        <button class="btn" id="dupe-refresh-btn" onclick="loadDuplicates()">Refresh</button>
+      </div>
+    </div>
+
+    <div id="dupe-status"
+         style="font-family:var(--font-mono);font-size:12px;color:var(--muted);min-height:18px;margin-bottom:10px;"></div>
+
+    <div id="dupe-results" style="min-height:80px;">
+      <div class="cart-empty" style="padding:10px;">Click Refresh to scan the pricebook.</div>
+    </div>
+  </div>
+
+  <!-- ── Recent merges (audit log) ────────────────────────────── -->
+  <details id="merge-log-panel" class="collapser" style="margin-top:16px;">
+    <summary>Recent merges (audit log)</summary>
+    <div class="panel" style="padding:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:12px;color:var(--muted);">
+          Soft merges deactivate the duplicates but preserve them in ServiceTitan. Undo reactivates them.
+        </div>
+        <button class="btn" onclick="loadMergeLog()">Refresh log</button>
+      </div>
+      <div id="merge-log-body" style="min-height:40px;">
+        <div class="cart-empty" style="padding:10px;">Click Refresh log to load recent merges.</div>
+      </div>
+    </div>
+  </details>
+
+  <!-- ── Merge confirmation modal ─────────────────────────────── -->
+  <div id="merge-modal" class="merge-modal-backdrop" onclick="if(event.target===this)closeMergeModal()">
+    <div class="merge-modal">
+      <h3>Confirm soft merge</h3>
+      <p>
+        This will deactivate the duplicate SKU(s) in ServiceTitan. Historical jobs,
+        estimates, and invoices that reference them will keep their links — only
+        future lookups are affected. You can undo this from the audit log below.
+      </p>
+      <div id="merge-modal-body"></div>
+      <p style="font-size:11px;color:var(--muted);margin-top:10px;">
+        Note: This does NOT reassign references on existing records. If you need a
+        true merge that rewrites line items on historical jobs, that's a separate tool.
+      </p>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeMergeModal()">Cancel</button>
+        <button class="btn-confirm" id="merge-modal-confirm" onclick="runConfirmedMerge()">Soft merge</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Manual Lookup (collapsed by default) ─────────────────── -->
+  <details class="collapser" style="margin-top:22px;">
+    <summary>Manual Lookup (search + quote cart)</summary>
+    <div>
+  <div class="pb-grid">
+
+    <!-- ── LEFT: search + results ─────────────────────────────── -->
+    <div>
+      <div class="section-label">Search</div>
+
+      <div class="pb-tabs" id="pb-tabs">
+        <button class="pb-tab active" data-type="services"            data-label="Service">Services</button>
+        <button class="pb-tab"        data-type="materials"           data-label="Material">Materials</button>
+        <button class="pb-tab"        data-type="equipment"           data-label="Equipment">Equipment</button>
+        <button class="pb-tab"        data-type="discounts-and-fees"  data-label="DiscountOrFee">Discounts &amp; Fees</button>
+      </div>
+
+      <div class="search-row">
+        <input class="search-input" id="pb-search" placeholder="Start typing — name, code, or keyword…" />
+        <button class="btn" id="pb-search-btn" onclick="runSearch(true)">Search</button>
+      </div>
+      <div id="pb-search-status"
+           style="margin-top:8px;font-family:var(--font-mono);font-size:12px;color:var(--muted);min-height:18px;"></div>
+
+      <div class="panel" id="pb-results-panel" style="margin-top:14px;min-height:140px;">
+        <div class="cart-empty">Type a keyword above to search live ServiceTitan pricing.</div>
+      </div>
+
+      <div class="pb-pager" id="pb-pager" style="display:none;">
+        <div><span id="pb-pager-info"></span></div>
+        <div style="display:flex;gap:8px;">
+          <button id="pb-prev" onclick="changePage(-1)">← Prev</button>
+          <button id="pb-next" onclick="changePage(1)">Next →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RIGHT: quote cart ──────────────────────────────────── -->
+    <div class="cart-dock">
+      <div class="cart-panel">
+        <div class="cart-header">
+          <div class="cart-title">Quote Cart</div>
+          <div class="cart-count" id="cart-count">0 items</div>
+        </div>
+        <div id="cart-items" class="cart-items">
+          <div class="cart-empty">Nothing in the cart yet.<br>Click <strong style="color:var(--accent);">Add</strong> on any line to start.</div>
+        </div>
+        <div class="cart-total">
+          <div>Total</div>
+          <div class="amount" id="cart-total">$0.00</div>
+        </div>
+
+        <div class="cart-job-row">
+          <input id="cart-job-number" placeholder="ServiceTitan Job # (for estimate)" />
+        </div>
+
+        <div class="cart-actions">
+          <button class="btn" style="background:var(--surface2);color:var(--text);" onclick="copyCartText()">Copy Quote</button>
+          <button class="btn" onclick="createEstimateFromCart()" id="cart-estimate-btn">Create Estimate</button>
+        </div>
+        <div class="cart-status" id="cart-status"></div>
+
+        <button class="btn" style="background:transparent;color:var(--muted);border:1px solid var(--border);margin-top:8px;width:100%;font-size:11px;padding:7px;"
+                onclick="clearCart()">Clear cart</button>
+      </div>
+    </div>
+
+  </div>
+    </div>
+  </details>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let activeType = "services";
+  let activeLabel = "Service"; // matches what the backend returned for skuType
+  let currentPage = 1;
+  let lastQuery = "";
+  let cart = []; // [{ skuId, skuType, name, code, description, unitPrice, quantity }]
+
+  // ── Tab switching ──────────────────────────────────────────────────────────
+  document.querySelectorAll('.pb-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.pb-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeType = btn.dataset.type;
+      activeLabel = btn.dataset.label;
+      currentPage = 1;
+      runSearch(true);
+    });
+  });
+
+  // ── Debounced live search on typing ────────────────────────────────────────
+  let searchDebounce = null;
+  document.getElementById('pb-search').addEventListener('input', () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => { currentPage = 1; runSearch(false); }, 350);
+  });
+  document.getElementById('pb-search').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { clearTimeout(searchDebounce); currentPage = 1; runSearch(true); }
+  });
+
+  // ── Search ─────────────────────────────────────────────────────────────────
+  async function runSearch(force) {
+    const term = document.getElementById('pb-search').value.trim();
+    lastQuery = term;
+    const statusEl = document.getElementById('pb-search-status');
+    const panel = document.getElementById('pb-results-panel');
+    const pager = document.getElementById('pb-pager');
+
+    if (!term && !force) {
+      panel.innerHTML = '<div class="cart-empty">Type a keyword above to search live ServiceTitan pricing.</div>';
+      pager.style.display = 'none';
+      statusEl.textContent = '';
+      return;
+    }
+
+    statusEl.textContent = 'Searching ServiceTitan…';
+    statusEl.style.color = 'var(--muted)';
+
+    try {
+      const params = new URLSearchParams();
+      if (term) params.set('searchTerm', term);
+      params.set('page', String(currentPage));
+      params.set('pageSize', '25');
+
+      const res = await fetch(`/api/pricebook/${activeType}?${params.toString()}`);
+      const data = await res.json();
+
+      if (!data.ok) {
+        panel.innerHTML = `<div class="cart-empty" style="color:var(--danger);">Error: ${escHtml(data.error || 'Unknown')}</div>`;
+        pager.style.display = 'none';
+        statusEl.textContent = '';
+        return;
+      }
+
+      renderResults(data);
+      statusEl.textContent = `${data.totalCount != null ? data.totalCount : data.items.length} result${data.items.length === 1 ? '' : 's'}${term ? ` for "${term}"` : ''}`;
+      statusEl.style.color = 'var(--muted)';
+    } catch (err) {
+      panel.innerHTML = `<div class="cart-empty" style="color:var(--danger);">Request failed: ${escHtml(err.message)}</div>`;
+      pager.style.display = 'none';
+      statusEl.textContent = '';
+    }
+  }
+
+  function renderResults(data) {
+    const panel = document.getElementById('pb-results-panel');
+    const pager = document.getElementById('pb-pager');
+    const items = data.items || [];
+
+    if (items.length === 0) {
+      panel.innerHTML = `<div class="cart-empty">No ${activeLabel.toLowerCase()} items match${lastQuery ? ` "${escHtml(lastQuery)}"` : ''}.</div>`;
+      pager.style.display = 'none';
+      return;
+    }
+
+    const rows = items.map(it => {
+      const name = it.displayName || it.name || '(unnamed)';
+      const code = it.code || it.sku || '';
+      const desc = it.description || '';
+      const price = pickPrice(it);
+
+      return `
+        <div class="pb-row">
+          <div style="min-width:0;">
+            <div class="pb-row-title">${escHtml(name)}</div>
+            ${code ? `<div class="pb-row-code">${escHtml(code)}</div>` : ''}
+            ${desc ? `<div class="pb-row-desc">${escHtml(desc)}</div>` : ''}
+          </div>
+          <div class="pb-price">${fmtMoney(price)}</div>
+          <button class="pb-row-btn" onclick='copyItemPrice(${JSON.stringify({name, code, price}).replace(/'/g, "&apos;")})'>Copy</button>
+          <button class="pb-row-btn add" onclick='addItemToCart(${JSON.stringify({
+            skuId: it.id,
+            skuType: activeLabel,
+            name,
+            code,
+            description: desc,
+            unitPrice: price
+          }).replace(/'/g, "&apos;")})'>Add</button>
+        </div>
+      `;
+    }).join('');
+
+    panel.innerHTML = `<div class="pb-results">${rows}</div>`;
+
+    // Pager
+    if (data.hasMore || currentPage > 1) {
+      pager.style.display = 'flex';
+      document.getElementById('pb-pager-info').textContent =
+        `Page ${currentPage}` + (data.totalCount != null ? ` of ~${Math.ceil(data.totalCount / 25)}` : '');
+      document.getElementById('pb-prev').disabled = currentPage <= 1;
+      document.getElementById('pb-next').disabled = !data.hasMore;
+    } else {
+      pager.style.display = 'none';
+    }
+  }
+
+  function pickPrice(item) {
+    // ST pricebook items use different price fields by type. Take the first
+    // non-null one; fall back to 0 if nothing reasonable is there.
+    const candidates = [item.price, item.memberPrice, item.addOnPrice, item.unitPrice, item.amount];
+    for (const v of candidates) {
+      if (typeof v === 'number') return v;
+    }
+    return 0;
+  }
+
+  function fmtMoney(n) {
+    if (typeof n !== 'number' || isNaN(n)) return '—';
+    return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  }
+
+  function changePage(delta) {
+    currentPage = Math.max(1, currentPage + delta);
+    runSearch(true);
+  }
+
+  // ── Copy price ─────────────────────────────────────────────────────────────
+  function copyItemPrice(item) {
+    const txt = `${item.name}${item.code ? ' ('+item.code+')' : ''} — ${fmtMoney(item.price)}`;
+    navigator.clipboard.writeText(txt)
+      .then(() => showToast(`Copied: ${item.name}`))
+      .catch(() => showToast('Copy failed'));
+  }
+
+  // ── Cart ───────────────────────────────────────────────────────────────────
+  function addItemToCart(item) {
+    // If the same sku already exists, bump quantity instead of duplicating
+    const existing = cart.find(r => r.skuId === item.skuId && r.skuType === item.skuType);
+    if (existing) {
+      existing.quantity = (existing.quantity || 1) + 1;
+    } else {
+      cart.push({ ...item, quantity: 1 });
+    }
+    renderCart();
+    showToast(`Added: ${item.name}`);
+  }
+
+  function removeFromCart(idx) {
+    cart.splice(idx, 1);
+    renderCart();
+  }
+
+  function updateQty(idx, qty) {
+    const q = Math.max(1, Number(qty) || 1);
+    cart[idx].quantity = q;
+    renderCart();
+  }
+
+  function clearCart() {
+    if (cart.length === 0) return;
+    if (!confirm('Clear all items from the quote cart?')) return;
+    cart = [];
+    renderCart();
+    setCartStatus('');
+  }
+
+  function renderCart() {
+    const list = document.getElementById('cart-items');
+    const countEl = document.getElementById('cart-count');
+    const totalEl = document.getElementById('cart-total');
+
+    countEl.textContent = `${cart.length} item${cart.length === 1 ? '' : 's'}`;
+
+    if (cart.length === 0) {
+      list.innerHTML = `<div class="cart-empty">Nothing in the cart yet.<br>Click <strong style="color:var(--accent);">Add</strong> on any line to start.</div>`;
+      totalEl.textContent = '$0.00';
+      return;
+    }
+
+    list.innerHTML = cart.map((r, i) => `
+      <div class="cart-item">
+        <div style="min-width:0;">
+          <div class="cart-item-name">${escHtml(r.name)}</div>
+          <div class="cart-item-meta">${escHtml(r.skuType)}${r.code ? ' · ' + escHtml(r.code) : ''} · ${fmtMoney(r.unitPrice)}</div>
+        </div>
+        <input type="number" min="1" value="${r.quantity}" class="cart-qty"
+               onchange="updateQty(${i}, this.value)" />
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div class="cart-line-price">${fmtMoney((r.unitPrice || 0) * (r.quantity || 1))}</div>
+          <button class="cart-remove" onclick="removeFromCart(${i})" title="Remove">✕</button>
+        </div>
+      </div>
+    `).join('');
+
+    const total = cart.reduce((s, r) => s + (r.unitPrice || 0) * (r.quantity || 1), 0);
+    totalEl.textContent = fmtMoney(total);
+  }
+
+  function copyCartText() {
+    if (cart.length === 0) { showToast('Cart is empty'); return; }
+    const lines = cart.map(r => {
+      const line = (r.unitPrice || 0) * (r.quantity || 1);
+      return `• ${r.name}${r.code ? ' ('+r.code+')' : ''}  ×${r.quantity}  ${fmtMoney(line)}`;
+    });
+    const total = cart.reduce((s, r) => s + (r.unitPrice || 0) * (r.quantity || 1), 0);
+    const txt = lines.join('\n') + `\n\nTotal: ${fmtMoney(total)}`;
+    navigator.clipboard.writeText(txt)
+      .then(() => showToast('Quote copied to clipboard'))
+      .catch(() => showToast('Copy failed'));
+  }
+
+  // ── Push cart → ST estimate ────────────────────────────────────────────────
+  async function createEstimateFromCart() {
+    const jobNumber = document.getElementById('cart-job-number').value.trim();
+    if (!jobNumber) { setCartStatus('Enter a ServiceTitan Job # first.', 'warn'); return; }
+    if (cart.length === 0) { setCartStatus('Cart is empty.', 'warn'); return; }
+
+    const btn = document.getElementById('cart-estimate-btn');
+    btn.disabled = true;
+    setCartStatus('Creating estimate in ServiceTitan…');
+
+    try {
+      const body = {
+        jobNumber,
+        name: `Phone Quote – ${new Date().toLocaleString()}`,
+        items: cart.map(r => ({
+          skuId: r.skuId,
+          skuType: r.skuType,
+          quantity: r.quantity,
+          unitPrice: r.unitPrice,
+          description: r.description || r.name,
+        })),
+      };
+      const res = await fetch('/api/pricebook/estimate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setCartStatus(`Failed: ${data.error || 'Unknown error'}`, 'err');
+        return;
+      }
+      const estimateId = data.estimate?.id || data.estimate?.estimateId || '(new)';
+      setCartStatus(`✓ Estimate ${estimateId} created on job ${jobNumber}`, 'ok');
+      showToast('Estimate created');
+      cart = [];
+      renderCart();
+    } catch (err) {
+      setCartStatus(`Network error: ${err.message}`, 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function setCartStatus(msg, type = '') {
+    const el = document.getElementById('cart-status');
+    el.textContent = msg;
+    el.style.color =
+      type === 'ok'   ? 'var(--ok)' :
+      type === 'err'  ? 'var(--danger)' :
+      type === 'warn' ? 'var(--accent2)' :
+      'var(--muted)';
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Scope → Estimate flow
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // In-memory preview returned by /api/pricebook/parse-scope
+  let scopePreview = null;   // the full preview object
+  let scopePreviewId = null; // id the server uses to look it up later
+
+  // ── Drag/drop + file picker ────────────────────────────────────────────────
+  function initScopeDrop() {
+    const drop = document.getElementById('scope-drop');
+    const input = document.getElementById('scope-file');
+
+    ['dragenter', 'dragover'].forEach(evt => {
+      drop.addEventListener(evt, e => {
+        e.preventDefault(); e.stopPropagation();
+        drop.classList.add('dragover');
+      });
+    });
+    ['dragleave', 'drop'].forEach(evt => {
+      drop.addEventListener(evt, e => {
+        e.preventDefault(); e.stopPropagation();
+        drop.classList.remove('dragover');
+      });
+    });
+    drop.addEventListener('drop', e => {
+      const file = e.dataTransfer?.files?.[0];
+      if (file) parseScope(file);
+    });
+    input.addEventListener('change', e => {
+      const file = e.target.files?.[0];
+      if (file) parseScope(file);
+    });
+  }
+
+  async function parseScope(file) {
+    const statusEl = document.getElementById('scope-parse-status');
+    const previewEl = document.getElementById('scope-preview');
+    const labelEl = document.getElementById('scope-drop-label');
+
+    labelEl.textContent = `Parsing ${file.name}…`;
+    statusEl.textContent = 'Uploading + reading with vision model. This takes ~10–25 seconds.';
+    statusEl.style.color = 'var(--muted)';
+    previewEl.style.display = 'none';
+    previewEl.innerHTML = '';
+    scopePreview = null;
+    scopePreviewId = null;
+
+    try {
+      const fd = new FormData();
+      fd.append('scopeFile', file);
+
+      const res = await fetch('/api/pricebook/parse-scope', {
+        method: 'POST',
+        body: fd,
+      });
+      const data = await res.json();
+
+      if (!data.ok) {
+        statusEl.textContent = '';
+        labelEl.textContent = 'Drop PDF here, or click to browse. Up to 5 pages supported.';
+        previewEl.style.display = 'block';
+        previewEl.innerHTML = `<div class="cart-empty" style="color:var(--danger);">Parse failed: ${escHtml(data.error || 'Unknown')}</div>`;
+        return;
+      }
+
+      // Backend response shape: { ok, previewId, parsed, jobMatch, stats, ready }
+      scopePreview = {
+        parsed:   data.parsed,
+        jobMatch: data.jobMatch,
+        stats:    data.stats,
+        ready:    data.ready,
+      };
+      scopePreviewId = data.previewId;
+      renderScopePreview();
+
+      const s = scopePreview.stats || {};
+      statusEl.innerHTML = `Parsed ${s.totalLines || 0} line${s.totalLines === 1 ? '' : 's'} · `
+        + `<span style="color:var(--ok);">${s.matched || 0} matched</span>`
+        + (s.unmatched ? ` · <span style="color:var(--danger);">${s.unmatched} unmatched</span>` : '')
+        + (s.llmUsed ? ` · <span style="color:var(--accent3);">${s.llmUsed} via LLM</span>` : '');
+      labelEl.textContent = `Loaded: ${file.name}. Drop another PDF to replace.`;
+    } catch (err) {
+      statusEl.textContent = '';
+      labelEl.textContent = 'Drop PDF here, or click to browse. Up to 5 pages supported.';
+      previewEl.style.display = 'block';
+      previewEl.innerHTML = `<div class="cart-empty" style="color:var(--danger);">Network error: ${escHtml(err.message)}</div>`;
+    }
+  }
+
+  // ── Render the preview (scope meta + line items) ──────────────────────────
+  function renderScopePreview() {
+    const el = document.getElementById('scope-preview');
+    if (!scopePreview) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+
+    const p = scopePreview.parsed || {};
+    const jm = scopePreview.jobMatch || {};
+    const parsedJob = p.parsedJobNumber || '—';
+    const jobInputVal = (jm.jobNumber || p.usedJobNumber || p.parsedJobNumber || '').toString();
+
+    let jobMatchBadge;
+    if (jm.jobId) {
+      jobMatchBadge = `<span class="conf-pill high">JOB ${escHtml(jm.jobNumber || '')} FOUND</span>`;
+    } else if (jm.error) {
+      jobMatchBadge = `<span class="conf-pill low">${escHtml(jm.error)}</span>`;
+    } else {
+      jobMatchBadge = `<span class="conf-pill mid">No job resolved</span>`;
+    }
+
+    el.innerHTML = `
+      <div class="scope-meta">
+        <div>
+          <div class="scope-meta-label">Customer</div>
+          <div class="scope-meta-value">${escHtml(p.customerName || '—')}</div>
+        </div>
+        <div>
+          <div class="scope-meta-label">Project</div>
+          <div class="scope-meta-value">${escHtml(p.projectTitle || '—')}</div>
+        </div>
+        <div>
+          <div class="scope-meta-label">Parsed job #</div>
+          <div class="scope-meta-value">${escHtml(parsedJob)}</div>
+        </div>
+        <div>
+          <div class="scope-meta-label">Match status</div>
+          <div class="scope-meta-value" style="font-size:11px;">${jobMatchBadge}</div>
+        </div>
+      </div>
+
+      <div id="scope-lines-host"></div>
+
+      <div class="scope-totals">
+        <div>Estimate total</div>
+        <div class="amount" id="scope-total">$0.00</div>
+      </div>
+
+      <div class="scope-submit-row">
+        <input id="scope-job-override" placeholder="Override ServiceTitan Job #" value="${escHtml(jobInputVal)}" />
+        <button class="btn" id="scope-create-btn" onclick="createScopeEstimate()">Create Estimate in ServiceTitan</button>
+      </div>
+
+      <div class="cart-status" id="scope-submit-status"></div>
+    `;
+
+    // Wire the override input to re-resolve job on change (blur)
+    const overrideInput = document.getElementById('scope-job-override');
+    overrideInput.addEventListener('change', reResolveJob);
+
+    renderScopeLines();
+  }
+
+  function renderScopeLines() {
+    const host = document.getElementById('scope-lines-host');
+    if (!host) return;
+    const lines = scopePreview?.parsed?.lineItems || [];
+
+    if (lines.length === 0) {
+      host.innerHTML = '<div class="cart-empty">No line items were extracted from this document.</div>';
+      document.getElementById('scope-total').textContent = '$0.00';
+      return;
+    }
+
+    host.innerHTML = '<div class="scope-lines">' + lines.map((li, i) => {
+      const m = li.match?.bestMatch;
+      const conf = li.match?.confidence;
+      const method = li.match?.method;
+      const unmatchedClass = m ? '' : ' unmatched';
+
+      let matchBlock;
+      if (m) {
+        const confClass = conf >= 0.75 ? 'high' : conf >= 0.55 ? 'mid' : 'low';
+        const methodBadge = method === 'llm'
+          ? `<span class="conf-pill llm">LLM</span>`
+          : '';
+        matchBlock = `
+          <div class="scope-line-match" onclick="openSwap(${i})">
+            <div class="scope-line-match-name">${escHtml(m.name || '(unnamed)')}
+              <span class="conf-pill ${confClass}">${conf != null ? Math.round(conf*100)+'%' : '—'}</span>
+              ${methodBadge}
+            </div>
+            <div class="scope-line-match-meta">${escHtml(m.skuType || '')}${m.code ? ' · '+escHtml(m.code) : ''} · ${fmtMoney(m.price || 0)}</div>
+          </div>`;
+      } else {
+        matchBlock = `
+          <div class="scope-line-match" onclick="openSwap(${i})" style="border-color:rgba(239,68,85,0.4);">
+            <div class="scope-line-match-name" style="color:var(--danger);">No match — click to pick</div>
+            <div class="scope-line-match-meta">Select a pricebook item to include this line</div>
+          </div>`;
+      }
+
+      const qty = Number(li.quantity) || 1;
+      const price = Number(m?.price) || 0;
+      const lineTotal = qty * price;
+
+      return `
+        <div class="scope-line${unmatchedClass}">
+          <div style="min-width:0;">
+            <div class="scope-line-desc">${escHtml(li.description || '(no description)')}</div>
+            ${li.notes ? `<div class="scope-line-notes">${escHtml(li.notes)}</div>` : ''}
+          </div>
+          ${matchBlock}
+          <input type="number" min="1" class="scope-line-qty" value="${qty}"
+                 onchange="updateScopeLineQty(${i}, this.value)" />
+          <div class="scope-line-total" id="scope-line-total-${i}">${fmtMoney(lineTotal)}</div>
+          <button class="scope-line-remove" onclick="removeScopeLine(${i})" title="Remove line">✕</button>
+        </div>
+      `;
+    }).join('') + '</div>';
+
+    recalcScopeTotal();
+  }
+
+  function recalcScopeTotal() {
+    const lines = scopePreview?.parsed?.lineItems || [];
+    const total = lines.reduce((s, li) => {
+      const q = Number(li.quantity) || 1;
+      const p = Number(li.match?.bestMatch?.price) || 0;
+      return s + q * p;
+    }, 0);
+    const el = document.getElementById('scope-total');
+    if (el) el.textContent = fmtMoney(total);
+  }
+
+  function updateScopeLineQty(idx, val) {
+    if (!scopePreview?.parsed?.lineItems?.[idx]) return;
+    scopePreview.parsed.lineItems[idx].quantity = Math.max(1, Number(val) || 1);
+    const li = scopePreview.parsed.lineItems[idx];
+    const price = Number(li.match?.bestMatch?.price) || 0;
+    const cell = document.getElementById(`scope-line-total-${idx}`);
+    if (cell) cell.textContent = fmtMoney(li.quantity * price);
+    recalcScopeTotal();
+  }
+
+  function removeScopeLine(idx) {
+    if (!scopePreview?.parsed?.lineItems) return;
+    scopePreview.parsed.lineItems.splice(idx, 1);
+    renderScopeLines();
+  }
+
+  // ── Swap an unmatched (or just-wrong) line via index search ───────────────
+  async function openSwap(idx) {
+    // Close any existing popover
+    document.querySelectorAll('.scope-swap-popover').forEach(el => el.remove());
+
+    const li = scopePreview?.parsed?.lineItems?.[idx];
+    if (!li) return;
+
+    // Find the clicked match cell
+    const host = document.getElementById('scope-lines-host');
+    const cells = host.querySelectorAll('.scope-line-match');
+    const cell = cells[idx];
+    if (!cell) return;
+
+    const pop = document.createElement('div');
+    pop.className = 'scope-swap-popover';
+    pop.innerHTML = `
+      <input type="text" placeholder="Search pricebook…" autocomplete="off" />
+      <div class="swap-results" style="padding:4px 0;color:var(--muted);font-size:11px;font-family:var(--font-mono);">Type to search…</div>
+    `;
+    cell.appendChild(pop);
+    pop.addEventListener('click', e => e.stopPropagation());
+
+    const input = pop.querySelector('input');
+    const resultsEl = pop.querySelector('.swap-results');
+    input.value = li.description || '';
+    input.focus(); input.select();
+
+    let searchT = null;
+    async function doSearch() {
+      const q = input.value.trim();
+      if (!q) { resultsEl.innerHTML = '<div style="padding:4px 0;color:var(--muted);">Type to search…</div>'; return; }
+      resultsEl.innerHTML = '<div style="padding:4px 0;color:var(--muted);">Searching…</div>';
+      try {
+        const res = await fetch(`/api/pricebook/index/search?q=${encodeURIComponent(q)}&limit=8`);
+        const data = await res.json();
+        if (!data.ok) {
+          resultsEl.innerHTML = `<div style="padding:4px 0;color:var(--danger);">${escHtml(data.error || 'Error')}</div>`;
+          return;
+        }
+        const results = data.results || [];
+        if (!results.length) {
+          resultsEl.innerHTML = '<div style="padding:4px 0;color:var(--muted);">No matches.</div>';
+          return;
+        }
+        resultsEl.innerHTML = results.map(r => `
+          <div class="scope-swap-row" data-payload='${JSON.stringify(r).replace(/'/g, "&apos;")}'>
+            <div class="n">${escHtml(r.name || '(unnamed)')}</div>
+            <div class="m">${escHtml(r.skuType || '')}${r.code ? ' · '+escHtml(r.code) : ''} · ${fmtMoney(r.price || 0)}</div>
+          </div>
+        `).join('');
+        resultsEl.querySelectorAll('.scope-swap-row').forEach(row => {
+          row.addEventListener('click', () => {
+            try {
+              const payload = JSON.parse(row.dataset.payload.replace(/&apos;/g, "'"));
+              applySwap(idx, payload);
+            } catch (err) {
+              console.error('Swap parse failed', err);
+            }
+          });
+        });
+      } catch (err) {
+        resultsEl.innerHTML = `<div style="padding:4px 0;color:var(--danger);">${escHtml(err.message)}</div>`;
+      }
+    }
+    input.addEventListener('input', () => {
+      clearTimeout(searchT);
+      searchT = setTimeout(doSearch, 250);
+    });
+    // Pre-populate with initial description
+    doSearch();
+
+    // Close on outside click
+    setTimeout(() => {
+      const outside = (e) => {
+        if (!pop.contains(e.target)) {
+          pop.remove();
+          document.removeEventListener('click', outside);
+        }
+      };
+      document.addEventListener('click', outside);
+    }, 0);
+  }
+
+  function applySwap(idx, item) {
+    if (!scopePreview?.parsed?.lineItems?.[idx]) return;
+    // Map index-search shape → match.bestMatch shape
+    const best = {
+      skuId: item.skuId || item.st_id,
+      skuType: item.skuType,
+      name: item.name,
+      code: item.code,
+      price: Number(item.price) || 0,
+    };
+    const li = scopePreview.parsed.lineItems[idx];
+    li.match = li.match || {};
+    li.match.bestMatch = best;
+    li.match.confidence = 1.0;   // user-selected, treat as certain
+    li.match.method = 'manual';
+    renderScopeLines();
+  }
+
+  // ── Re-resolve job # when the override input changes ──────────────────────
+  async function reResolveJob() {
+    const input = document.getElementById('scope-job-override');
+    const num = input.value.trim();
+    if (!num) return;
+    const statusEl = document.getElementById('scope-submit-status');
+    statusEl.textContent = `Looking up job #${num}…`;
+    statusEl.style.color = 'var(--muted)';
+    try {
+      const res = await fetch('/api/pricebook/parse-scope/resolve-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ previewId: scopePreviewId, jobNumber: num }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        statusEl.textContent = `Job lookup failed: ${data.error || 'Unknown'}`;
+        statusEl.style.color = 'var(--danger)';
+        return;
+      }
+      scopePreview.jobMatch = data.jobMatch;
+      scopePreview.parsed.usedJobNumber = num;
+      renderScopePreview(); // redraw to update badge
+    } catch (err) {
+      statusEl.textContent = `Job lookup error: ${err.message}`;
+      statusEl.style.color = 'var(--danger)';
+    }
+  }
+
+  // ── Submit the preview → create ST estimate ───────────────────────────────
+  async function createScopeEstimate() {
+    if (!scopePreview || !scopePreviewId) {
+      setScopeStatus('No parsed scope loaded.', 'warn');
+      return;
+    }
+    const lines = scopePreview.parsed?.lineItems || [];
+    const matchedCount = lines.filter(li => li.match?.bestMatch).length;
+    if (matchedCount === 0) {
+      setScopeStatus('Nothing to push — no matched line items.', 'warn');
+      return;
+    }
+    const unmatchedCount = lines.length - matchedCount;
+    if (unmatchedCount > 0) {
+      const go = confirm(
+        `${unmatchedCount} line${unmatchedCount === 1 ? ' is' : 's are'} still unmatched and will be dropped from the estimate. Continue?`
+      );
+      if (!go) return;
+    }
+
+    // Require a resolved job
+    if (!scopePreview.jobMatch?.jobId) {
+      // Try once to resolve from the override field
+      const override = document.getElementById('scope-job-override')?.value.trim();
+      if (override) {
+        await reResolveJob();
+      }
+      if (!scopePreview.jobMatch?.jobId) {
+        setScopeStatus('Enter a valid ServiceTitan Job # (we couldn\'t resolve the parsed one).', 'warn');
+        return;
+      }
+    }
+
+    const btn = document.getElementById('scope-create-btn');
+    btn.disabled = true;
+    setScopeStatus('Creating estimate in ServiceTitan…');
+
+    try {
+      const res = await fetch('/api/pricebook/create-estimate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          previewId: scopePreviewId,
+          preview: scopePreview,
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setScopeStatus(`Failed: ${data.error || 'Unknown error'}`, 'err');
+        return;
+      }
+      setScopeStatus(
+        `✓ Estimate ${data.estimateId || '(new)'} created on job ${data.jobNumber || ''} · `
+        + `${data.lineItemCount} line${data.lineItemCount === 1 ? '' : 's'} · ${fmtMoney(data.total || 0)}`,
+        'ok'
+      );
+      showToast('Estimate created');
+      loadRecentScopeEstimates();
+    } catch (err) {
+      setScopeStatus(`Network error: ${err.message}`, 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function setScopeStatus(msg, type = '') {
+    const el = document.getElementById('scope-submit-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color =
+      type === 'ok'   ? 'var(--ok)' :
+      type === 'err'  ? 'var(--danger)' :
+      type === 'warn' ? 'var(--accent2)' :
+      'var(--muted)';
+  }
+
+  // ── Pricebook index: stats + refresh ──────────────────────────────────────
+  async function loadIndexStats() {
+    try {
+      const res = await fetch('/api/pricebook/index/stats');
+      const data = await res.json();
+      const counts = document.getElementById('idx-counts');
+      const synced = document.getElementById('idx-synced');
+      if (!data.ok) {
+        counts.textContent = `Index error: ${data.error || 'unknown'}`;
+        synced.textContent = '';
+        return;
+      }
+      // Backend shape: { ok, totals: {Service, Material, Equipment}, active, lastSync, lastAttempt }
+      const active = data.active || {};
+      const totals = data.totals || {};
+      const nSvc = active.Service ?? totals.Service ?? 0;
+      const nMat = active.Material ?? totals.Material ?? 0;
+      const nEq  = active.Equipment ?? totals.Equipment ?? 0;
+      counts.textContent = `Indexed: ${nSvc} services · ${nMat} materials · ${nEq} equipment`;
+      const lastSync = data.lastSync || data.stats?.lastSyncedAt;
+      if (lastSync) {
+        // SQLite returns 'YYYY-MM-DD HH:MM:SS' (UTC, no TZ) — add Z so JS parses it
+        const iso = String(lastSync).includes("T") ? lastSync : lastSync.replace(" ", "T") + "Z";
+        const d = new Date(iso);
+        const mins = Math.round((Date.now() - d.getTime()) / 60000);
+        const ago = mins < 60
+          ? `${mins}m ago`
+          : mins < 60*24
+            ? `${Math.round(mins/60)}h ago`
+            : `${Math.round(mins/60/24)}d ago`;
+        synced.textContent = `Last synced ${ago}`;
+      } else {
+        synced.textContent = 'Never synced — click Refresh';
+      }
+    } catch (err) {
+      document.getElementById('idx-counts').textContent = `Index error: ${err.message}`;
+    }
+  }
+
+  async function refreshIndex() {
+    const btn = document.getElementById('idx-refresh-btn');
+    const counts = document.getElementById('idx-counts');
+    btn.disabled = true;
+    counts.textContent = 'Syncing pricebook from ServiceTitan… (this can take ~30s)';
+    try {
+      const res = await fetch('/api/pricebook/index/refresh', { method: 'POST' });
+      const data = await res.json();
+      if (!data.ok) {
+        counts.textContent = `Sync failed: ${data.error || 'unknown'}`;
+        return;
+      }
+      showToast('Pricebook index refreshed');
+      loadIndexStats();
+    } catch (err) {
+      counts.textContent = `Sync failed: ${err.message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ── Recent scope-to-estimate audit log ────────────────────────────────────
+  async function loadRecentScopeEstimates() {
+    const panel = document.getElementById('recent-scope-panel');
+    try {
+      const res = await fetch('/api/pricebook/recent-scope-estimates?limit=10');
+      const data = await res.json();
+      if (!data.ok) {
+        panel.innerHTML = `<div class="cart-empty" style="color:var(--danger);">${escHtml(data.error || 'Error')}</div>`;
+        return;
+      }
+      const rows = data.imports || data.rows || [];
+      if (!rows.length) {
+        panel.innerHTML = `<div class="cart-empty" style="padding:10px;">No scope-to-estimate runs yet.</div>`;
+        return;
+      }
+      panel.innerHTML = rows.map(r => {
+        const ok = r.status === 'created';
+        const pill = ok
+          ? `<span class="conf-pill high">CREATED</span>`
+          : `<span class="conf-pill low">FAILED</span>`;
+        const total = fmtMoney(Number(r.total) || 0);
+        const when = r.created_at ? new Date(r.created_at + 'Z').toLocaleString() : '';
+        return `
+          <div style="display:grid;grid-template-columns:1.4fr 100px 100px 90px 90px 1fr;gap:12px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--border);font-size:12px;">
+            <div>
+              <div style="font-weight:600;">${escHtml(r.file_name || '(no file)')}</div>
+              <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);">${escHtml(when)}</div>
+            </div>
+            <div style="font-family:var(--font-mono);">Job ${escHtml(r.job_number || '—')}</div>
+            <div style="font-family:var(--font-mono);">Est ${escHtml(r.estimate_id ? String(r.estimate_id) : '—')}</div>
+            <div style="text-align:right;font-family:var(--font-display);font-weight:700;">${total}</div>
+            <div style="font-family:var(--font-mono);color:var(--muted);">${r.line_item_count || 0} lines</div>
+            <div>${pill}${r.error ? ` <span style="color:var(--danger);font-size:10px;">${escHtml(r.error)}</span>` : ''}</div>
+          </div>
+        `;
+      }).join('');
+    } catch (err) {
+      panel.innerHTML = `<div class="cart-empty" style="color:var(--danger);">${escHtml(err.message)}</div>`;
+    }
+  }
+
+  // ── Duplicates panel ───────────────────────────────────────────────────────
+  let dupeRule = 'code';
+  let dupeType = 'all';
+
+  function wireDupeTabs() {
+    document.querySelectorAll('#dupe-rule-tabs .pb-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#dupe-rule-tabs .pb-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        dupeRule = btn.dataset.rule;
+        loadDuplicates();
+      });
+    });
+    document.querySelectorAll('#dupe-type-tabs .pb-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#dupe-type-tabs .pb-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        dupeType = btn.dataset.type;
+        loadDuplicates();
+      });
+    });
+    document.getElementById('dupe-active-only').addEventListener('change', loadDuplicates);
+  }
+
+  async function loadDuplicates() {
+    const panel = document.getElementById('dupe-results');
+    const status = document.getElementById('dupe-status');
+    const activeOnly = document.getElementById('dupe-active-only').checked;
+    const ruleLabel = dupeRule === 'code' ? 'code' : 'display name';
+
+    panel.innerHTML = `<div class="cart-empty" style="padding:10px;">Scanning pricebook for ${escHtml(ruleLabel)} duplicates…</div>`;
+    status.textContent = '';
+
+    try {
+      const qs = new URLSearchParams({ type: dupeType, rule: dupeRule, activeOnly: String(activeOnly) });
+      const res = await fetch(`/api/pricebook/duplicates?${qs.toString()}`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Request failed');
+
+      const { groups, stats } = data;
+      status.textContent = `${stats.groups} duplicate group${stats.groups === 1 ? '' : 's'} — ${stats.records} total records — matching on ${ruleLabel}${activeOnly ? ', active only' : ', all records'}.`;
+
+      if (!groups.length) {
+        panel.innerHTML = `<div class="cart-empty" style="padding:14px;">✓ No ${escHtml(ruleLabel)} duplicates found for this scope.</div>`;
+        return;
+      }
+
+      // Store groups globally so merge handlers can reference the items.
+      window._dupeGroups = groups;
+
+      panel.innerHTML = groups.map((g, gi) => {
+        // Mixed-type groups (when scope=all & same code across types) are
+        // unsafe to soft-merge because type has its own ST endpoint. We still
+        // render them but disable the merge bar with a reason.
+        const mixedType = g.sku_type === 'mixed';
+        const allInactive = g.items.every(it => !it.active);
+
+        const rows = g.items.map((it, ri) => {
+          const radioId = `canon-${gi}-${ri}`;
+          const radio = (mixedType || !it.active)
+            ? `<input type="radio" disabled title="${!it.active ? 'inactive records cannot be canonical' : 'mixed-type group'}">`
+            : `<input type="radio" name="canon-${gi}" id="${radioId}" value="${it.st_id}"
+                      onchange="onCanonicalChange(${gi}, ${it.st_id})">`;
+          return `
+            <label for="${radioId}" class="dupe-record ${it.active ? '' : 'inactive'}" data-group="${gi}" data-st-id="${it.st_id}" style="cursor:${(mixedType || !it.active) ? 'default' : 'pointer'};">
+              ${radio}
+              <div>
+                <div class="name">${escHtml(it.name || '(no name)')}</div>
+                <div class="code">${escHtml(it.code || '—')}${it.active ? '' : ' · inactive'}</div>
+              </div>
+              <div class="st-id">ST #${it.st_id}</div>
+              <div class="price">${formatPrice(it.price)}</div>
+            </label>
+          `;
+        }).join('');
+
+        let mergeBar = '';
+        if (mixedType) {
+          mergeBar = `
+            <div class="dupe-merge-bar" style="background:var(--surface2);">
+              <span style="color:var(--muted);font-size:11px;">
+                Mixed-type group (${g.items.map(i => i.sku_type).filter((v,i,a)=>a.indexOf(v)===i).join(' / ')}).
+                Merge unavailable — resolve in ServiceTitan manually.
+              </span>
+            </div>`;
+        } else if (allInactive) {
+          mergeBar = `
+            <div class="dupe-merge-bar">
+              <span style="color:var(--muted);font-size:11px;">All records in this group are already inactive.</span>
+            </div>`;
+        } else {
+          mergeBar = `
+            <div class="dupe-merge-bar" id="merge-bar-${gi}">
+              <button class="btn-suggest" onclick="suggestCanonicalForGroup(${gi})">Suggest canonical</button>
+              <label>
+                <input type="checkbox" id="copy-fields-${gi}">
+                Copy canonical's price/name to itself (opt-in)
+              </label>
+              <span class="spacer"></span>
+              <button class="btn-merge" id="merge-btn-${gi}" disabled onclick="openMergeModal(${gi})">
+                Soft merge
+              </button>
+            </div>
+            <div class="dupe-merge-status" id="merge-status-${gi}"></div>`;
+        }
+
+        return `
+          <details class="dupe-group" data-group-index="${gi}">
+            <summary>
+              <span class="dupe-group-badge">${g.count} matches</span>
+              <span class="dupe-group-key">${escHtml(g.key)}</span>
+              <span class="dupe-group-type">${escHtml(g.sku_type)}</span>
+            </summary>
+            <div class="dupe-group-body">
+              ${rows}
+              ${mergeBar}
+            </div>
+          </details>
+        `;
+      }).join('');
+    } catch (err) {
+      panel.innerHTML = `<div class="cart-empty" style="color:var(--danger);padding:14px;">${escHtml(err.message)}</div>`;
+      status.textContent = '';
+    }
+  }
+
+  function formatPrice(p) {
+    const n = Number(p) || 0;
+    return '$' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // ── Merge handlers ─────────────────────────────────────────────────────────
+  // Track which canonical the user has chosen per group-index (key = group idx)
+  window._dupeCanonical = {};
+
+  function onCanonicalChange(groupIndex, stId) {
+    window._dupeCanonical[groupIndex] = Number(stId);
+    // Visually mark the canonical vs. the ones that will deactivate
+    const groupEl = document.querySelector(`.dupe-group[data-group-index="${groupIndex}"]`);
+    if (!groupEl) return;
+    groupEl.querySelectorAll('.dupe-record').forEach(rec => {
+      const recId = Number(rec.getAttribute('data-st-id'));
+      const active = !rec.classList.contains('inactive');
+      rec.classList.remove('canonical', 'will-deactivate');
+      if (!active) return;
+      if (recId === Number(stId)) rec.classList.add('canonical');
+      else rec.classList.add('will-deactivate');
+    });
+    const btn = document.getElementById(`merge-btn-${groupIndex}`);
+    if (btn) btn.disabled = false;
+  }
+
+  async function suggestCanonicalForGroup(groupIndex) {
+    const g = (window._dupeGroups || [])[groupIndex];
+    if (!g) return;
+    const stIds = g.items.filter(it => it.active).map(it => it.st_id);
+    if (stIds.length < 2) return;
+
+    const statusEl = document.getElementById(`merge-status-${groupIndex}`);
+    statusEl.textContent = 'Looking up canonical…';
+    statusEl.className = 'dupe-merge-status';
+
+    try {
+      const qs = new URLSearchParams({ type: g.sku_type, stIds: stIds.join(',') });
+      const res = await fetch(`/api/pricebook/duplicates/suggest-canonical?${qs.toString()}`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Request failed');
+
+      // Select the radio button for this st_id
+      const radio = document.querySelector(`input[name="canon-${groupIndex}"][value="${data.canonicalStId}"]`);
+      if (radio) {
+        radio.checked = true;
+        onCanonicalChange(groupIndex, data.canonicalStId);
+      }
+      statusEl.textContent = `Suggested ST #${data.canonicalStId} — ${data.reason}`;
+      statusEl.className = 'dupe-merge-status ok';
+    } catch (err) {
+      statusEl.textContent = '✗ ' + err.message;
+      statusEl.className = 'dupe-merge-status err';
+    }
+  }
+
+  function openMergeModal(groupIndex) {
+    const g = (window._dupeGroups || [])[groupIndex];
+    const canonicalStId = window._dupeCanonical[groupIndex];
+    if (!g || !canonicalStId) return;
+
+    const canonical = g.items.find(it => it.st_id === canonicalStId);
+    const duplicates = g.items.filter(it => it.st_id !== canonicalStId && it.active);
+    const copyFields = document.getElementById(`copy-fields-${groupIndex}`).checked;
+
+    window._pendingMerge = {
+      groupIndex,
+      canonicalStId,
+      skuType: g.sku_type,
+      duplicateStIds: duplicates.map(d => d.st_id),
+      copyFields,
+      canonical,
+    };
+
+    // Canonical already has an image? If image_path exists in index, no need.
+    const canonicalHasImage = !!(canonical.image_path && String(canonical.image_path).trim());
+
+    const body = document.getElementById('merge-modal-body');
+    body.innerHTML = `
+      <div class="keep-box">
+        <strong>KEEP:</strong> ST #${canonical.st_id} — ${escHtml(canonical.code || '(no code)')} — ${escHtml(canonical.name || '')}
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;font-family:var(--font-mono);">
+          ${canonicalHasImage ? '🖼 has image' : '<span style="color:var(--warn,#f0ad4e);">⚠ no image on file</span>'}
+        </div>
+      </div>
+      ${duplicates.map(d => `
+        <div class="drop-box">
+          <strong>DEACTIVATE:</strong> ST #${d.st_id} — ${escHtml(d.code || '(no code)')} — ${escHtml(d.name || '')}
+        </div>
+      `).join('')}
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;font-family:var(--font-mono);cursor:pointer;">
+        <input type="checkbox" id="merge-generate-image" ${!canonicalHasImage ? 'checked' : ''} />
+        Generate image for canonical if it's missing one
+        ${canonicalHasImage ? '<span style="color:var(--muted);">(replace existing)</span>' : '<span style="color:var(--warn,#f0ad4e);">(recommended)</span>'}
+      </label>
+      ${copyFields ? `<p style="font-size:11px;color:var(--warn);margin-top:8px;">⚠ Copy-fields is opt-in but currently has no fields wired — this flag is reserved for a future picker.</p>` : ''}
+    `;
+    document.getElementById('merge-modal').classList.add('show');
+  }
+
+  function closeMergeModal() {
+    document.getElementById('merge-modal').classList.remove('show');
+    window._pendingMerge = null;
+  }
+
+  async function runConfirmedMerge() {
+    const pending = window._pendingMerge;
+    if (!pending) return;
+
+    const btn = document.getElementById('merge-modal-confirm');
+    btn.disabled = true;
+    const generateImage = !!document.getElementById('merge-generate-image')?.checked;
+    btn.textContent = generateImage ? 'Merging + generating image…' : 'Merging…';
+
+    try {
+      // We currently don't expose a field picker in the UI, so copyFields on
+      // the payload stays null regardless of the checkbox. The checkbox is
+      // preserved for a future "pick which fields to propagate" UX; for now
+      // the backend happily ignores an empty/null copyFields.
+      const res = await fetch('/api/pricebook/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          canonicalStId: pending.canonicalStId,
+          duplicateStIds: pending.duplicateStIds,
+          skuType: pending.skuType,
+          copyFields: null,
+          userNote: null,
+          generateImage,
+          imageSource: 'hybrid',
+        }),
+      });
+      const data = await res.json();
+
+      const statusEl = document.getElementById(`merge-status-${pending.groupIndex}`);
+      if (data.ok && data.status !== 'failed') {
+        const pieces = [
+          `✓ ${data.status === 'partial' ? 'Partial' : 'Merged'}: deactivated ${data.deactivated.length} SKU(s)`,
+          data.failed && data.failed.length ? ` · ${data.failed.length} failed` : '',
+          ` · log #${data.logId}`,
+        ];
+        if (generateImage && data.image) {
+          if (data.image.ok && data.image.imagePath) {
+            pieces.push(` · 🖼 image added (${data.image.source || 'ai'})`);
+          } else if (data.image.ok && data.image.skipped) {
+            pieces.push(` · image skipped`);
+          } else if (!data.image.ok) {
+            pieces.push(` · ⚠ image: ${data.image.error || 'failed'}`);
+          }
+        }
+        statusEl.textContent = pieces.join('');
+        statusEl.className = 'dupe-merge-status ' + (data.status === 'partial' ? '' : 'ok');
+        // If the image sub-step failed, use a warn toast that sticks long
+        // enough to read + gives a Copy button for the error text.
+        const imgErr = (generateImage && data.image && !data.image.ok) ? data.image.error : null;
+        if (imgErr) {
+          showToast(`Merge OK (log #${data.logId}) · ⚠ image failed: ${imgErr}`,
+                    { type: 'warn', copy: imgErr, duration: 15000 });
+        } else {
+          showToast(`Merge complete — log #${data.logId}`);
+        }
+      } else {
+        statusEl.textContent = '✗ ' + (data.error || 'merge failed');
+        statusEl.className = 'dupe-merge-status err';
+        showToast('Merge failed: ' + (data.error || 'unknown'),
+                  { type: 'error', copy: data.error || '' });
+      }
+
+      closeMergeModal();
+      // Refresh the duplicates list so the merged rows now show as inactive
+      setTimeout(() => loadDuplicates(), 400);
+      // If the log panel is open, refresh it too
+      if (document.getElementById('merge-log-panel').open) loadMergeLog();
+    } catch (err) {
+      const statusEl = document.getElementById(`merge-status-${pending.groupIndex}`);
+      statusEl.textContent = '✗ ' + err.message;
+      statusEl.className = 'dupe-merge-status err';
+      closeMergeModal();
+      showToast('Merge error: ' + err.message, { type: 'error', copy: err.message });
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Soft merge';
+    }
+  }
+
+  async function loadMergeLog() {
+    const body = document.getElementById('merge-log-body');
+    body.innerHTML = `<div class="cart-empty" style="padding:10px;">Loading merge log…</div>`;
+    try {
+      const res = await fetch('/api/pricebook/merge/log?limit=50');
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Request failed');
+      if (!data.log.length) {
+        body.innerHTML = `<div class="cart-empty" style="padding:10px;">No merges yet.</div>`;
+        return;
+      }
+      body.innerHTML = data.log.map(row => {
+        const dupCount = (row.duplicate_st_ids || []).length;
+        const undoDisabled = row.undone ? 'disabled' : '';
+        const statusClass = row.undone ? 'undone' : row.status;
+        return `
+          <div class="merge-log-row">
+            <span class="log-time">${escHtml((row.merged_at || '').replace('T', ' ').slice(0, 16))}</span>
+            <div>
+              <div style="font-weight:600;">
+                ${escHtml(row.sku_type)} · kept ST #${row.canonical_st_id}
+                ${row.canonical_code ? `<span style="color:var(--muted);font-weight:400;">(${escHtml(row.canonical_code)})</span>` : ''}
+              </div>
+              <div style="font-size:11px;color:var(--muted);">
+                deactivated ${dupCount} SKU(s)${row.field_copy ? ' · fields copied' : ''}${row.undone ? ` · undone ${escHtml((row.undone_at || '').replace('T',' ').slice(0,16))}` : ''}
+                ${row.error ? ` · <span style="color:var(--danger);">${escHtml(String(row.error).slice(0, 80))}</span>` : ''}
+              </div>
+            </div>
+            <span class="log-status ${statusClass}">${escHtml(row.undone ? 'undone' : row.status)}</span>
+            <button class="btn-undo" ${undoDisabled} onclick="undoMergeLog(${row.id}, this)">Undo</button>
+          </div>
+        `;
+      }).join('');
+    } catch (err) {
+      body.innerHTML = `<div class="cart-empty" style="color:var(--danger);padding:10px;">${escHtml(err.message)}</div>`;
+    }
+  }
+
+  async function undoMergeLog(logId, btn) {
+    if (!confirm('Reactivate the deactivated SKUs from this merge? This will restore them to the pricebook.')) return;
+    btn.disabled = true;
+    btn.textContent = 'Undoing…';
+    try {
+      const res = await fetch(`/api/pricebook/merge/${logId}/undo`, { method: 'POST' });
+      const data = await res.json();
+      if (!data.ok && !(data.reactivated && data.reactivated.length)) {
+        throw new Error(data.error || 'undo failed');
+      }
+      showToast(`Reactivated ${data.reactivated.length} SKU(s)${data.failed && data.failed.length ? ` · ${data.failed.length} failed` : ''}`);
+      loadMergeLog();
+      // Refresh duplicates so those records return to the active set
+      loadDuplicates();
+    } catch (err) {
+      alert('Undo failed: ' + err.message);
+      btn.disabled = false;
+      btn.textContent = 'Undo';
+    }
+  }
+
+  // If the user arrived via #duplicates, auto-load and scroll.
+  function maybeAutoloadDuplicates() {
+    if (window.location.hash === '#duplicates') {
+      loadDuplicates();
+      const el = document.getElementById('duplicates');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //   Material Rename review
+  // ══════════════════════════════════════════════════════════════════════════
+  // A tiny in-page queue: we fetch up to 25 cryptic-name candidates at a time
+  // and walk through them one card at a time. After the user hits Approve or
+  // Skip, we advance to the next item; when the queue drains we reload.
+  let renameQueue = [];
+  let renameIndex = 0;
+  let renameTotalRemaining = 0;
+  let renameCurrentSuggestion = null;
+
+  async function loadRenameQueue() {
+    const card = document.getElementById('rename-card');
+    const progress = document.getElementById('rename-progress-text');
+    const includeReviewed = document.getElementById('rename-include-reviewed').checked;
+    card.innerHTML = '<div class="cart-empty" style="padding:20px;">Loading…</div>';
+    progress.textContent = 'Loading candidates…';
+    try {
+      const res = await fetch(`/api/pricebook/rename/candidates?limit=25&includeReviewed=${includeReviewed}`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Failed to load candidates');
+      renameQueue = data.candidates || [];
+      renameTotalRemaining = data.total || 0;
+      renameIndex = 0;
+      renameCurrentSuggestion = null;
+      if (renameQueue.length === 0) {
+        progress.textContent = '✓ Queue empty — no cryptic material names left to review.';
+        card.innerHTML = `
+          <div class="cart-empty" style="padding:24px;color:var(--ok);">
+            🎉 Nothing left to rename. Uncheck "Show already-reviewed" to re-scan only unreviewed items, or check it to walk through the whole list again.
+          </div>`;
+        return;
+      }
+      renderRenameCard();
+    } catch (err) {
+      progress.textContent = '';
+      card.innerHTML = `<div class="cart-empty" style="padding:20px;color:var(--danger);">${escHtml(err.message)}</div>`;
+    }
+  }
+
+  function renderRenameCard() {
+    const card = document.getElementById('rename-card');
+    const progress = document.getElementById('rename-progress-text');
+    const it = renameQueue[renameIndex];
+    if (!it) {
+      card.innerHTML = `
+        <div class="cart-empty" style="padding:24px;">
+          ✓ Reviewed ${renameIndex} item${renameIndex === 1 ? '' : 's'} this pass. Click <strong>Reload queue</strong> for more.
+        </div>`;
+      return;
+    }
+    progress.textContent = `Reviewing ${renameIndex + 1} of ${renameQueue.length} loaded · ${renameTotalRemaining} total remaining`;
+
+    card.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr;gap:14px;">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:6px;">Current name</div>
+          <div style="font-size:15px;font-weight:600;font-family:var(--font-mono);color:var(--text);">${escHtml(it.name)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px;font-family:var(--font-mono);">
+            ${it.code ? `Code: <span style="color:var(--text);">${escHtml(it.code)}</span>` : 'No code'}
+            ${typeof it.price === 'number' ? `<span style="margin:0 6px;color:var(--border);">·</span>Price: <span style="color:var(--text);">$${Number(it.price).toFixed(2)}</span>` : ''}
+            <span style="margin:0 6px;color:var(--border);">·</span>Cryptic score: <span style="color:var(--accent2);">${it.crypticScore}</span>
+          </div>
+          <!-- Primary vendor row — populated by fetchSuggestionForCurrent() so
+               it appears as soon as ST returns the material's vendors[]. Stays
+               empty if the SKU has no vendor records or the lookup fails. -->
+          <div id="rename-vendor-row" style="font-size:11px;color:var(--muted);margin-top:6px;font-family:var(--font-mono);min-height:14px;"></div>
+          ${it.description ? `<div style="font-size:11px;color:var(--muted);margin-top:8px;white-space:pre-wrap;word-break:break-word;">${escHtml(it.description)}</div>` : ''}
+        </div>
+
+        <div style="background:var(--surface2);border:1px solid var(--accent);border-radius:10px;padding:14px 16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <div style="font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;font-family:var(--font-mono);">AI suggestion</div>
+            <button class="btn" style="background:transparent;color:var(--muted);border:1px solid var(--border);padding:4px 10px;font-size:10px;" onclick="fetchSuggestionForCurrent()" id="rename-suggest-btn">
+              ↻ Get suggestion
+            </button>
+          </div>
+          <input type="text" id="rename-new-name"
+                 placeholder="Click 'Get suggestion' above, or type a new name yourself…"
+                 value=""
+                 style="width:100%;padding:10px 12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:var(--font-mono);font-size:14px;box-sizing:border-box;" />
+          <div id="rename-reason" style="font-size:11px;color:var(--muted);margin-top:6px;font-family:var(--font-mono);min-height:14px;"></div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <button class="btn" onclick="approveRenameCurrent()" id="rename-approve-btn" disabled
+                  style="opacity:0.5;">
+            ✓ Approve &amp; apply
+          </button>
+          <button class="btn" style="background:var(--surface2);color:var(--text);" onclick="skipRenameCurrent()">
+            Skip
+          </button>
+          <div id="rename-status" style="flex:1;min-width:200px;font-family:var(--font-mono);font-size:12px;color:var(--muted);"></div>
+        </div>
+      </div>
+    `;
+
+    // Wire the input so Approve enables only once the field has content
+    const input = document.getElementById('rename-new-name');
+    input.addEventListener('input', () => {
+      const btn = document.getElementById('rename-approve-btn');
+      const hasVal = input.value.trim().length > 0 && input.value.trim() !== it.name;
+      btn.disabled = !hasVal;
+      btn.style.opacity = hasVal ? '1' : '0.5';
+    });
+
+    // Auto-fetch the first suggestion for a smoother flow
+    fetchSuggestionForCurrent();
+  }
+
+  async function fetchSuggestionForCurrent() {
+    const it = renameQueue[renameIndex];
+    if (!it) return;
+    const btn = document.getElementById('rename-suggest-btn');
+    const input = document.getElementById('rename-new-name');
+    const reason = document.getElementById('rename-reason');
+    btn.disabled = true;
+    btn.textContent = '…thinking';
+    reason.textContent = '';
+    try {
+      const res = await fetch('/api/pricebook/rename/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stId: it.st_id }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Suggest failed');
+      renameCurrentSuggestion = data;
+      input.value = data.suggestedName;
+      reason.innerHTML = `<span style="color:var(--accent);">AI: ${escHtml(data.reason || '')}</span> <span style="color:var(--muted);">(confidence ${escHtml(data.confidence)})</span>`;
+      const approve = document.getElementById('rename-approve-btn');
+      approve.disabled = false;
+      approve.style.opacity = '1';
+
+      // Drop the primary-vendor info into the current-name card. The suggest
+      // endpoint includes vendors[] data on every material lookup, so this
+      // appears the moment the AI suggestion does. Empty state (no vendors,
+      // or ST lookup failed) is silent — better than displaying "Unknown".
+      const vendorRow = document.getElementById('rename-vendor-row');
+      if (vendorRow) {
+        const pv = data.primaryVendor;
+        if (pv && (pv.vendorName || pv.vendorPartNumber)) {
+          const parts = [];
+          if (pv.vendorName) {
+            const label = pv.isPrimary ? 'Primary vendor' : 'Vendor';
+            parts.push(`${label}: <span style="color:var(--text);">${escHtml(pv.vendorName)}</span>`);
+          }
+          if (pv.vendorPartNumber) {
+            parts.push(`Part #: <span style="color:var(--text);">${escHtml(pv.vendorPartNumber)}</span>`);
+          }
+          if (typeof pv.cost === 'number') {
+            parts.push(`Cost: <span style="color:var(--text);">$${Number(pv.cost).toFixed(2)}</span>`);
+          }
+          if (pv.vendorCount > 1) {
+            parts.push(`<span style="color:var(--muted);">(+${pv.vendorCount - 1} more)</span>`);
+          }
+          vendorRow.innerHTML = parts.join('<span style="margin:0 6px;color:var(--border);">·</span>');
+        } else {
+          vendorRow.innerHTML = '<span style="color:var(--muted);">No primary vendor on this SKU</span>';
+        }
+      }
+    } catch (err) {
+      reason.innerHTML = `<span style="color:var(--danger);">✗ ${escHtml(err.message)}</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '↻ Get suggestion';
+    }
+  }
+
+  async function approveRenameCurrent() {
+    const it = renameQueue[renameIndex];
+    const input = document.getElementById('rename-new-name');
+    const statusEl = document.getElementById('rename-status');
+    const newName = (input.value || '').trim();
+    if (!it || !newName) return;
+
+    const approveBtn = document.getElementById('rename-approve-btn');
+    approveBtn.disabled = true;
+    approveBtn.textContent = 'Applying…';
+    statusEl.style.color = 'var(--accent3)';
+    statusEl.textContent = 'Pushing to ServiceTitan…';
+
+    try {
+      const res = await fetch('/api/pricebook/rename/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stId: it.st_id, newName }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Apply failed');
+
+      showToast(`✓ Renamed to "${data.newName}"`);
+      advanceRenameQueue();
+      loadRecentRenames();
+    } catch (err) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '✗ ' + err.message;
+      approveBtn.disabled = false;
+      approveBtn.textContent = '✓ Approve & apply';
+      // Also surface as a sticky error toast with a Copy button — the inline
+      // status text can be long and easy to miss.
+      showToast('Rename failed: ' + err.message, { type: 'error', copy: err.message });
+    }
+  }
+
+  async function skipRenameCurrent() {
+    const it = renameQueue[renameIndex];
+    if (!it) return;
+    try {
+      await fetch('/api/pricebook/rename/skip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stId: it.st_id }),
+      });
+      advanceRenameQueue();
+      loadRecentRenames();
+    } catch (err) {
+      showToast('Skip failed: ' + err.message, { type: 'error', copy: err.message });
+    }
+  }
+
+  function advanceRenameQueue() {
+    renameIndex += 1;
+    renameTotalRemaining = Math.max(0, renameTotalRemaining - 1);
+    renameCurrentSuggestion = null;
+    if (renameIndex >= renameQueue.length) {
+      // Auto-reload so the user can keep going without clicking reload
+      loadRenameQueue();
+    } else {
+      renderRenameCard();
+    }
+  }
+
+  async function loadRecentRenames() {
+    const panel = document.getElementById('recent-renames-panel');
+    try {
+      const res = await fetch('/api/pricebook/rename/recent?limit=25');
+      const data = await res.json();
+      const rows = data.log || [];
+      if (!rows.length) {
+        panel.innerHTML = `<div class="cart-empty" style="padding:10px;">No renames yet.</div>`;
+        return;
+      }
+      // Stash the rows so the accordion can look them up on expand without
+      // another round-trip.
+      window._recentRenamesById = {};
+      rows.forEach(r => { window._recentRenamesById[r.id] = r; });
+
+      panel.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr;gap:8px;">
+          ${rows.map(r => {
+            const statusColor =
+              r.status === 'applied' ? 'var(--ok)' :
+              r.status === 'failed' ? 'var(--danger)' :
+              'var(--muted)';
+            const statusLabel =
+              r.status === 'applied' ? '✓ applied' :
+              r.status === 'failed' ? '✗ failed' :
+              '⏭ skipped';
+            const hasError = !!(r.error && r.error.trim());
+            // Short error preview in the collapsed row, full error in expanded.
+            const errorPreview = hasError
+              ? `<div style="color:var(--danger);font-size:11px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;">${escHtml(r.error.slice(0, 120))}${r.error.length > 120 ? '…' : ''}</div>`
+              : '';
+
+            return `
+              <details class="rename-accordion" data-rename-id="${r.id}"
+                       style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+                <summary style="display:flex;justify-content:space-between;gap:12px;padding:8px 12px;cursor:pointer;flex-wrap:wrap;align-items:flex-start;list-style:none;">
+                  <div style="flex:1;min-width:220px;font-family:var(--font-mono);font-size:12px;">
+                    <span style="color:var(--muted);font-size:10px;margin-right:6px;">▸</span>
+                    <span style="color:var(--muted);">${escHtml(r.old_name || '—')}</span>
+                    ${r.new_name ? `<span style="color:var(--muted);margin:0 6px;">→</span><span style="color:var(--text);">${escHtml(r.new_name)}</span>` : ''}
+                    ${errorPreview}
+                  </div>
+                  <div style="font-family:var(--font-mono);font-size:11px;color:${statusColor};white-space:nowrap;">
+                    ${statusLabel}
+                    <span style="color:var(--muted);margin-left:6px;">${escHtml(fmtTs(r.created_at) || '')}</span>
+                  </div>
+                </summary>
+                <div class="rename-accordion-body" style="padding:12px 14px;border-top:1px solid var(--border);background:var(--bg);">
+                  <div style="color:var(--muted);font-size:11px;font-family:var(--font-mono);">Loading details…</div>
+                </div>
+              </details>
+            `;
+          }).join('')}
+        </div>
+      `;
+
+      // Wire up lazy-expansion: fetch the image thumbnail only when opened.
+      panel.querySelectorAll('details.rename-accordion').forEach(el => {
+        el.addEventListener('toggle', () => {
+          if (!el.open) return;
+          const id = el.getAttribute('data-rename-id');
+          const row = (window._recentRenamesById || {})[id];
+          if (!row) return;
+          const body = el.querySelector('.rename-accordion-body');
+          if (body && body.dataset.loaded !== '1') {
+            renderRenameAccordionBody(body, row);
+            body.dataset.loaded = '1';
+          }
+        });
+      });
+    } catch (err) {
+      panel.innerHTML = `<div class="cart-empty" style="padding:10px;color:var(--danger);">Failed to load: ${escHtml(err.message)}</div>`;
+    }
+  }
+
+  // Renders the expanded body of a recent-renames accordion row. Shows:
+  //   - Full ISO timestamp + ST IDs + SKU type
+  //   - Image thumbnail (proxied through /api/pricebook/image-proxy so the
+  //     browser can display ST-auth'd images). Applied renames may also have
+  //     triggered image gen; we show whatever image is currently on the SKU.
+  //   - Full error text + Copy button (for failed rows)
+  //   - Quick actions: re-open this SKU in the rename queue, copy ST URL
+  function renderRenameAccordionBody(body, r) {
+    const isFailed = r.status === 'failed';
+    const isApplied = r.status === 'applied';
+    const skuType = r.sku_type || 'Material';
+    const stId = r.st_id;
+    const imgProxy = `/api/pricebook/image-proxy?stId=${encodeURIComponent(stId)}&skuType=${encodeURIComponent(skuType)}&t=${Date.now()}`;
+
+    // ST's tenant ID isn't exposed client-side; we just show the ST ID + sku type.
+    const errorHtml = isFailed && r.error
+      ? `
+        <div style="margin-top:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">
+            <div style="font-size:10px;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);font-family:var(--font-mono);">Error</div>
+            <button type="button" class="btn" onclick="copyToClipboardWithToast(\`${escHtml(r.error).replace(/`/g, '\\`')}\`, 'Error copied')"
+                    style="background:transparent;border:1px solid var(--border);color:var(--muted);padding:3px 10px;font-size:10px;">
+              ⧉ Copy error
+            </button>
+          </div>
+          <pre style="background:var(--surface2);border:1px solid rgba(239,68,85,0.35);border-radius:6px;padding:10px 12px;color:var(--danger);font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:220px;overflow-y:auto;margin:0;font-family:var(--font-mono);">${escHtml(r.error)}</pre>
+        </div>
+      ` : '';
+
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:flex-start;">
+        ${isApplied ? `
+          <div style="width:112px;height:112px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+            <img src="${imgProxy}" alt="SKU image"
+                 style="max-width:100%;max-height:100%;object-fit:contain;"
+                 onerror="this.parentElement.innerHTML='<div style=\\'color:var(--muted);font-size:10px;text-align:center;padding:4px;font-family:var(--font-mono);\\'>No image<br>available</div>';" />
+          </div>
+        ` : `
+          <div style="width:112px;height:112px;background:var(--surface2);border:1px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px;text-align:center;padding:4px;font-family:var(--font-mono);">
+            ${isFailed ? 'Rename<br>failed' : 'Skipped'}
+          </div>
+        `}
+        <div style="min-width:0;font-family:var(--font-mono);font-size:11px;display:flex;flex-direction:column;gap:6px;">
+          <div><span style="color:var(--muted);">ST ID:</span> <span style="color:var(--text);">${escHtml(stId)}</span> <span style="color:var(--border);margin:0 6px;">·</span> <span style="color:var(--muted);">Type:</span> <span style="color:var(--text);">${escHtml(skuType)}</span></div>
+          <div><span style="color:var(--muted);">When:</span> <span style="color:var(--text);">${escHtml(fmtTsFull(r.created_at) || r.created_at || '')}</span></div>
+          ${r.old_name ? `<div><span style="color:var(--muted);">From:</span> <span style="color:var(--text);word-break:break-word;">${escHtml(r.old_name)}</span></div>` : ''}
+          ${r.new_name ? `<div><span style="color:var(--muted);">To:</span> <span style="color:var(--text);word-break:break-word;">${escHtml(r.new_name)}</span></div>` : ''}
+
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+            <button type="button" class="btn" onclick="copyToClipboardWithToast('${escHtml(String(stId))}', 'ST ID copied')"
+                    style="background:transparent;border:1px solid var(--border);color:var(--muted);padding:3px 10px;font-size:10px;">
+              ⧉ Copy ST ID
+            </button>
+            ${r.new_name ? `
+              <button type="button" class="btn" onclick="copyToClipboardWithToast(\`${escHtml(r.new_name).replace(/`/g, '\\`')}\`, 'Name copied')"
+                      style="background:transparent;border:1px solid var(--border);color:var(--muted);padding:3px 10px;font-size:10px;">
+                ⧉ Copy new name
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+      ${errorHtml}
+    `;
+  }
+
+  // Clipboard helper that pops a short info toast. Used by Copy buttons.
+  function copyToClipboardWithToast(text, label) {
+    navigator.clipboard.writeText(text).then(
+      () => showToast('✓ ' + (label || 'Copied')),
+      () => showToast('Copy failed', { type: 'error', copy: text })
+    );
+  }
+
+  // ── Initial render ─────────────────────────────────────────────────────────
+  renderCart();
+  initScopeDrop();
+  loadIndexStats();
+  loadRecentScopeEstimates();
+  wireDupeTabs();
+  maybeAutoloadDuplicates();
+  loadRenameQueue();
+  loadRecentRenames();
+</script>
+
+</body>
+</html>

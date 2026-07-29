@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memberships - ServiceOps Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+
+<!-- ── Navigation Bar ───────────────────────────────────────────────── -->
+<!-- Nav: built by /js/shared.js — do not hand-edit, it gets wiped on load. -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+
+  <div class="page-header">
+    <div>
+      <h1>Ground Club <span class="accent">Memberships</span></h1>
+      <p>Look up a membership, preview what GHL will see, and push contacts to GoHighLevel one at a time or in bulk.</p>
+    </div>
+  </div>
+
+  <!-- ── Membership Lookup ──────────────────────────────────────── -->
+  <div class="section-label">Membership Lookup</div>
+  <div class="panel" style="margin-bottom:24px;">
+    <div style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:14px;">
+      Look up a Ground Club membership by Membership ID, Customer ID, or Location ID.
+    </div>
+    <div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;" id="lookup-type-radios">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--text);">
+        <input type="radio" name="lookupType" value="membership" checked
+          style="accent-color:var(--accent);width:15px;height:15px;cursor:pointer;" />
+        Membership ID
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--text);">
+        <input type="radio" name="lookupType" value="customer"
+          style="accent-color:var(--accent);width:15px;height:15px;cursor:pointer;" />
+        Customer ID
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--text);">
+        <input type="radio" name="lookupType" value="location"
+          style="accent-color:var(--accent);width:15px;height:15px;cursor:pointer;" />
+        Location ID
+      </label>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input id="lookup-membership-id" class="search-input" placeholder="Membership ID..." style="flex:1;min-width:200px;font-size:13px;padding:10px 14px;" onkeydown="if(event.key==='Enter')lookupMembership()" />
+      <button class="btn" style="font-size:13px;padding:10px 20px;" onclick="lookupMembership()" id="btn-lookup">Look Up</button>
+    </div>
+    <div class="action-status" id="status-lookup" style="margin-top:8px;"></div>
+  </div>
+
+  <div id="lookup-result" style="display:none;margin-bottom:24px;">
+    <div class="panel" id="lookup-panel" style="padding:0;overflow:hidden;"></div>
+  </div>
+
+  <!-- ── Add Complimentary Membership ──────────────────────────────── -->
+  <div class="section-label">Add Complimentary Membership</div>
+  <div class="panel" style="margin-bottom:24px;">
+    <div style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:14px;">
+      Enter a Customer ID to load their locations, pick the location and plan, then add a complimentary membership in ServiceTitan.
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input id="comp-customer-id" class="search-input" placeholder="Customer ID..." style="flex:1;min-width:200px;font-size:13px;padding:10px 14px;" onkeydown="if(event.key==='Enter')compLoadLocations()" />
+      <button class="btn" style="font-size:13px;padding:10px 20px;" onclick="compLoadLocations()" id="btn-comp-load">Load Locations</button>
+    </div>
+    <div class="action-status" id="status-comp" style="margin-top:8px;"></div>
+
+    <div id="comp-details" style="display:none;margin-top:18px;border-top:1px solid var(--border);padding-top:16px;">
+      <div id="comp-customer-name" style="font-size:16px;font-weight:800;margin-bottom:12px;"></div>
+
+      <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:8px;">Location</div>
+      <div id="comp-locations" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px;">
+        <div>
+          <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:6px;">Plan</div>
+          <select id="comp-plan" class="search-input" style="width:100%;font-size:13px;padding:10px 12px;box-sizing:border-box;"></select>
+        </div>
+        <div>
+          <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:6px;">Start Date</div>
+          <input id="comp-start" type="date" class="search-input" style="width:100%;font-size:13px;padding:10px 12px;box-sizing:border-box;" />
+        </div>
+        <div>
+          <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:6px;">Term (months)</div>
+          <input id="comp-months" type="number" min="1" value="12" class="search-input" style="width:100%;font-size:13px;padding:10px 12px;box-sizing:border-box;" />
+        </div>
+      </div>
+
+      <button class="btn" id="btn-comp-add" onclick="compAddMembership()" style="font-size:13px;padding:10px 20px;">➕ Add Complimentary Membership</button>
+      <div class="action-status" id="status-comp-add" style="margin-top:10px;"></div>
+      <div id="comp-result" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Bulk Membership Import ──────────────────────────────────────── -->
+  <div style="margin-bottom:24px;">
+    <div class="section-label">Bulk Membership Import</div>
+    <div class="panel">
+      <div style="margin-bottom:12px;font-size:13px;color:var(--muted);">Paste membership IDs below — one per line or comma-separated. Runs a dry-run preview on all of them, then you can send them all to GHL at once.</div>
+      <textarea id="bulk-membership-ids"
+        placeholder="850012&#10;850047&#10;850103"
+        style="width:100%;height:100px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;resize:vertical;box-sizing:border-box;"></textarea>
+      <div style="display:flex;gap:10px;margin-top:10px;align-items:center;">
+        <button class="btn" style="background:#f5c518;color:#000;font-size:12px;padding:8px 16px;" onclick="runBulkDryRun()">🔬 Preview All</button>
+        <button id="btn-bulk-send" class="btn" style="display:none;background:var(--accent);color:#000;font-size:12px;padding:8px 16px;" onclick="sendAllToGHL()">🚀 Send All to GHL</button>
+        <button id="btn-patch-months" class="btn" style="background:#4d9fff;color:#000;font-size:12px;padding:8px 16px;" onclick="patchAllCheckMonths()">🔄 Patch Check Months</button>
+        <span id="bulk-status" style="font-size:12px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--muted);"></span>
+      </div>
+      <div id="bulk-results" style="margin-top:16px;display:flex;flex-direction:column;gap:12px;"></div>
+
+      <!-- GHL Field Options inspector -->
+      <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+        <button class="btn" style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:11px;padding:6px 14px;" onclick="loadGhlFieldOptions(this)">🔍 Inspect GHL Opportunity Fields</button>
+        <div id="ghl-field-options-result" style="margin-top:12px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+  // Constants
+  const BATCH_SIZE = 25;
+  let _bulkPayloads = [];
+  let _bulkCancelled = false;
+
+  // ── Radio placeholder swap ─────────────────────────────────────────
+  const PLACEHOLDER_MAP = { membership: 'Membership ID...', customer: 'Customer ID...', location: 'Location ID...' };
+  document.querySelectorAll('input[name="lookupType"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const input = document.getElementById('lookup-membership-id');
+      input.placeholder = PLACEHOLDER_MAP[r.value] || 'ID...';
+      input.value = '';
+      input.focus();
+      document.getElementById('lookup-result').style.display = 'none';
+      setStatus('status-lookup', '', '');
+    });
+  });
+
+  // ── Membership Lookup ─────────────────────────────────────────────
+  async function lookupMembership() {
+    const inputVal = document.getElementById('lookup-membership-id').value.trim();
+    const lookupType = document.querySelector('input[name="lookupType"]:checked').value;
+    if (!inputVal) {
+      setStatus('status-lookup', `⚠ Enter a ${PLACEHOLDER_MAP[lookupType].replace('...', '')}`, 'warn');
+      return;
+    }
+
+    const btn = document.getElementById('btn-lookup');
+    btn.disabled = true;
+    btn.textContent = 'Looking up...';
+    setStatus('status-lookup', `Searching by ${lookupType} ID: ${inputVal}...`, 'info');
+
+    const panel = document.getElementById('lookup-panel');
+    const resultSection = document.getElementById('lookup-result');
+    panel.innerHTML = '<div style="padding:28px;"><div class="loading-overlay"><div class="spinner"></div> Loading membership details…</div></div>';
+    resultSection.style.display = 'block';
+    resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    try {
+      // Build the request based on lookup type
+      let res;
+      if (lookupType === 'membership') {
+        res = await fetch('/api/fanclubs/test-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ membershipId: inputVal, dryRun: true })
+        });
+      } else {
+        res = await fetch(`/api/fanclubs/lookup?type=${lookupType}&id=${encodeURIComponent(inputVal)}`);
+      }
+      const data = await res.json();
+
+      // If lookup by customer/location returned multiple memberships, show picker
+      if (data.memberships && data.memberships.length > 1) {
+        renderMembershipPicker(data.memberships);
+        setStatus('status-lookup', `Found ${data.memberships.length} active membership(s)`, 'info');
+        btn.disabled = false;
+        btn.textContent = 'Look Up';
+        return;
+      }
+
+      // If lookup by customer/location returned exactly one, unwrap it
+      if (data.memberships && data.memberships.length === 1) {
+        // Re-fetch via test-sync to get the full dashboard data
+        const mid = data.memberships[0].id;
+        res = await fetch('/api/fanclubs/test-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ membershipId: String(mid), dryRun: true })
+        });
+        const fullData = await res.json();
+        Object.assign(data, fullData);
+      }
+
+      // No memberships found for customer/location search
+      if (data.memberships && data.memberships.length === 0) {
+        setStatus('status-lookup', '⚠ No active memberships found', 'warn');
+        panel.innerHTML = `<div style="padding:28px;"><div style="color:var(--accent2);font-family:'JetBrains Mono','DM Mono',monospace;font-size:13px;">No active memberships found for ${lookupType} ID: ${escHtml(inputVal)}</div></div>`;
+        btn.disabled = false;
+        btn.textContent = 'Look Up';
+        return;
+      }
+
+      const r = data.result || {};
+      const m = data.membership?.raw || {};
+      const cf = r.wouldSendToGHL?.contactPayload?.customFields || {};
+      // Resolve the actual membership ID (inputVal for direct lookup, or from the API response)
+      const resolvedMembershipId = r.membershipId || data.membership?.id || inputVal;
+
+      if (r.skipped || data.error) {
+        setStatus('status-lookup', '⚠ Could not load membership', 'warn');
+        panel.innerHTML = `
+          <div style="padding:28px;">
+            <div style="color:var(--accent2);font-family:'JetBrains Mono','DM Mono',monospace;font-size:13px;margin-bottom:16px;">⚠ ${r.reason || data.error || 'Membership not found or skipped'}</div>
+            <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;">Membership ID: ${resolvedMembershipId}</div>
+            ${Object.keys(m).length ? `<details style="margin-top:12px;"><summary style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;cursor:pointer;">Raw data</summary><pre style="margin-top:8px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;font-size:11px;overflow:auto;color:var(--muted);">${JSON.stringify(m, null, 2)}</pre></details>` : ''}
+          </div>`;
+      } else {
+        setStatus('status-lookup', '', '');
+        const name = r.name || m.customerName || '—';
+        const addr = r.address
+          ? [r.address.address1, r.address.city, r.address.state, r.address.postalCode].filter(Boolean).join(', ')
+          : 'No address found';
+        const membershipType = cf.membership_fan_club || m.membershipTypeName || '—';
+        const startDate = cf.fan_club_start_date || cf.membership_start_date || '—';
+        const endDate = cf.expiration_date || '—';
+        const totalVisits = r.visits?.total ?? '—';
+        const completedVisits = r.visits?.completed ?? 0;
+        const remainingVisits = r.visits?.remaining ?? '—';
+        const coolingMonth = r.coolingCheckMonth || cf.cooling_check_month || '—';
+        const heatingMonth = r.heatingCheckMonth || cf.heating_check_month || '—';
+        const stLocId = r.stLocationId || '—';
+        const memStatus = m.status || (m.active ? 'Active' : 'Unknown');
+        const isActive = /active/i.test(memStatus);
+
+        // Visit progress bar
+        const visitPct = (totalVisits !== '—' && totalVisits > 0)
+          ? Math.round((completedVisits / totalVisits) * 100) : 0;
+
+        panel.innerHTML = `
+          <!-- Header banner -->
+          <div style="padding:24px 28px;background:linear-gradient(135deg,var(--surface2),var(--surface));border-bottom:1px solid var(--border);">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+              <div>
+                <div style="font-size:22px;font-weight:800;letter-spacing:-0.5px;">${escHtml(name)}</div>
+                <div style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-top:4px;">${escHtml(addr)}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:11px;font-family:'JetBrains Mono','DM Mono',monospace;padding:5px 12px;border-radius:100px;border:1px solid ${isActive ? '#4caf50' : 'var(--accent2)'};color:${isActive ? '#4caf50' : 'var(--accent2)'};">${escHtml(memStatus)}</span>
+                <span style="font-size:11px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--muted);padding:5px 12px;border-radius:100px;border:1px solid var(--border);">ID: ${escHtml(resolvedMembershipId)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:24px 28px;">
+
+            <!-- Membership info row -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px;">
+              <div class="kpi-mini-card">
+                <div class="kpi-mini-label">Membership Plan</div>
+                <div style="font-size:15px;font-weight:700;margin-top:6px;color:var(--accent);">${escHtml(membershipType)}</div>
+              </div>
+              <div class="kpi-mini-card">
+                <div class="kpi-mini-label">Start Date</div>
+                <div style="font-size:15px;font-weight:700;margin-top:6px;color:var(--text);">${escHtml(startDate)}</div>
+              </div>
+              <div class="kpi-mini-card">
+                <div class="kpi-mini-label">Expiration</div>
+                <div style="font-size:15px;font-weight:700;margin-top:6px;color:var(--accent2);">${escHtml(endDate)}</div>
+              </div>
+              <div class="kpi-mini-card">
+                <div class="kpi-mini-label">ST Location ID</div>
+                <div style="font-size:15px;font-weight:700;margin-top:6px;color:var(--accent3);">${escHtml(String(stLocId))}</div>
+              </div>
+            </div>
+
+            <!-- Visit schedule section -->
+            <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:10px;">Visit Schedule</div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px;text-align:center;">
+                <div style="font-size:28px;margin-bottom:6px;">❄️</div>
+                <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:6px;">Cooling Check</div>
+                <div style="font-size:20px;font-weight:800;color:var(--accent3);">${escHtml(coolingMonth)}</div>
+              </div>
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px;text-align:center;">
+                <div style="font-size:28px;margin-bottom:6px;">🔥</div>
+                <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:6px;">Heating Check</div>
+                <div style="font-size:20px;font-weight:800;color:var(--accent2);">${escHtml(heatingMonth)}</div>
+              </div>
+            </div>
+
+            <!-- Visit progress -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:24px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <span style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;">Visit Progress</span>
+                <span style="font-size:12px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--text);">${completedVisits} of ${totalVisits} completed</span>
+              </div>
+              <div style="background:var(--bg);border-radius:6px;height:10px;overflow:hidden;">
+                <div style="height:100%;background:linear-gradient(90deg,var(--accent),var(--accent3));width:${visitPct}%;transition:width 0.5s;border-radius:6px;"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:10px;">
+                <span style="font-size:22px;font-weight:800;color:var(--accent);">${remainingVisits}</span>
+                <span style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;align-self:flex-end;">visits remaining</span>
+              </div>
+            </div>
+
+            <!-- GHL sync info -->
+            <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:10px;">GHL Sync Preview</div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:11px;">
+                ${renderGhlField('Contact', r.wouldSendToGHL?.contactPayload?.firstName + ' ' + (r.wouldSendToGHL?.contactPayload?.lastName || ''), 'var(--text)')}
+                ${renderGhlField('Phone', r.wouldSendToGHL?.contactPayload?.phone, 'var(--text)')}
+                ${renderGhlField('Email', r.wouldSendToGHL?.contactPayload?.email, 'var(--text)')}
+                ${renderGhlField('Tags', (r.wouldSendToGHL?.tags || []).join(', '), 'var(--accent3)')}
+                ${renderGhlField('Workflow', r.wouldSendToGHL?.workflowId ? '✓ Assigned' : '—', r.wouldSendToGHL?.workflowId ? '#4caf50' : 'var(--muted)')}
+              </div>
+            </div>
+
+            <!-- Actions row -->
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              <button class="btn" style="font-size:12px;padding:8px 18px;" onclick="syncThisMembership('${resolvedMembershipId}')">🚀 Sync to GHL</button>
+              <span id="sync-single-status" style="font-size:11px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--muted);"></span>
+            </div>
+
+            <!-- Raw data -->
+            <details style="margin-top:20px;">
+              <summary style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;cursor:pointer;">View raw membership data</summary>
+              <pre style="margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px;font-size:11px;overflow:auto;color:var(--muted);max-height:300px;">${JSON.stringify(m, null, 2)}</pre>
+            </details>
+
+          </div>`;
+        showToast(`✓ Loaded membership for ${name}`);
+      }
+    } catch (err) {
+      setStatus('status-lookup', '✗ ' + err.message, 'error');
+      panel.innerHTML = `<div style="padding:28px;"><div class="error-msg">${escHtml(err.message)}</div></div>`;
+    }
+    btn.disabled = false;
+    btn.textContent = 'Look Up';
+  }
+
+  function renderGhlField(label, value, color) {
+    return `<div style="padding:4px 0;"><span style="color:var(--muted);">${label}:</span> <span style="color:${color};">${escHtml(value || '—')}</span></div>`;
+  }
+
+  // Render membership picker when multiple found
+  function renderMembershipPicker(memberships) {
+    const panel = document.getElementById('lookup-panel');
+    const rows = memberships.map(m => {
+      const name = m.customerName || '—';
+      const type = m.membershipTypeName || m.type || '—';
+      const status = m.status || 'Active';
+      const from = m.from ? new Date(m.from).toLocaleDateString() : '—';
+      const to = m.to ? new Date(m.to).toLocaleDateString() : '—';
+      return `
+        <div onclick="selectPickerMembership('${m.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;"
+          onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+          <div>
+            <div style="font-weight:700;font-size:14px;">${escHtml(name)}</div>
+            <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-top:3px;">${escHtml(type)} · ${from} → ${to}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:11px;font-family:'JetBrains Mono','DM Mono',monospace;padding:4px 10px;border-radius:100px;border:1px solid #4caf50;color:#4caf50;">${escHtml(status)}</span>
+            <span style="font-size:11px;font-family:'JetBrains Mono','DM Mono',monospace;color:var(--muted);">ID: ${m.id}</span>
+            <span style="color:var(--muted);font-size:16px;">›</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    panel.innerHTML = `
+      <div style="padding:20px 28px;border-bottom:1px solid var(--border);">
+        <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-bottom:4px;">Multiple Memberships Found</div>
+        <div style="font-size:13px;color:var(--text);">Select a membership to view details:</div>
+      </div>
+      ${rows}`;
+  }
+
+  async function selectPickerMembership(membershipId) {
+    // Set the radio back to membership mode and fill the input
+    document.querySelector('input[name="lookupType"][value="membership"]').checked = true;
+    document.getElementById('lookup-membership-id').value = membershipId;
+    document.getElementById('lookup-membership-id').placeholder = PLACEHOLDER_MAP.membership;
+    lookupMembership();
+  }
+
+  // Sync a single membership (actually push to GHL)
+  async function syncThisMembership(membershipId) {
+    const statusEl = document.getElementById('sync-single-status');
+    statusEl.textContent = 'Syncing to GHL...';
+    statusEl.style.color = 'var(--accent3)';
+    try {
+      const res = await fetch('/api/fanclubs/test-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ membershipId, dryRun: false })
+      });
+      const data = await res.json();
+      const r = data.result || {};
+      if (r.ghlContactId) {
+        statusEl.textContent = `✓ Synced — GHL contact ${r.created ? 'created' : 'updated'}`;
+        statusEl.style.color = '#4caf50';
+        showToast(`✓ Membership synced to GHL`);
+      } else if (r.skipped) {
+        statusEl.textContent = `⚠ Skipped: ${r.reason}`;
+        statusEl.style.color = 'var(--accent2)';
+      } else {
+        statusEl.textContent = '⚠ Unexpected response';
+        statusEl.style.color = 'var(--accent2)';
+      }
+    } catch (err) {
+      statusEl.textContent = '✗ ' + err.message;
+      statusEl.style.color = 'var(--danger)';
+    }
+  }
+
+  // Bulk dry run
+  async function runBulkDryRun() {
+    const raw = document.getElementById('bulk-membership-ids').value;
+    const ids = raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+    if (ids.length === 0) {
+      alert('Enter at least one membership ID.');
+      return;
+    }
+
+    const statusEl = document.getElementById('bulk-status');
+    const resultsEl = document.getElementById('bulk-results');
+    const sendBtn = document.getElementById('btn-bulk-send');
+
+    _bulkPayloads = [];
+    _bulkCancelled = false;
+    sendBtn.style.display = 'none';
+    resultsEl.innerHTML = `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span id="bulk-progress-label" style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--muted);">Starting...</span>
+          <button onclick="_bulkCancelled=true;this.textContent='Cancelling...';" style="font-size:11px;padding:4px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;">Cancel</button>
+        </div>
+        <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden;">
+          <div id="bulk-progress-bar" style="height:100%;background:var(--accent);width:0%;transition:width 0.3s;"></div>
+        </div>
+      </div>`;
+
+    let passed = 0, failed = 0;
+    const rowMap = {};
+
+    for (const id of ids) {
+      const row = document.createElement('div');
+      row.style = 'background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;';
+      row.innerHTML = `<div style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--muted);">⏳ ${id}</div>`;
+      resultsEl.appendChild(row);
+      rowMap[id] = row;
+    }
+
+    for (let i = 0; i < ids.length; i++) {
+      if (_bulkCancelled) break;
+
+      const id = ids[i];
+      const row = rowMap[id];
+      row.innerHTML = `<div style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--muted);">⏳ Loading ${id}...</div>`;
+
+      const pct = Math.round((i / ids.length) * 100);
+      document.getElementById('bulk-progress-bar').style.width = pct + '%';
+      document.getElementById('bulk-progress-label').textContent = `Processing ${i + 1} of ${ids.length} — ${passed} ready, ${failed} skipped`;
+
+      try {
+        const res = await fetch('/api/fanclubs/test-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ membershipId: id, dryRun: true })
+        });
+        const data = await res.json();
+        const r = data.result || {};
+        const cf = r.wouldSendToGHL?.contactPayload?.customFields || {};
+
+        if (r.skipped || data.error) {
+          failed++;
+          row.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--accent2);">⚠ ${id} — ${r.reason || data.error || 'Skipped'}</span>
+          </div>`;
+        } else {
+          passed++;
+          _bulkPayloads.push({
+            membershipId: r.membershipId,
+            name: r.name,
+            address: r.address,
+            stLocationId: r.stLocationId,
+            visits: r.visits,
+            ...(r.wouldSendToGHL?.contactPayload || {})
+          });
+          row.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+              <div>
+                <div style="font-weight:700;font-size:14px;">${r.name || '—'}</div>
+                <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono','DM Mono',monospace;margin-top:2px;">${id} · ${cf.membership_fan_club || '—'} · ${cf.fan_club_start_date || '—'} → ${cf.expiration_date || '—'}</div>
+              </div>
+              <div style="display:flex;gap:16px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;">
+                <span>❄️ ${cf.cooling_check_month || '—'}</span>
+                <span>🔥 ${cf.heating_check_month || '—'}</span>
+                <span>Visits: ${r.visits?.total ?? '—'} / ${r.visits?.remaining ?? '—'} left</span>
+              </div>
+            </div>`;
+        }
+      } catch (err) {
+        failed++;
+        row.innerHTML = `<div style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--accent2);">✗ ${id} — ${err.message}</div>`;
+      }
+
+      if ((i + 1) % BATCH_SIZE === 0 && i + 1 < ids.length) {
+        document.getElementById('bulk-progress-label').textContent = `Pausing after batch ${Math.ceil((i+1)/BATCH_SIZE)} of ${Math.ceil(ids.length/BATCH_SIZE)}...`;
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    }
+
+    document.getElementById('bulk-progress-bar').style.width = '100%';
+    statusEl.textContent = _bulkCancelled
+      ? `Cancelled — ${passed} ready, ${failed} skipped`
+      : `Preview complete — ${passed} ready, ${failed} skipped`;
+    if (_bulkPayloads.length > 0) sendBtn.style.display = 'inline-block';
+  }
+
+  // Send all to GHL
+  async function sendAllToGHL() {
+    const btn = document.getElementById('btn-bulk-send');
+    const statusEl = document.getElementById('bulk-status');
+    if (_bulkPayloads.length === 0) return;
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Sending...';
+    let sent = 0, failed = 0;
+
+    for (const payload of _bulkPayloads) {
+      try {
+        const res = await fetch('/api/fanclubs/send-webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.sent) sent++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+      statusEl.textContent = `Sending... ${sent + failed} / ${_bulkPayloads.length}`;
+    }
+
+    btn.textContent = '✓ Done';
+    statusEl.textContent = `✓ ${sent} sent to GHL${failed ? `, ${failed} failed` : ''}`;
+    showToast(`✓ Bulk send complete — ${sent} membership(s) pushed to GHL`);
+  }
+
+  // Patch check months
+  async function patchAllCheckMonths() {
+    const raw = document.getElementById('bulk-membership-ids').value;
+    const ids = raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+    if (ids.length === 0) {
+      alert('Paste your membership IDs into the box above first.');
+      return;
+    }
+
+    const btn = document.getElementById('btn-patch-months');
+    const statusEl = document.getElementById('bulk-status');
+    const resultsEl = document.getElementById('bulk-results');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Patching...';
+    statusEl.textContent = '';
+    resultsEl.innerHTML = `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span id="patch-progress-label" style="font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--muted);">Starting patch...</span>
+        </div>
+        <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden;">
+          <div id="patch-progress-bar" style="height:100%;background:#4d9fff;width:0%;transition:width 0.3s;"></div>
+        </div>
+      </div>`;
+
+    let updated = 0, skipped = 0, failed = 0;
+
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const pct = Math.round((i / ids.length) * 100);
+      document.getElementById('patch-progress-bar').style.width = pct + '%';
+      document.getElementById('patch-progress-label').textContent =
+        `Patching ${i + 1} of ${ids.length} — ${updated} updated, ${skipped} skipped, ${failed} failed`;
+
+      try {
+        const res = await fetch('/api/fanclubs/patch-check-months', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ membershipId: id })
+        });
+        const data = await res.json();
+
+        if (data.updated) {
+          updated++;
+        } else if (data.skipped) {
+          skipped++;
+        } else {
+          failed++;
+        }
+      } catch (err) {
+        failed++;
+        console.error(`[Patch] Error for ${id}:`, err.message);
+      }
+
+      if ((i + 1) % BATCH_SIZE === 0 && i + 1 < ids.length) {
+        document.getElementById('patch-progress-label').textContent =
+          `Pausing after batch ${Math.ceil((i+1)/BATCH_SIZE)} of ${Math.ceil(ids.length/BATCH_SIZE)}...`;
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    }
+
+    document.getElementById('patch-progress-bar').style.width = '100%';
+    document.getElementById('patch-progress-label').textContent =
+      `Done — ${updated} updated, ${skipped} skipped, ${failed} failed`;
+    statusEl.textContent = `✓ Patch complete — ${updated} check months updated`;
+    btn.disabled = false;
+    btn.textContent = '🔄 Patch Check Months';
+    showToast(`✓ Check months patched — ${updated} contact(s) updated in GHL`);
+  }
+
+  // Load GHL field options
+  function renderFieldGroup(fields, title, color) {
+    if (!fields || fields.length === 0) return `<div style="color:var(--muted);margin-bottom:8px;">No ${title} found.</div>`;
+    return `
+      <div style="margin-bottom:14px;">
+        <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:${color};margin-bottom:6px;">${title} (${fields.length})</div>
+        ${fields.map(f => `
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:6px;">
+            <div style="color:var(--text);">${f.name} <span style="color:var(--muted);">${f.fieldKey} · ${f.dataType}</span></div>
+            ${f.options && f.options.length > 0 ? `
+              <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">
+                ${f.options.map(o => `<span style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:10px;">${o.label} <span style="color:var(--muted);">→ ${o.id}</span></span>`).join('')}
+              </div>` : ''}
+          </div>`).join('')}
+      </div>`;
+  }
+
+  async function loadGhlFieldOptions(btn) {
+    const resultEl = document.getElementById('ghl-field-options-result');
+    btn.disabled = true;
+    btn.textContent = '⏳ Loading...';
+    resultEl.innerHTML = '';
+    try {
+      const res = await fetch('/api/fanclubs/ghl-field-options');
+      const data = await res.json();
+      if (data.error) {
+        resultEl.innerHTML = `<span style="color:var(--danger);">Error: ${data.error}</span>`;
+      } else {
+        let html = `<div style="color:var(--muted);margin-bottom:10px;">Total fields in GHL: ${data.total} · Opportunity fields: ${data.opportunityFieldCount} · Contact fields: ${data.contactFieldCount}</div>`;
+        if (data.likelyMatches && data.likelyMatches.length > 0) {
+          html += renderFieldGroup(data.likelyMatches, '⭐ Likely Check Month Fields', 'var(--accent)');
+        } else {
+          html += `<div style="color:var(--accent2);margin-bottom:10px;">⚠ No fields matched keywords (cool, heat, check, month, season). See all opportunity fields below.</div>`;
+        }
+        html += renderFieldGroup(data.opportunityFields, 'All Opportunity Fields', 'var(--accent3)');
+        resultEl.innerHTML = html;
+      }
+    } catch (err) {
+      resultEl.innerHTML = `<span style="color:var(--danger);">Failed: ${err.message}</span>`;
+    }
+    btn.disabled = false;
+    btn.textContent = '🔍 Inspect GHL Opportunity Fields';
+  }
+
+  // ── Add Complimentary Membership ──────────────────────────────────
+  const GROUND_CLUB_PLANS = [
+    { id: 7001, name: 'Ground Club - Annual' },
+    { id: 7002, name: 'Ground Club - Two System' },
+    { id: 7003, name: 'Ground Club - Three System' },
+    { id: 7004, name: 'Ground Club - Monthly' },
+    { id: 7007, name: 'Ground Club - Commercial' },
+  ];
+  let _compState = { customerId: null, locationId: null };
+  let _compPlansLoaded = false;
+
+  async function compLoadPlans() {
+    if (_compPlansLoaded) return;
+    const sel = document.getElementById('comp-plan');
+    try {
+      const res = await fetch('/api/fanclubs/membership-types');
+      const data = await res.json();
+      let types = (data.membershipTypes || []).filter(t => t.active !== false);
+      if (!types.length) throw new Error('no types');
+      // Ground Club plans first, then the rest
+      types.sort((a, b) => (/ground club/i.test(b.name || '') ? 1 : 0) - (/ground club/i.test(a.name || '') ? 1 : 0));
+      sel.innerHTML = types.map(t => `<option value="${t.id}">${escHtml(t.name || ('Type ' + t.id))}</option>`).join('');
+    } catch (_) {
+      sel.innerHTML = GROUND_CLUB_PLANS.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    }
+    const oneSys = Array.prototype.slice.call(sel.options).find(o => /one system/i.test(o.textContent));
+    if (oneSys) sel.value = oneSys.value;
+    _compPlansLoaded = true;
+  }
+
+  async function compLoadLocations() {
+    const cid = document.getElementById('comp-customer-id').value.trim();
+    if (!/^\d+$/.test(cid)) { setStatus('status-comp', '⚠ Enter a numeric Customer ID', 'warn'); return; }
+    const btn = document.getElementById('btn-comp-load');
+    btn.disabled = true; btn.textContent = 'Loading...';
+    setStatus('status-comp', 'Loading customer ' + cid + '...', 'info');
+    document.getElementById('comp-details').style.display = 'none';
+    _compState = { customerId: cid, locationId: null };
+    try {
+      const res = await fetch('/api/fanclubs/customer-locations?customerId=' + encodeURIComponent(cid));
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setStatus('status-comp', '⚠ ' + (data.error || 'Not found'), 'warn');
+        btn.disabled = false; btn.textContent = 'Load Locations'; return;
+      }
+      setStatus('status-comp', '', '');
+      document.getElementById('comp-customer-name').textContent = data.customer.name + ' (#' + data.customer.id + ')';
+      const locWrap = document.getElementById('comp-locations');
+      locWrap.innerHTML = '';
+      if (!data.locations.length) {
+        locWrap.innerHTML = '<div style="color:var(--accent2);font-family:monospace;font-size:12px;">No locations found for this customer.</div>';
+      } else {
+        data.locations.forEach(function (l) {
+          const row = document.createElement('div');
+          row.className = 'comp-loc-row';
+          row.style = 'display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;';
+          row.innerHTML = '<div><div style="font-weight:700;font-size:13px;">' + escHtml(l.address || l.name || ('Location #' + l.id)) + '</div>' +
+            (l.name && l.address ? '<div style="font-size:11px;color:var(--muted);font-family:monospace;">' + escHtml(l.name) + '</div>' : '') +
+            '</div><span style="font-size:11px;font-family:monospace;color:var(--muted);">#' + l.id + '</span>';
+          row.onclick = function () { compSelectLocation(l.id, row); };
+          locWrap.appendChild(row);
+        });
+        if (data.locations.length === 1) compSelectLocation(data.locations[0].id, locWrap.firstChild);
+      }
+      await compLoadPlans();
+      if (!document.getElementById('comp-start').value) document.getElementById('comp-start').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('comp-details').style.display = 'block';
+    } catch (err) {
+      setStatus('status-comp', '✗ ' + err.message, 'error');
+    }
+    btn.disabled = false; btn.textContent = 'Load Locations';
+  }
+
+  function compSelectLocation(id, row) {
+    _compState.locationId = id;
+    document.querySelectorAll('.comp-loc-row').forEach(function (r) { r.style.borderColor = 'var(--border)'; r.style.background = ''; });
+    if (row) { row.style.borderColor = '#4caf50'; row.style.background = 'rgba(76,175,80,0.08)'; }
+  }
+
+  async function compAddMembership() {
+    if (!_compState.customerId) { setStatus('status-comp-add', '⚠ Load a customer first', 'warn'); return; }
+    if (!_compState.locationId) { setStatus('status-comp-add', '⚠ Select a location', 'warn'); return; }
+    const membershipTypeId = document.getElementById('comp-plan').value;
+    const from = document.getElementById('comp-start').value;
+    const durationMonths = document.getElementById('comp-months').value || 12;
+    const planName = document.getElementById('comp-plan').selectedOptions[0].textContent;
+    const btn = document.getElementById('btn-comp-add');
+    btn.disabled = true; btn.textContent = '⏳ Adding...';
+    setStatus('status-comp-add', 'Creating membership in ServiceTitan...', 'info');
+    document.getElementById('comp-result').innerHTML = '';
+    try {
+      const res = await fetch('/api/fanclubs/add-membership', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId: _compState.customerId, locationId: _compState.locationId, membershipTypeId: membershipTypeId, from: from, durationMonths: durationMonths })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setStatus('status-comp-add', '', '');
+        document.getElementById('comp-result').innerHTML =
+          '<div style="background:rgba(76,175,80,0.1);border:1px solid #4caf50;border-radius:8px;padding:12px 14px;color:#cdeecf;font-size:13px;">✓ Membership created — <b>' +
+          escHtml(planName) + '</b>, ID ' + (data.membershipId || '?') + ' (' + data.from + ' → ' + data.to + ')</div>';
+        showToast('✓ Complimentary membership added');
+      } else {
+        setStatus('status-comp-add', '✗ Could not create membership', 'error');
+        document.getElementById('comp-result').innerHTML =
+          '<div style="background:rgba(255,71,87,0.1);border:1px solid var(--danger);border-radius:8px;padding:12px 14px;color:#ffd5d9;font-size:12px;font-family:monospace;word-break:break-word;">' +
+          escHtml(data.error || 'Unknown error') + '</div>';
+      }
+    } catch (err) {
+      setStatus('status-comp-add', '✗ ' + err.message, 'error');
+    }
+    btn.disabled = false; btn.textContent = '➕ Add Complimentary Membership';
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Timesheet — ServiceOps Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    /* ── GHS timesheet card ───────────────────────────────────────────────
+       Self-contained light "paper sheet" that sits inside the dark dashboard
+       shell. Colors are the Grounded brand palette: deep red, blue, navy,
+       bright red.
+       All classes are prefixed .ts- so nothing here leaks into the shell.
+       ─────────────────────────────────────────────────────────────────── */
+    :root {
+      --ghs-red-deep: #8A181A;
+      --ghs-blue:     #278CAE;
+      --ghs-navy:     #00354E;
+      --ghs-red:      #DD1F26;
+      --ghs-paper:    #FBFAF8;
+      --ghs-line:     #D8DEE3;
+      --ghs-line-strong: #B4BFC7;
+      --ghs-ink:      #00354E;
+      --ghs-ink-soft: #4A5A66;
+    }
+
+    .ts-shell {
+      max-width: 940px; margin: 0 auto 28px;
+      background: var(--ghs-paper);
+      border: 1px solid var(--ghs-line);
+      border-radius: 14px; overflow: hidden;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      color: var(--ghs-ink);
+      box-shadow: 0 1px 3px rgba(0,53,78,0.16), 0 8px 28px rgba(0,53,78,0.28);
+    }
+
+    .ts-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 20px 24px; background: var(--ghs-navy); color: #fff;
+      gap: 16px; flex-wrap: wrap;
+    }
+    .ts-brand-row { display: flex; align-items: center; gap: 12px; }
+    .ts-brand-name { font-size: 22px; font-weight: 800; letter-spacing: 3px; line-height: 1; }
+    .ts-brand-sub { font-size: 11px; letter-spacing: 1.5px; opacity: .72; margin-top: 3px; text-transform: uppercase; }
+    .ts-doc-title-wrap { display: flex; align-items: center; gap: 14px; }
+    .ts-doc-title { font-size: 15px; font-weight: 600; opacity: .92; }
+
+    .ts-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 20px; border: 1px solid;
+    }
+    .ts-pill-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .ts-pill.draft     { background:#FBF0E7; color:#9A5B1E; border-color:#EAD3B8; }
+    .ts-pill.draft     .ts-pill-dot { background:#C9821F; }
+    .ts-pill.processed { background:#E7F1EC; color:#1C6B45; border-color:#BFE0CD; }
+    .ts-pill.processed .ts-pill-dot { background:#1C6B45; }
+
+    /* Balance summary strip */
+    .ts-balances { display:flex; gap:14px; padding:14px 24px 4px; flex-wrap:wrap; }
+    .ts-bal-card {
+      flex:1; min-width:170px; background:#fff; border:1px solid var(--ghs-line);
+      border-radius:10px; padding:12px 14px;
+    }
+    .ts-bal-label { font-size:10px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--ghs-ink-soft); }
+    .ts-bal-value { font-size:26px; font-weight:800; color:var(--ghs-navy); letter-spacing:-.5px; margin-top:2px; }
+    .ts-bal-value.neg { color:var(--ghs-red); }
+    .ts-bal-sub { font-size:11px; color:var(--ghs-ink-soft); margin-top:2px; }
+    .ts-bal-card.uninit { border-style:dashed; border-color:var(--ghs-line-strong); background:#F7FAFB; }
+
+    .ts-id-row { display:flex; gap:16px; padding:14px 24px 8px; flex-wrap:wrap; }
+    .ts-field { display:flex; flex-direction:column; gap:6px; min-width:150px; }
+    .ts-field.grow { flex:2; }
+    .ts-field-label { font-size:11px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; color:var(--ghs-ink-soft); }
+
+    .ts-input {
+      font:inherit; color:var(--ghs-navy); background:#fff;
+      border:1px solid var(--ghs-line); border-radius:8px; padding:9px 11px;
+      outline:none; transition:border-color .12s, box-shadow .12s; width:100%; box-sizing:border-box;
+    }
+    .ts-input:focus { border-color:var(--ghs-blue); box-shadow:0 0 0 3px rgba(39,140,174,.15); }
+    .ts-input:disabled { background:#F4F5F6; color:var(--ghs-ink-soft); }
+
+    .ts-table-wrap { padding:8px 24px 4px; overflow-x:auto; }
+    .ts-table { width:100%; border-collapse:separate; border-spacing:0; min-width:640px; }
+    .ts-table th {
+      background:var(--ghs-navy); color:#fff; font-size:11px; font-weight:700;
+      letter-spacing:.5px; text-transform:uppercase; padding:9px 6px; text-align:center;
+      border-right:1px solid rgba(255,255,255,.12);
+    }
+    .ts-th-date { font-size:10px; font-weight:600; letter-spacing:0; text-transform:none; opacity:.82; margin-top:3px; }
+    .ts-th-type { text-align:left; padding-left:14px; border-top-left-radius:8px; min-width:108px; }
+    .ts-th-total { background:var(--ghs-red-deep); border-top-right-radius:8px; border-right:none; }
+    .ts-row-label {
+      font-size:13px; font-weight:600; color:var(--ghs-navy); padding:0 14px; background:#fff;
+      border-bottom:1px solid var(--ghs-line); border-left:1px solid var(--ghs-line); white-space:nowrap;
+    }
+    .ts-cell-td { padding:0; border-bottom:1px solid var(--ghs-line); border-left:1px solid var(--ghs-line); background:#fff; }
+    .ts-cell {
+      font:inherit; font-weight:600; text-align:center; color:var(--ghs-navy);
+      width:100%; box-sizing:border-box; border:none; outline:none; padding:11px 4px; background:transparent;
+    }
+    .ts-cell:focus { background:rgba(39,140,174,.10); box-shadow:inset 0 0 0 2px var(--ghs-blue); }
+    .ts-cell:disabled { color:var(--ghs-ink-soft); }
+    .ts-row-total {
+      text-align:center; font-weight:700; font-size:14px; color:var(--ghs-red-deep); background:#FCF6F6;
+      border-bottom:1px solid var(--ghs-line); border-left:1px solid var(--ghs-line-strong);
+      border-right:1px solid var(--ghs-line); min-width:62px;
+    }
+    .ts-row-total.neg-comp { color:var(--ghs-navy); background:#EEF3F6; }
+    .ts-totals-label {
+      font-size:12px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:#fff;
+      background:var(--ghs-navy); padding:10px 14px; border-bottom-left-radius:8px;
+    }
+    .ts-col-total { text-align:center; font-weight:700; font-size:14px; color:var(--ghs-navy); background:#EEF3F6; border-left:1px solid var(--ghs-line-strong); }
+    .ts-grand-total { text-align:center; font-weight:800; font-size:15px; color:#fff; background:var(--ghs-red-deep); border-bottom-right-radius:8px; }
+
+    .ts-lower { display:grid; grid-template-columns:1fr; gap:16px; padding:16px 24px 4px; }
+    .ts-comp-card { background:#F2F6F8; border:1px solid var(--ghs-line); border-radius:10px; padding:14px 16px 12px; }
+    .ts-comp-title { font-size:12px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--ghs-navy); margin-bottom:12px; }
+    .ts-comp-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    .ts-comp-stat { display:flex; flex-direction:column; gap:5px; }
+    .ts-comp-stat-label { font-size:10px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--ghs-ink-soft); }
+    .ts-comp-stat-hint { font-weight:500; text-transform:none; letter-spacing:0; opacity:.7; }
+    .ts-comp-value {
+      font-size:20px; font-weight:700; color:var(--ghs-navy); background:#fff; border:1px solid var(--ghs-line);
+      border-radius:7px; padding:6px 8px; text-align:center;
+    }
+    .ts-comp-value.emph { color:var(--ghs-red-deep); border-color:var(--ghs-red-deep); background:#FCF6F6; }
+    .ts-comp-value.neg { color:var(--ghs-red); }
+    .ts-comp-input {
+      font:inherit; font-size:20px; font-weight:700; text-align:center; color:var(--ghs-navy); background:#fff;
+      border:1px solid var(--ghs-line); border-radius:7px; padding:6px 8px; outline:none; width:100%; box-sizing:border-box;
+    }
+    .ts-comp-input:focus { border-color:var(--ghs-blue); box-shadow:0 0 0 3px rgba(39,140,174,.15); }
+    .ts-comp-input:disabled { background:#F4F5F6; }
+    .ts-comp-formula { font-size:11px; color:var(--ghs-ink-soft); margin-top:10px; font-style:italic; }
+
+    .ts-notes-card { background:#fff; border:1px solid var(--ghs-line); border-radius:10px; padding:14px 16px; display:flex; flex-direction:column; }
+    .ts-notes-label { font-size:12px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--ghs-navy); margin-bottom:8px; }
+    .ts-notes {
+      font:inherit; color:var(--ghs-navy); border:1px solid var(--ghs-line); border-radius:8px; padding:10px 12px;
+      outline:none; resize:vertical; min-height:84px; flex:1; box-sizing:border-box;
+    }
+    .ts-notes:focus { border-color:var(--ghs-blue); box-shadow:0 0 0 3px rgba(39,140,174,.15); }
+    .ts-notes:disabled { background:#F4F5F6; }
+
+    .ts-action-bar { display:flex; justify-content:space-between; align-items:center; padding:16px 24px 20px; margin-top:8px; border-top:1px solid var(--ghs-line); flex-wrap:wrap; gap:12px; }
+    .ts-saved-note { font-size:12px; color:var(--ghs-ink-soft); }
+    .ts-action-btns { display:flex; gap:10px; }
+    .ts-btn { font:inherit; font-weight:700; font-size:14px; padding:10px 20px; border-radius:9px; cursor:pointer; border:1px solid transparent; transition:transform .06s, filter .12s, background .12s; }
+    .ts-btn:active { transform:translateY(1px); }
+    .ts-btn:disabled { opacity:.5; cursor:not-allowed; }
+    .ts-btn-primary { background:var(--ghs-red); color:#fff; }
+    .ts-btn-primary:hover:not(:disabled) { filter:brightness(1.06); }
+    .ts-btn-ghost { background:#fff; color:var(--ghs-navy); border-color:var(--ghs-line-strong); }
+    .ts-btn-ghost:hover:not(:disabled) { background:#F4F7F9; }
+
+    /* History accordion */
+    .ts-history { max-width:940px; margin:0 auto 40px; }
+    .ts-history-title { font-size:12px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; color:var(--muted); margin:8px 4px 12px; }
+    .ts-acc-item { background:var(--ghs-paper); border:1px solid var(--ghs-line); border-radius:10px; margin-bottom:10px; overflow:hidden; box-shadow:0 4px 14px rgba(0,53,78,.18); }
+    .ts-acc-head { display:flex; align-items:center; gap:14px; padding:14px 18px; cursor:pointer; color:var(--ghs-navy); }
+    .ts-acc-head:hover { background:#fff; }
+    .ts-acc-period { font-weight:700; font-size:14px; }
+    .ts-acc-meta { font-size:12px; color:var(--ghs-ink-soft); }
+    .ts-acc-spacer { flex:1; }
+    .ts-acc-hours { font-size:13px; font-weight:700; color:var(--ghs-red-deep); }
+    .ts-acc-caret { color:var(--ghs-ink-soft); transition:transform .15s; }
+    .ts-acc-item.open .ts-acc-caret { transform:rotate(90deg); }
+    .ts-acc-body { display:none; padding:0 18px 16px; border-top:1px solid var(--ghs-line); }
+    .ts-acc-item.open .ts-acc-body { display:block; }
+    .ts-acc-grid-wrap { overflow-x:auto; margin-top:12px; }
+    .ts-acc-mini { width:100%; border-collapse:collapse; min-width:560px; font-size:12px; }
+    .ts-acc-mini th, .ts-acc-mini td { border:1px solid var(--ghs-line); padding:5px 7px; text-align:center; color:var(--ghs-navy); }
+    .ts-acc-mini th { background:#EEF3F6; font-weight:700; }
+    .ts-acc-mini td.rl { text-align:left; font-weight:600; }
+    .ts-acc-applied { display:flex; gap:18px; flex-wrap:wrap; margin-top:12px; font-size:12px; color:var(--ghs-ink-soft); }
+    .ts-acc-applied strong { color:var(--ghs-navy); }
+    .ts-acc-actions { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+    .ts-empty { text-align:center; padding:26px; color:var(--ghs-ink-soft); background:var(--ghs-paper); border:1px dashed var(--ghs-line-strong); border-radius:10px; font-size:13px; }
+
+    .ts-page-head { max-width:940px; margin:0 auto; padding:6px 4px 14px; }
+    .ts-page-head h1 { font-family:var(--font-display, 'Space Grotesk'), system-ui; font-size:24px; color:var(--text); margin:0; }
+    .ts-page-head p { color:var(--muted); font-size:13px; margin:4px 0 0; }
+
+    /* ── Print / Save-as-PDF ──────────────────────────────────────────────
+       Print just the sheet itself: drop the dashboard nav, the action
+       buttons, the history accordion, and any toast. Force color rendering
+       so the navy header + red totals survive (otherwise white-on-white).
+       ─────────────────────────────────────────────────────────────────── */
+    /* Live time clock panel */
+    .ts-clock { margin:14px 24px 0; background:#fff; border:1px solid var(--ghs-line); border-radius:12px; padding:16px 18px; }
+    .ts-clock-row { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+    .ts-clock-status { display:flex; flex-direction:column; gap:3px; min-width:190px; }
+    .ts-clock-state { font-size:12px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--ghs-ink-soft); }
+    .ts-clock-timer { font-size:32px; font-weight:800; color:var(--ghs-navy); letter-spacing:-.5px; font-variant-numeric:tabular-nums; line-height:1.05; }
+    .ts-clock-sub { font-size:12px; color:var(--ghs-ink-soft); }
+    .ts-clock-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+    .ts-clock-dot.on { background:#1C6B45; box-shadow:0 0 8px #1C6B45; }
+    .ts-clock-dot.brk { background:#E8A838; box-shadow:0 0 8px #E8A838; }
+    .ts-clock-dot.off { background:var(--ghs-line-strong); }
+    .ts-clock-btns { display:flex; gap:10px; margin-left:auto; flex-wrap:wrap; }
+    .ts-clk-btn { font:inherit; font-weight:700; font-size:15px; padding:12px 22px; border-radius:10px; cursor:pointer; border:1px solid transparent; color:#fff; transition:filter .12s, transform .06s; }
+    .ts-clk-btn:active { transform:translateY(1px); }
+    .ts-clk-btn:hover { filter:brightness(1.06); }
+    .ts-clk-in    { background:#1C6B45; }
+    .ts-clk-out   { background:var(--ghs-red); }
+    .ts-clk-break { background:#E8A838; }
+    .ts-clk-end   { background:#278CAE; }
+    .ts-clk-at    { background:#fff; color:var(--ghs-navy); border:1px solid var(--ghs-line-strong); font-weight:600; }
+    .ts-clk-at:hover { filter:none; background:#F4F7F9; }
+    .ts-clock-links { display:flex; gap:14px; margin-top:12px; flex-wrap:wrap; align-items:center; }
+    .ts-clock-link { background:none; border:none; color:var(--ghs-blue); font:inherit; font-size:12.5px; cursor:pointer; padding:0; text-decoration:underline; }
+    .ts-clock-panel { margin-top:12px; padding:12px 14px; background:#F2F6F8; border:1px solid var(--ghs-line); border-radius:9px; display:none; }
+    .ts-clock-panel.open { display:block; }
+    .ts-clock-panel .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+    .ts-clock-panel label { display:flex; flex-direction:column; gap:4px; font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--ghs-ink-soft); }
+    .ts-clock-panel input { font:inherit; border:1px solid var(--ghs-line); border-radius:7px; padding:7px 9px; color:var(--ghs-navy); }
+    .ts-clock-hint { font-size:12px; color:var(--ghs-ink-soft); margin-top:6px; }
+
+    /* Overtime control + suggestion banner */
+    .ts-ot-row { padding:6px 24px 0; }
+    .ts-ot-check { display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--ghs-navy); cursor:pointer; }
+    .ts-ot-check input { width:16px; height:16px; accent-color:var(--ghs-blue); cursor:pointer; }
+    .ts-ot-banner { margin:10px 24px 0; padding:10px 14px; border-radius:8px; font-size:13px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .ts-ot-banner .ts-ot-msg { flex:1; min-width:180px; }
+    .ts-ot-banner.warn { background:#FBF0E7; border:1px solid #EAD3B8; color:#9A5B1E; }
+    .ts-ot-banner.ok   { background:#E7F1EC; border:1px solid #BFE0CD; color:#1C6B45; }
+    .ts-ot-banner.info { background:#EEF3F6; border:1px solid var(--ghs-line); color:var(--ghs-navy); }
+    .ts-ot-banner .ts-btn { padding:7px 14px; font-size:13px; }
+    .ts-grand-total.over { background:var(--ghs-red); }
+
+    /* Over-40 decision modal (shown when processing an unrolled week) */
+    .ts-modal-backdrop {
+      display:none; position:fixed; inset:0; background:rgba(0,20,32,.55);
+      align-items:center; justify-content:center; padding:20px; z-index:60;
+    }
+    .ts-modal-backdrop.open { display:flex; }
+    .ts-modal {
+      background:#fff; border:1px solid var(--ghs-line); border-radius:14px;
+      max-width:460px; width:100%; padding:22px 24px;
+      font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; color:var(--ghs-ink);
+      box-shadow:0 20px 60px rgba(0,53,78,.35);
+    }
+    .ts-modal h3 { margin:0 0 8px; font-size:18px; color:var(--ghs-navy); }
+    .ts-modal p { margin:0 0 18px; font-size:14px; color:var(--ghs-ink-soft); line-height:1.5; }
+    .ts-modal p strong { color:var(--ghs-navy); }
+    .ts-modal-actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+    .ts-modal-actions .ts-btn { padding:10px 16px; font-size:14px; }
+
+    .ts-print-meta { display:none; }
+
+    /* ── One-page print ───────────────────────────────────────────────────
+       Trim to the sheet and compress spacing/type so a full week + comp
+       tracker + notes fit on a single Letter page. Screen-only chrome (nav,
+       buttons, history, OT checkbox/banner, toast) is dropped.
+       ─────────────────────────────────────────────────────────────────── */
+    @media print {
+      @page { size: letter portrait; margin: 9mm; }
+      /* Kill the 100vh body min-height + app padding — otherwise the viewport
+         height spills into a blank second page. */
+      html, body { background:#fff !important; min-height:0 !important; height:auto !important; }
+      .app { padding:0 !important; margin:0 !important; min-height:0 !important; }
+      .nav-bar, #toast, .ts-history, .ts-action-bar,
+      .ts-ot-row, #ts-ot-banner, .ts-page-head, .ts-clock,
+      .ts-modal-backdrop { display:none !important; }
+
+      .ts-shell {
+        max-width:none; margin:0; border:1px solid var(--ghs-line);
+        box-shadow:none !important; break-inside:avoid; page-break-inside:avoid;
+      }
+      .ts-shell, .ts-shell * {
+        -webkit-print-color-adjust:exact !important;
+        print-color-adjust:exact !important;
+      }
+
+      .ts-print-meta {
+        display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap;
+        padding:8px 16px; font-size:11.5px; color:#00354E;
+        border-bottom:1px solid var(--ghs-line);
+      }
+      .ts-print-meta strong { font-weight:700; }
+
+      /* Compact spacing + type so everything lands on one page. */
+      .ts-header { padding:10px 16px; }
+      .ts-brand-name, .ts-doc-title { font-size:14px; }
+      .ts-id-row { padding:8px 16px 2px; gap:10px; }
+      .ts-input { padding:5px 8px; }
+      .ts-table-wrap { padding:4px 16px 2px; }
+      .ts-table th { padding:5px 4px; font-size:10px; }
+      .ts-th-date { font-size:9px; margin-top:1px; }
+      .ts-row-label { padding:0 10px; font-size:11px; }
+      .ts-cell { padding:5px 3px; }
+      .ts-row-total, .ts-col-total, .ts-grand-total, .ts-totals-label { font-size:11px; padding:4px 6px; }
+      .ts-lower { padding:8px 16px 2px; gap:10px; }
+      .ts-comp-card, .ts-notes-card { padding:8px 12px; }
+      .ts-comp-title, .ts-notes-label { margin-bottom:6px; }
+      .ts-comp-value, .ts-comp-input { font-size:15px; padding:4px 6px; }
+      .ts-comp-formula { margin-top:6px; }
+      .ts-notes { min-height:40px; }
+
+      /* Inputs render as clean cells on paper — no focus rings / editable look. */
+      .ts-input, .ts-cell, .ts-comp-input, .ts-notes {
+        border-color:var(--ghs-line) !important; box-shadow:none !important; background:#fff !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Nav: built by /js/shared.js — do not hand-edit, it gets wiped on load. -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+
+  <div class="ts-page-head">
+    <h1>My Timesheet</h1>
+    <p>Enter your weekly hours, then save a draft or process the period.</p>
+  </div>
+
+  <!-- ── The editable sheet ─────────────────────────────────────────── -->
+  <div class="ts-shell">
+    <header class="ts-header">
+      <div class="ts-doc-title-wrap">
+        <div class="ts-doc-title">Administrative Time Sheet</div>
+        <span id="ts-status-pill" class="ts-pill draft"><span class="ts-pill-dot"></span>Draft</span>
+      </div>
+    </header>
+
+    <!-- Print-only meta: employee full name + printed-on date. Hidden on
+         screen, populated by JS just before the print dialog opens. -->
+    <div class="ts-print-meta" id="ts-print-meta"></div>
+
+    <!-- Live time clock (screen only) -->
+    <div class="ts-clock" id="ts-clock"><!-- rendered by JS --></div>
+
+    <!-- Identity + period -->
+    <section class="ts-id-row">
+      <div class="ts-field grow">
+        <label class="ts-field-label">Employee</label>
+        <input class="ts-input" id="ts-employee" disabled placeholder="Loading…" />
+      </div>
+      <div class="ts-field">
+        <label class="ts-field-label">Pay Period Start (Wed)</label>
+        <input class="ts-input" id="ts-start" type="date" />
+      </div>
+      <div class="ts-field">
+        <label class="ts-field-label">Pay Period End (Tue)</label>
+        <input class="ts-input" id="ts-end" type="date" />
+      </div>
+    </section>
+
+    <!-- Over-40 → comp suggestion banner -->
+    <div id="ts-ot-banner" class="ts-ot-banner info" style="display:none;"></div>
+
+    <!-- Grid -->
+    <div class="ts-table-wrap">
+      <table class="ts-table">
+        <thead>
+          <tr>
+            <th class="ts-th-type">Hours</th>
+            <th><div class="ts-th-day">Wed</div><div class="ts-th-date" id="ts-date-0"></div></th>
+            <th><div class="ts-th-day">Thurs</div><div class="ts-th-date" id="ts-date-1"></div></th>
+            <th><div class="ts-th-day">Friday</div><div class="ts-th-date" id="ts-date-2"></div></th>
+            <th><div class="ts-th-day">Saturday</div><div class="ts-th-date" id="ts-date-3"></div></th>
+            <th><div class="ts-th-day">Sunday</div><div class="ts-th-date" id="ts-date-4"></div></th>
+            <th><div class="ts-th-day">Monday</div><div class="ts-th-date" id="ts-date-5"></div></th>
+            <th><div class="ts-th-day">Tuesday</div><div class="ts-th-date" id="ts-date-6"></div></th>
+            <th class="ts-th-total">Total</th>
+          </tr>
+        </thead>
+        <tbody id="ts-grid-body"><!-- filled by JS --></tbody>
+      </table>
+    </div>
+
+    <!-- Comp tracker + notes -->
+    <div class="ts-lower">
+      <section class="ts-comp-card">
+        <div class="ts-comp-title">Comp Time Tracking</div>
+        <div class="ts-comp-grid">
+          <div class="ts-comp-stat">
+            <div class="ts-comp-stat-label" id="ts-banked-label">Banked</div>
+            <input class="ts-comp-input" id="ts-banked" inputmode="decimal" placeholder="0" disabled />
+          </div>
+          <div class="ts-comp-stat">
+            <div class="ts-comp-stat-label">Earned <span class="ts-comp-stat-hint">· rolled over 40</span></div>
+            <div class="ts-comp-value" id="ts-earned">—</div>
+          </div>
+          <div class="ts-comp-stat">
+            <div class="ts-comp-stat-label">Used <span class="ts-comp-stat-hint">· comp row</span></div>
+            <div class="ts-comp-value" id="ts-comp-used">—</div>
+          </div>
+          <div class="ts-comp-stat">
+            <div class="ts-comp-stat-label">Left</div>
+            <div class="ts-comp-value" id="ts-left">—</div>
+          </div>
+        </div>
+        <div class="ts-comp-formula">
+          Left = Banked + Earned − Used · tracked 1:1 · earn by rolling hours over 40,
+          use by entering comp hours on a day
+        </div>
+
+        <!-- P-Law starting field, only shown on the very first sheet -->
+        <div id="ts-plaw-init-wrap" style="display:none; margin-top:14px;">
+          <div class="ts-comp-stat-label" style="margin-bottom:5px;">
+            P-Law Starting Balance <span class="ts-comp-stat-hint">· set once, then counts down</span>
+          </div>
+          <input class="ts-comp-input" id="ts-plaw-start" inputmode="decimal" placeholder="0" style="max-width:140px;" />
+        </div>
+      </section>
+
+      <section class="ts-notes-card">
+        <div class="ts-notes-label">Notes</div>
+        <textarea class="ts-notes" id="ts-notes" placeholder="Anything payroll should know about this period…"></textarea>
+      </section>
+    </div>
+
+    <!-- Actions -->
+    <footer class="ts-action-bar">
+      <div class="ts-saved-note" id="ts-saved-note">Not yet saved</div>
+      <div class="ts-action-btns" id="ts-action-btns">
+        <button class="ts-btn ts-btn-ghost" id="ts-print-btn" type="button">Print / Save PDF</button>
+        <button class="ts-btn ts-btn-ghost" id="ts-new-btn" type="button" style="display:none;">New week</button>
+        <button class="ts-btn ts-btn-ghost" id="ts-save-btn" type="button">Save Draft</button>
+        <button class="ts-btn ts-btn-primary" id="ts-process-btn" type="button">Process Timesheet</button>
+        <button class="ts-btn ts-btn-primary" id="ts-reopen-btn" type="button" style="display:none;">Reopen for edits</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ── History accordion ──────────────────────────────────────────── -->
+  <div class="ts-history">
+    <div class="ts-history-title">Pay Period History</div>
+    <div id="ts-history-list"><div class="ts-empty">No periods yet.</div></div>
+  </div>
+
+</div>
+
+<!-- Over-40 decision, shown when processing a week that hasn't been rolled -->
+<div class="ts-modal-backdrop" id="ts-roll-modal">
+  <div class="ts-modal">
+    <h3>This week is over 40 hours</h3>
+    <p id="ts-roll-msg"></p>
+    <div class="ts-modal-actions">
+      <button type="button" class="ts-btn ts-btn-ghost" id="roll-cancel">Cancel</button>
+      <button type="button" class="ts-btn ts-btn-ghost" id="roll-payot">Pay as overtime</button>
+      <button type="button" class="ts-btn ts-btn-primary" id="roll-comp">Roll into comp</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+(function () {
+  // ── Static config (must mirror the server's timesheetBalanceService) ──
+  const ROWS = [
+    { key: "regular",  label: "Regular" },
+    { key: "overtime", label: "Overtime" },
+    { key: "pto",      label: "PTO Time" },
+    { key: "plaw",     label: "P-Law Time" },
+    { key: "holiday",  label: "Holiday" },
+    { key: "comp",     label: "Comp Time" },
+  ];
+  const DAYS = [
+    { key: "wed", label: "Wed" }, { key: "thu", label: "Thurs" },
+    { key: "fri", label: "Friday" }, { key: "sat", label: "Saturday" },
+    { key: "sun", label: "Sunday" }, { key: "mon", label: "Monday" },
+    { key: "tue", label: "Tuesday" },
+  ];
+
+  // ── State ─────────────────────────────────────────────────────────────
+  const state = {
+    employee: null,          // { id, name, email }
+    balances: null,          // { comp, plaw, compInitialized, plawInitialized }
+    currentId: null,         // id of the timesheet being edited (null = unsaved new)
+    status: "draft",         // draft | processed
+    otBanked: 0,             // hours over 40 rolled into comp this week
+    lastSaved: null,
+    clock: { active: null, timer: null },  // live time clock
+  };
+
+  // ── Helpers ──────────────────────────────────────────────────────────
+  const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
+  const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+  const fmt = (n) => {
+    n = round2(n);
+    if (n === 0) return "—";
+    return Number.isInteger(n) ? String(n) : String(n);
+  };
+  const numericOnly = (v) => (v === "" || /^\d*\.?\d*$/.test(v));
+
+  function isoLocal(d) {
+    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  function mostRecentWednesday(d) {
+    const x = new Date(d); const diff = (x.getDay() - 3 + 7) % 7; x.setDate(x.getDate() - diff); return x;
+  }
+  function addDaysIso(iso, n) {
+    const x = new Date(iso + "T00:00:00"); x.setDate(x.getDate() + n); return isoLocal(x);
+  }
+  function fmtPeriod(startIso, endIso) {
+    const opt = { month: "short", day: "numeric" };
+    try {
+      const s = new Date(startIso + "T00:00:00").toLocaleDateString(undefined, opt);
+      const e = endIso ? new Date(endIso + "T00:00:00").toLocaleDateString(undefined, { ...opt, year: "numeric" }) : "";
+      return e ? `${s} – ${e}` : s;
+    } catch (_) { return startIso; }
+  }
+
+  // ── DOM refs ─────────────────────────────────────────────────────────
+  const $ = (id) => document.getElementById(id);
+  const gridBody = $("ts-grid-body");
+  const startEl = $("ts-start"), endEl = $("ts-end");
+  const bankedEl = $("ts-banked"), compUsedEl = $("ts-comp-used"), plawStartEl = $("ts-plaw-start");
+  // NOTE: compUsedEl is now a read-only display — comp "Used" is derived from
+  // the positive hours entered on the Comp Time row, not typed separately.
+  const notesEl = $("ts-notes");
+
+  // ── Build the grid inputs once ───────────────────────────────────────
+  function buildGrid() {
+    gridBody.innerHTML = "";
+    for (const r of ROWS) {
+      const tr = document.createElement("tr");
+      const rl = document.createElement("td");
+      rl.className = "ts-row-label"; rl.textContent = r.label;
+      tr.appendChild(rl);
+      for (const d of DAYS) {
+        const td = document.createElement("td"); td.className = "ts-cell-td";
+        const inp = document.createElement("input");
+        inp.className = "ts-cell"; inp.inputMode = "decimal";
+        inp.dataset.row = r.key; inp.dataset.day = d.key;
+        inp.setAttribute("aria-label", `${r.label} ${d.label}`);
+        inp.addEventListener("input", (e) => {
+          if (!numericOnly(e.target.value)) { e.target.value = e.target.value.slice(0, -1); return; }
+          recompute();
+        });
+        // On blur, apply the daily overtime rule (Regular caps at 8/day, the
+        // rest moves to Overtime). Done on change (not per keystroke) so typing
+        // a value like "10.5" isn't cut off mid-entry.
+        inp.addEventListener("change", () => { normalizeDailyOvertime(); recompute(); });
+        td.appendChild(inp); tr.appendChild(td);
+      }
+      const rt = document.createElement("td");
+      rt.className = "ts-row-total"; rt.dataset.rowtotal = r.key; rt.textContent = "—";
+      tr.appendChild(rt);
+      gridBody.appendChild(tr);
+    }
+    // Totals row
+    const tr = document.createElement("tr");
+    const tl = document.createElement("td"); tl.className = "ts-totals-label"; tl.textContent = "Totals";
+    tr.appendChild(tl);
+    for (const d of DAYS) {
+      const td = document.createElement("td"); td.className = "ts-col-total"; td.dataset.coltotal = d.key; td.textContent = "—";
+      tr.appendChild(td);
+    }
+    const gt = document.createElement("td"); gt.className = "ts-grand-total"; gt.id = "ts-grand-total"; gt.textContent = "—";
+    tr.appendChild(gt);
+    gridBody.appendChild(tr);
+  }
+
+  function cellInput(row, day) {
+    return gridBody.querySelector(`input[data-row="${row}"][data-day="${day}"]`);
+  }
+
+  function readGrid() {
+    const g = {};
+    for (const r of ROWS) { g[r.key] = {}; for (const d of DAYS) g[r.key][d.key] = cellInput(r.key, d.key).value || ""; }
+    return g;
+  }
+
+  function writeGrid(grid) {
+    for (const r of ROWS) for (const d of DAYS) {
+      const v = grid && grid[r.key] ? (grid[r.key][d.key] ?? "") : "";
+      cellInput(r.key, d.key).value = v === 0 ? "" : String(v);
+    }
+  }
+
+  // Stamp each day column header with its calendar date (Wed = period start,
+  // then +1 day per column). Recomputed whenever the start date changes.
+  function updateDayDates() {
+    const start = startEl.value;
+    for (let i = 0; i < 7; i++) {
+      const el = document.getElementById("ts-date-" + i);
+      if (!el) continue;
+      if (!start) { el.textContent = ""; continue; }
+      const d = new Date(addDaysIso(start, i) + "T00:00:00");
+      el.textContent = isNaN(d) ? "" : d.toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
+    }
+  }
+
+  const WEEK = 40; // standard week; hours beyond this can roll into comp
+
+  function rawGrandTotal() {
+    let s = 0;
+    for (const r of ROWS) for (const d of DAYS) s += num(cellInput(r.key, d.key).value);
+    return round2(s);
+  }
+
+  function confirmAndProcess() {
+    if (!confirm("Process this timesheet? It locks the period and updates your balances. You can reopen it for corrections. A printable copy will open after processing.")) return;
+    processSheet();
+  }
+
+  // Ask what to do with hours over 40 at process time. Three outcomes: roll the
+  // extra into comp, pay it as overtime, or back out and keep editing.
+  function openRollModal(rawGrand, overage) {
+    const m = $("ts-roll-modal");
+    $("ts-roll-msg").innerHTML =
+      `This week totals <strong>${fmt(rawGrand)} hours</strong> — <strong>${fmt(overage)}</strong> over 40.<br><br>` +
+      `Roll the extra into comp time (the week then pays 40), or leave it to be paid as overtime?`;
+    const close = () => m.classList.remove("open");
+    $("roll-cancel").onclick = close;
+    $("roll-comp").onclick = () => { close(); state.otBanked = overage; recompute(); confirmAndProcess(); };
+    $("roll-payot").onclick = () => { close(); state.otBanked = 0; recompute(); confirmAndProcess(); };
+    m.classList.add("open");
+  }
+
+  // Daily overtime split (client mirror of the server rule): per day, Regular
+  // caps at 8 and the remainder goes to Overtime. Total-preserving + idempotent.
+  function normalizeDailyOvertime() {
+    for (const d of DAYS) {
+      const rEl = cellInput("regular", d.key);
+      const oEl = cellInput("overtime", d.key);
+      const worked = round2(num(rEl.value) + num(oEl.value));
+      const reg = Math.min(worked, 8);
+      const ot = round2(Math.max(0, worked - 8));
+      rEl.value = reg === 0 ? "" : String(round2(reg));
+      oEl.value = ot === 0 ? "" : String(ot);
+    }
+  }
+
+  // ── Live recompute of totals + comp tracker ──────────────────────────
+  function recompute() {
+    updateDayDates();
+
+    const rowTotals = {};
+    for (const r of ROWS) {
+      let sum = 0;
+      for (const d of DAYS) sum += num(cellInput(r.key, d.key).value);
+      rowTotals[r.key] = round2(sum);
+    }
+    // Per-day column totals + the raw week total.
+    let rawGrand = 0;
+    for (const d of DAYS) {
+      let sum = 0;
+      for (const r of ROWS) sum += num(cellInput(r.key, d.key).value);
+      rawGrand += sum;
+      gridBody.querySelector(`[data-coltotal="${d.key}"]`).textContent = fmt(sum);
+    }
+    rawGrand = round2(rawGrand);
+
+    // Weekly roll-over: hours above 40 can be banked to comp. `otBanked` is set
+    // by the banner's Apply button; clamp it to the actual overage so a stale
+    // value can't over-bank a week that has since shrunk.
+    const overage = round2(Math.max(0, rawGrand - WEEK));
+    state.otBanked = Math.min(Math.max(0, round2(state.otBanked)), overage);
+    const otB = state.otBanked;
+
+    // Row totals — the comp row carries the banked hours as a negative, which
+    // is what pulls the week's payable total back down to 40.
+    for (const r of ROWS) {
+      const disp = r.key === "comp" ? round2(rowTotals[r.key] - otB) : rowTotals[r.key];
+      const cell = gridBody.querySelector(`[data-rowtotal="${r.key}"]`);
+      cell.textContent = fmt(disp);
+      if (r.key === "comp") cell.classList.toggle("neg-comp", disp < 0);
+    }
+
+    // Grand total = payable hours (raw − banked). Lands on 40 once banked.
+    $("ts-grand-total").textContent = fmt(round2(rawGrand - otB));
+
+    // Comp tracker — comp is EARNED by rolling hours over 40 into the bank, and
+    // USED by entering positive hours on the Comp Time row (comp taken as leave
+    // that day, which draws straight out of the bank).
+    const earned = otB;
+    const used = rowTotals.comp;
+    let banked, left;
+    if (state.status === "processed") {
+      // The running balance ALREADY reflects this processed week, so "Left" is
+      // that balance and "Banked" (carried-in) is derived by backing this
+      // week's net out of it — never add this week's comp on top again.
+      left = round2(num(state.balances ? state.balances.comp : 0));
+      banked = round2(left - (earned - used));
+      bankedEl.value = fmt(banked) === "—" ? "0" : String(banked);
+    } else {
+      const inited = state.balances && state.balances.compInitialized;
+      banked = inited ? num(state.balances.comp) : num(bankedEl.value);
+      left = round2(banked + earned - used);
+    }
+    $("ts-earned").textContent = fmt(earned);
+    compUsedEl.textContent = fmt(used);
+    const leftEl = $("ts-left");
+    leftEl.textContent = fmt(left);
+    leftEl.classList.toggle("neg", left < 0);
+
+    updatePlawBalanceCard(rowTotals.plaw);
+    renderOtBanner(rawGrand, overage);
+  }
+
+  function mkInlineBtn(label, fn) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "ts-btn ts-btn-ghost"; b.textContent = label;
+    b.addEventListener("click", fn);
+    return b;
+  }
+
+  // Over-40 → comp suggestion. Banking is optional: ignore it and the week
+  // simply processes as paid overtime.
+  function renderOtBanner(rawGrand, overage) {
+    const banner = $("ts-ot-banner");
+    if (!banner) return;
+    const hide = () => { banner.style.display = "none"; };
+
+    if (state.status === "processed") {
+      if (state.otBanked > 0) {
+        banner.style.display = "flex"; banner.className = "ts-ot-banner ok";
+        banner.innerHTML = `<span class="ts-ot-msg">${fmt(state.otBanked)} hr(s) over 40 rolled into comp — week paid at 40.</span>`;
+      } else if (rawGrand > WEEK) {
+        banner.style.display = "flex"; banner.className = "ts-ot-banner info";
+        banner.innerHTML = `<span class="ts-ot-msg">Week totals ${fmt(rawGrand)} hr(s) — overtime paid, nothing rolled to comp.</span>`;
+      } else hide();
+      return;
+    }
+
+    if (overage <= 0) { hide(); return; }
+
+    if (state.otBanked >= overage && state.otBanked > 0) {
+      banner.style.display = "flex"; banner.className = "ts-ot-banner ok";
+      banner.innerHTML = `<span class="ts-ot-msg">Rolled <strong>${fmt(state.otBanked)}</strong> hr(s) over 40 into comp — week now pays 40.</span>`;
+      banner.appendChild(mkInlineBtn("Undo", () => { state.otBanked = 0; recompute(); }));
+    } else {
+      banner.style.display = "flex"; banner.className = "ts-ot-banner warn";
+      banner.innerHTML = `<span class="ts-ot-msg">This week totals <strong>${fmt(rawGrand)}</strong> hr(s) — <strong>${fmt(overage)}</strong> over 40. Roll the extra into comp, or leave it to be paid as overtime.</span>`;
+      banner.appendChild(mkInlineBtn(`Roll ${fmt(overage)} into comp`, () => { state.otBanked = overage; recompute(); }));
+    }
+  }
+
+  // Print a specific pay period: load it into the sheet (so it uses the exact
+  // same @media print layout as the main sheet), then open the print / Save-as-
+  // PDF dialog. Every period comes out in the identical controlled style.
+  function printPeriod(p) {
+    loadIntoEditor(p);
+    fillPrintMeta();
+    setTimeout(() => window.print(), 350);
+  }
+
+  // ── Balance summary strip ────────────────────────────────────────────
+  // The top Comp/P-Law summary cards were removed per request; this is now a
+  // no-op guard so callers don't need to change. Balances still drive the
+  // comp tracker (Banked/Left) and the P-Law starting field below.
+  function renderBalances() {
+    const wrap = $("ts-balances");
+    if (!wrap) return;
+    const b = state.balances || { comp: 0, plaw: 0, compInitialized: false, plawInitialized: false };
+    const compCard = b.compInitialized
+      ? `<div class="ts-bal-card"><div class="ts-bal-label">Comp Time Balance</div>
+           <div class="ts-bal-value ${b.comp < 0 ? "neg" : ""}">${fmt(b.comp)}</div>
+           <div class="ts-bal-sub">hours banked, carried in</div></div>`
+      : `<div class="ts-bal-card uninit"><div class="ts-bal-label">Comp Time Balance</div>
+           <div class="ts-bal-value">—</div>
+           <div class="ts-bal-sub">set your starting "Banked" below on this first sheet</div></div>`;
+    const plawCard = b.plawInitialized
+      ? `<div class="ts-bal-card" id="ts-plaw-card"><div class="ts-bal-label">P-Law Remaining</div>
+           <div class="ts-bal-value" id="ts-plaw-value">${fmt(b.plaw)}</div>
+           <div class="ts-bal-sub" id="ts-plaw-sub">frontloaded — counts down</div></div>`
+      : `<div class="ts-bal-card uninit" id="ts-plaw-card"><div class="ts-bal-label">P-Law Remaining</div>
+           <div class="ts-bal-value" id="ts-plaw-value">—</div>
+           <div class="ts-bal-sub" id="ts-plaw-sub">set your starting balance below on this first sheet</div></div>`;
+    wrap.innerHTML = compCard + plawCard;
+  }
+
+  function updatePlawBalanceCard(plawUsedThisWeek) {
+    const b = state.balances; if (!b) return;
+    const valEl = $("ts-plaw-value"), subEl = $("ts-plaw-sub");
+    if (!valEl) return;
+    if (b.plawInitialized) {
+      const proj = round2(num(b.plaw) - num(plawUsedThisWeek));
+      valEl.textContent = fmt(b.plaw);
+      valEl.classList.toggle("neg", b.plaw < 0);
+      subEl.textContent = plawUsedThisWeek > 0 ? `using ${fmt(plawUsedThisWeek)} → ${fmt(proj)} after processing` : "frontloaded — counts down";
+    } else {
+      const start = num(plawStartEl.value);
+      const proj = round2(start - num(plawUsedThisWeek));
+      valEl.textContent = start ? fmt(proj) : "—";
+      subEl.textContent = start ? `start ${fmt(start)} − ${fmt(plawUsedThisWeek)} used this week` : "set your starting balance below on this first sheet";
+    }
+  }
+
+  // ── Init-field visibility (first sheet vs later) ─────────────────────
+  function applyInitFieldsVisibility() {
+    const b = state.balances || {};
+    // Comp "Banked": editable only when not yet initialized. Once initialized
+    // it shows the carried-in running balance, read-only.
+    if (b.compInitialized) {
+      bankedEl.disabled = true;
+      bankedEl.value = fmt(b.comp) === "—" ? "0" : String(round2(b.comp));
+      $("ts-banked-label").textContent = "Banked";
+    } else {
+      bankedEl.disabled = state.status === "processed";
+      $("ts-banked-label").innerHTML = 'Banked <span class="ts-comp-stat-hint">· starting</span>';
+    }
+    // P-Law starting field only on the first-ever sheet.
+    $("ts-plaw-init-wrap").style.display = b.plawInitialized ? "none" : "block";
+  }
+
+  // ── Lock / unlock the sheet based on status ──────────────────────────
+  function setLocked(locked) {
+    gridBody.querySelectorAll("input.ts-cell").forEach((el) => (el.disabled = locked));
+    startEl.disabled = locked; endEl.disabled = locked;
+    notesEl.disabled = locked;
+    plawStartEl.disabled = locked;
+    if (state.balances && !state.balances.compInitialized) bankedEl.disabled = locked;
+
+    $("ts-save-btn").style.display = locked ? "none" : "";
+    $("ts-process-btn").style.display = locked ? "none" : "";
+    $("ts-reopen-btn").style.display = locked ? "" : "none";
+    $("ts-new-btn").style.display = locked ? "" : (state.currentId ? "" : "none");
+
+    const pill = $("ts-status-pill");
+    pill.className = "ts-pill " + (locked ? "processed" : "draft");
+    pill.innerHTML = `<span class="ts-pill-dot"></span>${locked ? "Processed" : "Draft"}`;
+  }
+
+  // ── Load a period into the editor ────────────────────────────────────
+  function loadIntoEditor(p) {
+    state.currentId = p.id;
+    state.status = p.status;
+    startEl.value = p.periodStart || "";
+    endEl.value = p.periodEnd || (p.periodStart ? addDaysIso(p.periodStart, 6) : "");
+    writeGrid(p.grid || {});
+    notesEl.value = p.notes || "";
+    state.otBanked = p.otBanked || 0;
+    if (state.balances && !state.balances.compInitialized && p.bankedCompInput != null) bankedEl.value = String(p.bankedCompInput);
+    if (state.balances && !state.balances.plawInitialized && p.plawStartInput != null) plawStartEl.value = String(p.plawStartInput);
+    state.lastSaved = p.updatedAt ? new Date(p.updatedAt.replace(" ", "T") + "Z") : null;
+    // Re-apply the daily overtime rule to drafts on load. Anything saved before
+    // this rule existed (or by an older server) still has raw hours sitting in
+    // Regular — this splits it immediately so the sheet reads 8 + OT rather
+    // than 9.25 in Regular. Processed sheets are left exactly as applied.
+    if (p.status !== "processed") normalizeDailyOvertime();
+    applyInitFieldsVisibility();
+    setLocked(p.status === "processed");
+    recompute();
+    updateSavedNote();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function resetEditorForNewWeek() {
+    state.currentId = null;
+    state.status = "draft";
+    const start = isoLocal(mostRecentWednesday(new Date()));
+    startEl.value = start; endEl.value = addDaysIso(start, 6);
+    writeGrid({});
+    notesEl.value = ""; state.otBanked = 0;
+    if (state.balances && !state.balances.compInitialized) { bankedEl.value = ""; plawStartEl.value = ""; }
+    state.lastSaved = null;
+    applyInitFieldsVisibility();
+    setLocked(false);
+    recompute();
+    updateSavedNote();
+  }
+
+  function fillPrintMeta() {
+    const name = (state.employee && state.employee.name) || $("ts-employee").value || "—";
+    const printed = new Date().toLocaleString(undefined, {
+      weekday: "long", year: "numeric", month: "long", day: "numeric",
+      hour: "numeric", minute: "2-digit",
+    });
+    $("ts-print-meta").innerHTML =
+      `<div>Employee: <strong>${escHtml(name)}</strong></div>` +
+      `<div>Printed: <strong>${escHtml(printed)}</strong></div>`;
+  }
+
+  function updateSavedNote() {
+    const el = $("ts-saved-note");
+    if (!state.lastSaved) { el.textContent = "Not yet saved"; return; }
+    const when = state.lastSaved.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    el.textContent = `${state.status === "processed" ? "Processed" : "Saved"} ${when}`;
+  }
+
+  // ── API ──────────────────────────────────────────────────────────────
+  async function api(path, opts) {
+    const r = await fetch("/api/timesheet" + path, opts);
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok) throw new Error(data.error || `Request failed (${r.status})`);
+    return data;
+  }
+
+  function collectDraftBody() {
+    return {
+      periodStart: startEl.value,
+      periodEnd: endEl.value || (startEl.value ? addDaysIso(startEl.value, 6) : null),
+      grid: readGrid(),
+      notes: notesEl.value,
+      // Comp used now comes from the Comp Time row itself; send 0 so any legacy
+      // value stored in the old separate field is cleared on the next save.
+      compUsed: 0,
+      otBanked: state.otBanked,
+      bankedCompInput: (state.balances && !state.balances.compInitialized) ? bankedEl.value : null,
+      plawStartInput: (state.balances && !state.balances.plawInitialized) ? plawStartEl.value : null,
+    };
+  }
+
+  async function saveDraft(showMsg = true) {
+    if (!startEl.value) { showToast("Pick a pay period start (a Wednesday) first.", { type: "error" }); return null; }
+    const data = await api("/draft", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(collectDraftBody()),
+    });
+    state.currentId = data.timesheet.id;
+    state.status = data.timesheet.status;
+    state.lastSaved = new Date();
+    updateSavedNote();
+    if (showMsg) showToast("✓ Draft saved.");
+    await refreshHistory();
+    return data.timesheet;
+  }
+
+  async function processSheet() {
+    // Always persist the latest edits first, then process. (Overtime is handled
+    // per-day, so there's no over-40 gate here.)
+    const saved = await saveDraft(false);
+    if (!saved) return;
+    try {
+      const data = await api(`/${state.currentId}/process`, { method: "POST" });
+      state.balances = data.balances;
+      state.status = "processed";
+      state.lastSaved = new Date();
+      renderBalances(); applyInitFieldsVisibility(); setLocked(true); recompute(); updateSavedNote();
+      await refreshHistory();
+      showToast("✓ Timesheet processed — balances updated. Opening a printable copy…");
+      // Let the "Processed" state paint, then open the print / Save-as-PDF dialog.
+      fillPrintMeta();
+      setTimeout(() => window.print(), 400);
+    } catch (err) {
+      showToast(err.message, { type: "error" });
+    }
+  }
+
+  async function reopenSheet() {
+    if (!state.currentId) return;
+    try {
+      const data = await api(`/${state.currentId}/reopen`, { method: "POST" });
+      state.balances = data.balances;
+      state.status = "draft";
+      renderBalances(); applyInitFieldsVisibility(); setLocked(false); recompute(); updateSavedNote();
+      await refreshHistory();
+      showToast("Reopened for edits — balance change reversed.");
+    } catch (err) {
+      showToast(err.message, { type: "error" });
+    }
+  }
+
+  // ── History accordion ────────────────────────────────────────────────
+  async function refreshHistory() {
+    let periods = [];
+    try { const d = await api("/periods"); periods = d.periods || []; } catch (_) {}
+    const list = $("ts-history-list");
+    if (!periods.length) { list.innerHTML = '<div class="ts-empty">No periods yet.</div>'; return; }
+
+    list.innerHTML = "";
+    for (const p of periods) {
+      const item = document.createElement("div");
+      item.className = "ts-acc-item";
+      const isEditing = p.id === state.currentId;
+
+      const head = document.createElement("div");
+      head.className = "ts-acc-head";
+      head.innerHTML =
+        `<span class="ts-acc-caret">▸</span>` +
+        `<div><div class="ts-acc-period">${escHtml(fmtPeriod(p.periodStart, p.periodEnd))}</div>` +
+        `<div class="ts-acc-meta">${escHtml(p.employeeName || "")}${isEditing ? " · editing now" : ""}</div></div>` +
+        `<span class="ts-acc-spacer"></span>` +
+        `<span class="ts-acc-hours">${fmt(p.totals.grandTotal)} hrs</span>` +
+        `<span class="ts-pill ${p.status === "processed" ? "processed" : "draft"}"><span class="ts-pill-dot"></span>${p.status === "processed" ? "Processed" : "Draft"}</span>`;
+      head.addEventListener("click", () => item.classList.toggle("open"));
+      item.appendChild(head);
+
+      const body = document.createElement("div");
+      body.className = "ts-acc-body";
+      body.appendChild(buildMiniTable(p));
+
+      // Applied deltas (what this period did to balances)
+      if (p.status === "processed") {
+        const applied = document.createElement("div");
+        applied.className = "ts-acc-applied";
+        const compParts = [];
+        if (p.appliedInitComp != null) compParts.push(`seed ${fmt(p.appliedInitComp)}`);
+        compParts.push(`${p.appliedCompDelta >= 0 ? "+" : ""}${fmt(p.appliedCompDelta)}`);
+        const plawParts = [];
+        if (p.appliedInitPlaw != null) plawParts.push(`seed ${fmt(p.appliedInitPlaw)}`);
+        plawParts.push(`${p.appliedPlawDelta >= 0 ? "+" : ""}${fmt(p.appliedPlawDelta)}`);
+        const otHrs = p.totals.rowTotals.overtime || 0;
+        let otLine = otHrs > 0 ? `<div>Overtime: <strong>${fmt(otHrs)} h</strong></div>` : "";
+        if (p.otBanked > 0) otLine += `<div>Over 40: <strong>${fmt(p.otBanked)} h rolled into comp (paid at 40)</strong></div>`;
+        applied.innerHTML =
+          `<div>Payable: <strong>${fmt(p.payableHours != null ? p.payableHours : p.totals.grandTotal)} h</strong></div>` +
+          otLine +
+          `<div>Comp change: <strong>${escHtml(compParts.join(", "))}</strong></div>` +
+          `<div>P-Law change: <strong>${escHtml(plawParts.join(", "))}</strong></div>` +
+          (p.notes ? `<div>Notes: <strong>${escHtml(p.notes)}</strong></div>` : "");
+        body.appendChild(applied);
+      } else if (p.notes) {
+        const n = document.createElement("div");
+        n.className = "ts-acc-applied";
+        n.innerHTML = `<div>Notes: <strong>${escHtml(p.notes)}</strong></div>`;
+        body.appendChild(n);
+      }
+
+      // Row actions
+      const actions = document.createElement("div");
+      actions.className = "ts-acc-actions";
+      if (p.status === "draft") {
+        const edit = mkBtn("Edit this week", "ghost", () => loadIntoEditor(p));
+        const printB = mkBtn("Print / PDF", "ghost", () => printPeriod(p));
+        const del = mkBtn("Delete", "ghost", async () => {
+          if (!confirm("Delete this draft period?")) return;
+          try { await api(`/${p.id}`, { method: "DELETE" }); if (state.currentId === p.id) resetEditorForNewWeek(); await refreshHistory(); showToast("Draft deleted."); }
+          catch (err) { showToast(err.message, { type: "error" }); }
+        });
+        actions.appendChild(edit); actions.appendChild(printB); actions.appendChild(del);
+      } else {
+        const view = mkBtn("Load (read-only)", "ghost", () => loadIntoEditor(p));
+        const printB = mkBtn("Print / PDF", "ghost", () => printPeriod(p));
+        const reopen = mkBtn("Reopen for edits", "primary", async () => { loadIntoEditor(p); await reopenSheet(); });
+        actions.appendChild(view); actions.appendChild(printB); actions.appendChild(reopen);
+      }
+      body.appendChild(actions);
+      item.appendChild(body);
+      list.appendChild(item);
+    }
+  }
+
+  function buildMiniTable(p) {
+    const wrap = document.createElement("div");
+    wrap.className = "ts-acc-grid-wrap";
+    let html = "<table class='ts-acc-mini'><thead><tr><th style='text-align:left'>Hours</th>";
+    DAYS.forEach((d, i) => {
+      let dateStr = "";
+      if (p.periodStart) {
+        const dt = new Date(addDaysIso(p.periodStart, i) + "T00:00:00");
+        if (!isNaN(dt)) dateStr = dt.toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
+      }
+      html += `<th>${d.label}${dateStr ? `<br><span style="font-weight:600;opacity:.75">${dateStr}</span>` : ""}</th>`;
+    });
+    html += "<th>Total</th></tr></thead><tbody>";
+    for (const r of ROWS) {
+      html += `<tr><td class='rl'>${r.label}</td>`;
+      for (const d of DAYS) {
+        const v = p.grid && p.grid[r.key] ? num(p.grid[r.key][d.key]) : 0;
+        html += `<td>${v ? fmt(v) : ""}</td>`;
+      }
+      html += `<td><strong>${fmt(p.totals.rowTotals[r.key] || 0)}</strong></td></tr>`;
+    }
+    html += "<tr><td class='rl'><strong>Totals</strong></td>";
+    for (const d of DAYS) html += `<td><strong>${fmt(p.totals.colTotals[d.key] || 0)}</strong></td>`;
+    html += `<td><strong>${fmt(p.totals.grandTotal)}</strong></td></tr>`;
+    html += "</tbody></table>";
+    wrap.innerHTML = html;
+    return wrap;
+  }
+
+  function mkBtn(label, kind, onClick) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "ts-btn ts-btn-" + kind; b.textContent = label;
+    b.style.padding = "8px 14px"; b.style.fontSize = "13px";
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  // ── Wire up static handlers ──────────────────────────────────────────
+  function wire() {
+    startEl.addEventListener("change", () => { if (startEl.value) endEl.value = addDaysIso(startEl.value, 6); recompute(); });
+    endEl.addEventListener("change", recompute);
+    bankedEl.addEventListener("input", (e) => { if (!numericOnly(e.target.value)) { e.target.value = e.target.value.slice(0, -1); return; } recompute(); });
+    plawStartEl.addEventListener("input", (e) => { if (!numericOnly(e.target.value)) { e.target.value = e.target.value.slice(0, -1); return; } recompute(); });
+
+    $("ts-save-btn").addEventListener("click", () => saveDraft(true).catch((err) => showToast(err.message, { type: "error" })));
+    $("ts-process-btn").addEventListener("click", () => {
+      // If the week ran over 40 and the extra hasn't been rolled yet, make the
+      // call here rather than letting it slip through as paid overtime.
+      const rawGrand = rawGrandTotal();
+      const overage = round2(Math.max(0, rawGrand - WEEK));
+      if (overage > 0 && state.otBanked < overage) {
+        openRollModal(rawGrand, overage);
+        return;
+      }
+      confirmAndProcess();
+    });
+    $("ts-reopen-btn").addEventListener("click", reopenSheet);
+    $("ts-new-btn").addEventListener("click", resetEditorForNewWeek);
+    // Print / Save PDF — hands off to the browser's print dialog (which has a
+    // "Save as PDF" destination). The @media print rules trim it to the sheet.
+    $("ts-print-btn").addEventListener("click", () => window.print());
+    // Stamp the employee's full name + printed-on date onto the sheet just
+    // before it prints. Uses beforeprint so it's filled whether the user
+    // clicks the button or hits Ctrl/Cmd-P.
+    window.addEventListener("beforeprint", fillPrintMeta);
+  }
+
+  // ── Live time clock ──────────────────────────────────────────────────
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const dayLabelOf = (key) => (DAYS.find((d) => d.key === key) || {}).label || key;
+  const fmtHrs = (h) => `${round2(h)} h`;
+  function fmtClockTime(iso) { try { return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch (_) { return ""; } }
+  function localTimeValue(iso) { const d = new Date(iso); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); }
+  function isoFromLocal(dateStr, timeStr) { if (!dateStr || !timeStr) return null; const d = new Date(`${dateStr}T${timeStr}`); return isNaN(d) ? null : d.toISOString(); }
+  function hms(sec) { sec = Math.max(0, Math.floor(sec)); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60; return `${h}:${pad2(m)}:${pad2(s)}`; }
+  function nowHHMM() { const d = new Date(); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); }
+
+  // Shared "…At" time picker. baseDate is the local YYYY-MM-DD the chosen time
+  // belongs to; onConfirm receives the resulting ISO timestamp.
+  function openTimePrompt(baseDate, label, defHHMM, onConfirm) {
+    const p = $("clk-timeprompt");
+    if (!p) return;
+    p.innerHTML =
+      `<div class="row">
+         <label>${escHtml(label)}<input type="time" id="tp-time" value="${defHHMM}"></label>
+         <button class="ts-btn ts-btn-primary" id="tp-go" style="padding:9px 16px">Confirm</button>
+         <button class="ts-btn ts-btn-ghost" id="tp-cancel" style="padding:9px 16px">Cancel</button>
+       </div>`;
+    p.classList.add("open");
+    $("tp-go").onclick = () => {
+      const iso = isoFromLocal(baseDate, $("tp-time").value);
+      if (!iso) { showToast("Enter a valid time.", { type: "error" }); return; }
+      p.classList.remove("open"); p.innerHTML = "";
+      onConfirm(iso);
+    };
+    $("tp-cancel").onclick = () => { p.classList.remove("open"); p.innerHTML = ""; };
+  }
+
+  function clockApi(path, body) {
+    return api("/clock" + path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined);
+  }
+
+  async function refreshClock() {
+    try { const d = await clockApi(""); state.clock.active = d.active || null; }
+    catch (_) { state.clock.active = null; }
+    renderClock();
+  }
+
+  function stopTicker() { if (state.clock.timer) { clearInterval(state.clock.timer); state.clock.timer = null; } }
+
+  function renderClock() {
+    const el = $("ts-clock");
+    stopTicker();
+    const a = state.clock.active;
+
+    if (!a) {
+      el.innerHTML =
+        `<div class="ts-clock-row">
+           <div class="ts-clock-status">
+             <div class="ts-clock-state"><span class="ts-clock-dot off"></span>Not clocked in</div>
+             <div class="ts-clock-sub">Clock in to start tracking today's hours.</div>
+           </div>
+           <div class="ts-clock-btns">
+             <button class="ts-clk-btn ts-clk-in" id="clk-in">Clock In</button>
+             <button class="ts-clk-btn ts-clk-at" id="clk-in-at">Clock In At…</button>
+           </div>
+         </div>
+         <div class="ts-clock-panel" id="clk-timeprompt"></div>
+         <div class="ts-clock-links">
+           <button class="ts-clock-link" id="clk-manual-toggle">＋ Add a past entry</button>
+         </div>
+         <div class="ts-clock-panel" id="clk-manual">
+           <div class="row">
+             <label>Date<input type="date" id="man-date"></label>
+             <label>Start<input type="time" id="man-in"></label>
+             <label>End<input type="time" id="man-out"></label>
+             <label>Break (min)<input type="number" id="man-break" min="0" step="5" value="0" style="width:90px"></label>
+             <button class="ts-btn ts-btn-primary" id="man-add" style="padding:9px 16px">Add entry</button>
+           </div>
+           <div class="ts-clock-hint">Adds the worked hours to that day's Regular row on the sheet.</div>
+         </div>`;
+      $("clk-in").onclick = doClockIn;
+      $("clk-in-at").onclick = () => openTimePrompt(isoLocal(new Date()), "Clock in at", nowHHMM(), clockInAt);
+      $("clk-manual-toggle").onclick = () => $("clk-manual").classList.toggle("open");
+      $("man-date").value = startEl.value || isoLocal(new Date());
+      $("man-add").onclick = doManual;
+      return;
+    }
+
+    const onBreak = a.onBreak;
+    el.innerHTML =
+      `<div class="ts-clock-row">
+         <div class="ts-clock-status">
+           <div class="ts-clock-state"><span class="ts-clock-dot ${onBreak ? "brk" : "on"}"></span>${onBreak ? "On break" : "Clocked in"}</div>
+           <div class="ts-clock-timer" id="clk-timer">0:00:00</div>
+           <div class="ts-clock-sub">since ${fmtClockTime(a.clockIn)} · <span id="clk-approx"></span></div>
+         </div>
+         <div class="ts-clock-btns">
+           ${onBreak
+             ? `<button class="ts-clk-btn ts-clk-end" id="clk-endbreak">End Break</button>
+                <button class="ts-clk-btn ts-clk-at" id="clk-endbreak-at">End Break At…</button>`
+             : `<button class="ts-clk-btn ts-clk-break" id="clk-break">Start Break</button>
+                <button class="ts-clk-btn ts-clk-at" id="clk-break-at">Start Break At…</button>`}
+           <button class="ts-clk-btn ts-clk-out" id="clk-out">Clock Out</button>
+           <button class="ts-clk-btn ts-clk-at" id="clk-out-at">Clock Out At…</button>
+         </div>
+       </div>
+       <div class="ts-clock-panel" id="clk-timeprompt"></div>
+       <div class="ts-clock-links">
+         <button class="ts-clock-link" id="clk-adjust-toggle">Adjust clock-in</button>
+       </div>
+       <div class="ts-clock-panel" id="clk-adjust">
+         <div class="row">
+           <label>Clock-in time<input type="time" id="adj-in" value="${localTimeValue(a.clockIn)}"></label>
+           <button class="ts-btn ts-btn-ghost" id="adj-save" style="padding:9px 16px">Save start time</button>
+         </div>
+       </div>`;
+
+    if (onBreak) {
+      $("clk-endbreak").onclick = () => clockAction("/break/end");
+      $("clk-endbreak-at").onclick = () => openTimePrompt(a.workDate, "End break at", nowHHMM(), (iso) => clockActionAt("/break/end", iso));
+    } else {
+      $("clk-break").onclick = () => clockAction("/break/start");
+      $("clk-break-at").onclick = () => openTimePrompt(a.workDate, "Start break at", nowHHMM(), (iso) => clockActionAt("/break/start", iso));
+    }
+    $("clk-out").onclick = () => doClockOut();
+    $("clk-out-at").onclick = () => openTimePrompt(a.workDate, "Clock out at", nowHHMM(), (iso) => doClockOut(iso));
+    $("clk-adjust-toggle").onclick = () => $("clk-adjust").classList.toggle("open");
+    $("adj-save").onclick = doAdjust;
+
+    const tick = () => {
+      const now = Date.now();
+      const inMs = Date.parse(a.clockIn);
+      let brk = a.breakSeconds || 0;
+      if (a.onBreak && a.breakStartedAt) brk += Math.max(0, (now - Date.parse(a.breakStartedAt)) / 1000);
+      const worked = Math.max(0, (now - inMs) / 1000 - brk);
+      const t = $("clk-timer"); if (t) t.textContent = hms(worked);
+      const ap = $("clk-approx"); if (ap) ap.textContent = `≈ ${round2(Math.round(worked / 3600 * 4) / 4)} h` + (brk > 0 ? ` · break ${Math.round(brk / 60)}m` : "");
+    };
+    tick();
+    state.clock.timer = setInterval(tick, 1000);
+  }
+
+  async function doClockIn() {
+    try {
+      const now = new Date();
+      await clockApi("/in", { at: now.toISOString(), workDate: isoLocal(now) });
+      await refreshClock();
+    } catch (err) { showToast(err.message, { type: "error" }); }
+  }
+  async function clockInAt(iso) {
+    try { await clockApi("/in", { at: iso, workDate: isoLocal(new Date(iso)) }); await refreshClock(); }
+    catch (err) { showToast(err.message, { type: "error" }); }
+  }
+  async function clockAction(path) {
+    try { await clockApi(path, { at: new Date().toISOString() }); await refreshClock(); }
+    catch (err) { showToast(err.message, { type: "error" }); }
+  }
+  async function clockActionAt(path, iso) {
+    try { await clockApi(path, { at: iso }); await refreshClock(); }
+    catch (err) { showToast(err.message, { type: "error" }); }
+  }
+  async function doClockOut(at) {
+    try { const result = await clockApi("/out", { at: at || new Date().toISOString() }); await reloadAfterFill(result); }
+    catch (err) { showToast(err.message, { type: "error" }); }
+  }
+  async function doAdjust() {
+    const a = state.clock.active; if (!a) return;
+    const iso = isoFromLocal(a.workDate, $("adj-in").value);
+    if (!iso) { showToast("Enter a valid time.", { type: "error" }); return; }
+    try { await clockApi("/adjust", { clockIn: iso }); await refreshClock(); showToast("Clock-in time updated."); }
+    catch (err) { showToast(err.message, { type: "error" }); }
+  }
+  async function doManual() {
+    const date = $("man-date").value;
+    const inISO = isoFromLocal(date, $("man-in").value);
+    const outISO = isoFromLocal(date, $("man-out").value);
+    if (!inISO || !outISO) { showToast("Enter date, start, and end times.", { type: "error" }); return; }
+    const breakSeconds = Math.max(0, (parseInt($("man-break").value, 10) || 0) * 60);
+    try { const result = await clockApi("/manual", { workDate: date, clockIn: inISO, clockOut: outISO, breakSeconds }); await reloadAfterFill(result); }
+    catch (err) { showToast(err.message, { type: "error" }); }
+  }
+
+  async function reloadAfterFill(result) {
+    if (result.fill && result.fill.added === false && result.fill.reason === "processed") {
+      showToast(`Recorded ${fmtHrs(result.hours)}, but ${fmtPeriod(result.periodStart)} is already processed — reopen that week to include it.`, { type: "warn", sticky: true });
+    } else {
+      showToast(`✓ Added ${fmtHrs(result.hours)} to ${dayLabelOf(result.dayKey)}.`);
+    }
+    await refreshClock();
+    try {
+      const d = await api("/periods");
+      const p = (d.periods || []).find((x) => x.periodStart === result.periodStart);
+      if (p) loadIntoEditor(p);
+    } catch (_) {}
+    await refreshHistory();
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────
+  async function boot() {
+    buildGrid();
+    wire();
+    try {
+      const s = await api("/summary");
+      state.employee = s.employee;
+      state.balances = s.balances;
+      $("ts-employee").value = s.employee.name;
+    } catch (err) {
+      // 401 is auto-handled (redirect to /login) by shared.js fetch patch.
+      $("ts-employee").value = "";
+      showToast(err.message || "Could not load your timesheet.", { type: "error" });
+    }
+    renderBalances();
+
+    // If there's an existing draft, drop the user straight into it; otherwise
+    // start a fresh week. Processed-only history stays in the accordion.
+    let periods = [];
+    try { const d = await api("/periods"); periods = d.periods || []; } catch (_) {}
+    const openDraft = periods.find((p) => p.status === "draft");
+    if (openDraft) loadIntoEditor(openDraft);
+    else resetEditorForNewWeek();
+
+    await refreshHistory();
+    await refreshClock();
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
+</script>
+
+</body>
+</html>

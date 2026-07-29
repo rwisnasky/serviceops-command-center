@@ -1,0 +1,19 @@
+[phases.setup]
+# poppler_utils → provides `pdftoppm` + `pdfimages`, used by invoiceParserService
+#   (rasterize page 1 for the OpenAI vision model) and jobTicketParserService
+#   (split scanned job tickets into per-page JPGs + pull embedded photos).
+# tesseract → local OCR engine (bundles the English model) for reading the
+#   printed text off scanned job tickets. No cloud call, no per-page cost.
+# zip → bundles the extracted page/photo JPGs + OCR text into one download.
+# ffmpeg → compresses/segments oversized or over-long call recordings before
+#   transcription (transcriptionService). OpenAI rejects audio over 25 MB, and
+#   the gpt-4o transcription models also cap a request at ~25 min; ffmpeg lets
+#   long calls transcribe instead of silently coming back empty.
+nixPkgs = ["nodejs_22", "poppler_utils", "tesseract", "zip", "ffmpeg"]
+
+[phases.install]
+# Use `npm install` instead of the default `npm ci`. `npm ci` refuses to run
+# if package.json and package-lock.json are out of sync (e.g. when a new dep
+# is added but the lockfile hasn't been regenerated locally yet). `npm install`
+# tolerates the drift and updates the lockfile in the build container.
+cmds = ["npm install --omit=dev --no-audit --no-fund"]

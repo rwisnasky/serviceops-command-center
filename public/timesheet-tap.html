@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Clock · Grounded Home Services</title>
+  <style>
+    :root{
+      --navy:#00354E; --red:#DD1F26; --green:#1C6B45; --orange:#E8A838;
+      --blue:#278CAE; --line:#D8DEE3; --ink:#00354E; --soft:#4A5A66; --paper:#FBFAF8;
+    }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html,body{ margin:0; height:100%; }
+    body{
+      font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+      background:linear-gradient(180deg,#eef3f6,#dde7ec); color:var(--ink);
+      display:flex; align-items:center; justify-content:center; padding:20px;
+      min-height:100dvh;
+    }
+    .card{
+      width:100%; max-width:440px; background:#fff; border:1px solid var(--line);
+      border-radius:20px; overflow:hidden; box-shadow:0 10px 40px rgba(0,53,78,.18);
+    }
+    .head{ background:var(--navy); color:#fff; padding:18px 22px; }
+    .brand{ font-size:20px; font-weight:800; letter-spacing:3px; }
+    .brand-sub{ font-size:11px; letter-spacing:1.4px; opacity:.72; text-transform:uppercase; margin-top:2px; }
+    .body{ padding:26px 22px 28px; text-align:center; }
+    .who{ font-size:14px; color:var(--soft); margin-bottom:18px; }
+    .who strong{ color:var(--navy); }
+    .state{
+      display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:700;
+      letter-spacing:.6px; text-transform:uppercase; padding:6px 14px; border-radius:20px; margin-bottom:8px;
+    }
+    .state .dot{ width:9px; height:9px; border-radius:50%; }
+    .state.on   { background:#E7F1EC; color:var(--green); } .state.on .dot{ background:var(--green); }
+    .state.off  { background:#EEF3F6; color:var(--soft);  } .state.off .dot{ background:var(--line); }
+    .state.brk  { background:#FBF3E3; color:#9A6B1E; }      .state.brk .dot{ background:var(--orange); }
+    .headline{ font-size:30px; font-weight:800; color:var(--navy); margin:8px 0 4px; letter-spacing:-.5px; }
+    .timer{ font-size:44px; font-weight:800; color:var(--navy); font-variant-numeric:tabular-nums; letter-spacing:-1px; margin:6px 0; }
+    .sub{ font-size:14px; color:var(--soft); margin-bottom:22px; }
+    .btns{ display:flex; flex-direction:column; gap:12px; }
+    .btn{
+      border:none; border-radius:14px; padding:18px; font-size:18px; font-weight:800; color:#fff;
+      cursor:pointer; font-family:inherit; letter-spacing:.3px;
+    }
+    .btn:active{ transform:translateY(1px); }
+    .btn.in{ background:var(--green); } .btn.out{ background:var(--red); }
+    .btn.brk{ background:var(--orange); } .btn.end{ background:var(--blue); }
+    .btn.ghost{ background:#fff; color:var(--navy); border:1px solid var(--line); font-weight:700; font-size:15px; padding:14px; }
+    .msg{ font-size:15px; color:var(--soft); margin:10px 0 0; min-height:20px; }
+    .msg.err{ color:var(--red); font-weight:600; }
+    .foot{ margin-top:20px; }
+    .foot a{ color:var(--blue); text-decoration:none; font-size:14px; font-weight:600; }
+    .spin{ display:inline-block; width:22px; height:22px; border:3px solid var(--line); border-top-color:var(--blue); border-radius:50%; animation:sp 0.8s linear infinite; }
+    @keyframes sp{ to{ transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="head">
+      <div class="brand">GROUNDED</div>
+      <div class="brand-sub">Time Clock</div>
+    </div>
+    <div class="body">
+      <div class="who" id="who"></div>
+      <div id="main"><div class="spin"></div></div>
+      <div class="msg" id="msg"></div>
+      <div class="foot"><a href="/timesheet">Open full timesheet →</a></div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const $ = (id)=>document.getElementById(id);
+  const qs = new URLSearchParams(location.search);
+  // ?a=in | out | toggle | break | endbreak  (default: show buttons)
+  const action = (qs.get("a") || "").toLowerCase();
+
+  const pad2 = (n)=>String(n).padStart(2,"0");
+  const isoLocalDate = (d)=>`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  const fmtTime = (iso)=>{ try{ return new Date(iso).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}); }catch(_){ return ""; } };
+  const DAY = { wed:"Wednesday", thu:"Thursday", fri:"Friday", sat:"Saturday", sun:"Sunday", mon:"Monday", tue:"Tuesday" };
+
+  let ticker = null;
+  function stopTick(){ if(ticker){ clearInterval(ticker); ticker=null; } }
+
+  async function apiFetch(path, opts){
+    const r = await fetch("/api/timesheet"+path, opts);
+    if (r.status === 401){
+      location.href = "/login?next=" + encodeURIComponent(location.pathname + location.search);
+      throw new Error("redirecting to login");
+    }
+    const data = await r.json().catch(()=>({}));
+    if (!r.ok || !data.ok) throw new Error(data.error || `Request failed (${r.status})`);
+    return data;
+  }
+
+  function setMsg(text, isErr){ const m=$("msg"); m.textContent=text||""; m.className = "msg" + (isErr?" err":""); }
+
+  async function loadWho(){
+    try{ const s = await apiFetch("/summary"); $("who").innerHTML = `Signed in as <strong>${escapeHtml(s.employee.name)}</strong>`; }
+    catch(_){ /* handled by redirect or below */ }
+  }
+  function escapeHtml(s){ return String(s??"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  async function getStatus(){ const d = await apiFetch("/clock"); return d.active || null; }
+
+  async function doIn(){
+    const now = new Date();
+    await apiFetch("/clock/in", post({ at: now.toISOString(), workDate: isoLocalDate(now) }));
+  }
+  async function doOut(){
+    return apiFetch("/clock/out", post({ at: new Date().toISOString() }));
+  }
+  async function doBreak(start){
+    await apiFetch("/clock/break/" + (start?"start":"end"), post({ at: new Date().toISOString() }));
+  }
+  function post(body){ return { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) }; }
+
+  function renderActive(a, note){
+    stopTick();
+    const onBreak = a.onBreak;
+    $("main").innerHTML =
+      `<div class="state ${onBreak?"brk":"on"}"><span class="dot"></span>${onBreak?"On break":"Clocked in"}</div>
+       <div class="timer" id="tm">0:00:00</div>
+       <div class="sub">since ${fmtTime(a.clockIn)}</div>
+       <div class="btns">
+         <button class="btn out" id="b-out">Clock Out</button>
+         ${onBreak ? `<button class="btn end" id="b-brk">End Break</button>`
+                   : `<button class="btn brk" id="b-brk">Start Break</button>`}
+       </div>`;
+    $("b-out").onclick = async ()=>{ try{ setBusy(); const r = await doOut(); showClockedOut(r); }catch(e){ setMsg(e.message,true); refresh(); } };
+    $("b-brk").onclick = async ()=>{ try{ setBusy(); await doBreak(!onBreak); refresh(); }catch(e){ setMsg(e.message,true); refresh(); } };
+    if (note) setMsg(note);
+
+    const tick = ()=>{
+      const now = Date.now();
+      let brk = a.breakSeconds||0;
+      if (a.onBreak && a.breakStartedAt) brk += Math.max(0,(now - Date.parse(a.breakStartedAt))/1000);
+      const worked = Math.max(0,(now - Date.parse(a.clockIn))/1000 - brk);
+      const h=Math.floor(worked/3600), m=Math.floor((worked%3600)/60), s=Math.floor(worked%60);
+      const t=$("tm"); if(t) t.textContent = `${h}:${pad2(m)}:${pad2(s)}`;
+    };
+    tick(); ticker = setInterval(tick, 1000);
+  }
+
+  function renderIdle(note){
+    stopTick();
+    $("main").innerHTML =
+      `<div class="state off"><span class="dot"></span>Not clocked in</div>
+       <div class="headline">Ready</div>
+       <div class="sub">Tap to start today's shift.</div>
+       <div class="btns"><button class="btn in" id="b-in">Clock In</button></div>`;
+    $("b-in").onclick = async ()=>{ try{ setBusy(); await doIn(); const a = await getStatus(); if(a) renderActive(a, "✓ Clocked in."); }catch(e){ setMsg(e.message,true); refresh(); } };
+    if (note) setMsg(note);
+  }
+
+  function showClockedOut(r){
+    stopTick();
+    const added = r.fill && r.fill.added === false
+      ? `${r.hours} h recorded, but that week is processed — reopen it to include these hours.`
+      : `${r.hours} h added to ${DAY[r.dayKey]||r.dayKey}.`;
+    $("main").innerHTML =
+      `<div class="state off"><span class="dot"></span>Clocked out</div>
+       <div class="headline">${r.hours} h</div>
+       <div class="sub">${escapeHtml(added)}</div>
+       <div class="btns"><button class="btn in" id="b-in">Clock In Again</button></div>`;
+    $("b-in").onclick = async ()=>{ try{ setBusy(); await doIn(); const a = await getStatus(); if(a) renderActive(a,"✓ Clocked in."); }catch(e){ setMsg(e.message,true); refresh(); } };
+  }
+
+  function setBusy(){ stopTick(); $("main").innerHTML = '<div class="spin"></div>'; setMsg(""); }
+
+  // Run the URL action once (for NFC), then fall back to the live view.
+  async function runAction(){
+    const a = await getStatus();
+    if (action === "in"){
+      if (a) { renderActive(a, "You were already clocked in."); return; }
+      await doIn(); const na = await getStatus(); renderActive(na, "✓ Clocked in."); return;
+    }
+    if (action === "out"){
+      if (!a) { renderIdle("You weren't clocked in."); return; }
+      const r = await doOut(); showClockedOut(r); return;
+    }
+    if (action === "toggle"){
+      if (a) { const r = await doOut(); showClockedOut(r); }
+      else { await doIn(); const na = await getStatus(); renderActive(na, "✓ Clocked in."); }
+      return;
+    }
+    if (action === "break"){
+      if (a && !a.onBreak){ await doBreak(true); renderActive(await getStatus(), "✓ Break started."); return; }
+    }
+    if (action === "endbreak"){
+      if (a && a.onBreak){ await doBreak(false); renderActive(await getStatus(), "✓ Break ended."); return; }
+    }
+    // No/!matched action → just show current state with buttons.
+    if (a) renderActive(a); else renderIdle();
+  }
+
+  async function refresh(){
+    try{ const a = await getStatus(); if (a) renderActive(a); else renderIdle(); }
+    catch(e){ setMsg(e.message, true); }
+  }
+
+  async function boot(){
+    try{
+      await loadWho();
+      await runAction();
+    }catch(e){
+      if (String(e.message).includes("redirecting")) return;
+      setMsg(e.message, true);
+      // best-effort: still try to show current state
+      refresh();
+    }
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

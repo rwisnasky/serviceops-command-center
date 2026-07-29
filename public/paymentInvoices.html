@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment Invoices - ServiceOps Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    .pi-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+      margin-bottom: 4px;
+    }
+    .pi-kv .pi-k {
+      font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 4px;
+    }
+    .pi-kv .pi-v {
+      font-family: var(--font-display, 'Space Grotesk', sans-serif);
+      font-size: 18px; font-weight: 600; color: var(--text);
+      letter-spacing: -0.01em; word-break: break-word;
+    }
+    .pi-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .pi-table th {
+      text-align: left; font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+      color: var(--muted); font-weight: 600; padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .pi-table th.num, .pi-table td.num { text-align: right; }
+    .pi-table td {
+      padding: 10px; border-bottom: 1px solid var(--border);
+      color: var(--text); vertical-align: middle;
+    }
+    .pi-table tr:last-child td { border-bottom: none; }
+    .pi-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+    .pi-mono { font-family: 'JetBrains Mono','DM Mono',monospace; }
+    .pi-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
+    .pi-hint {
+      font-family: 'JetBrains Mono','DM Mono',monospace; font-size: 11px;
+      color: var(--muted); line-height: 1.6;
+    }
+    .pi-warn {
+      margin-top: 12px; font-size: 12px; color: var(--accent2, #e8a838);
+      background: rgba(232,168,56,0.10); border: 1px solid rgba(232,168,56,0.35);
+      border-radius: 8px; padding: 8px 12px;
+    }
+    .btn[disabled] { opacity: .55; cursor: default; }
+    .btn.ghost { background: transparent; border: 1px solid var(--border-strong); color: var(--text); }
+  </style>
+</head>
+<body>
+
+<!-- ── Navigation Bar ───────────────────────────────────────────────── -->
+<!-- Nav: built by /js/shared.js — do not hand-edit, it gets wiped on load. -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+
+  <div class="page-header">
+    <div>
+      <h1>Payment <span class="accent">Invoices</span></h1>
+      <p>Enter a ServiceTitan payment ID to see every invoice it was applied to — then download each one as its own PDF (or grab them all at once).</p>
+    </div>
+    <div class="status-bar"><span class="status-dot"></span> Ready</div>
+  </div>
+
+  <!-- ── Lookup ───────────────────────────────────────────────────── -->
+  <div class="section-label">Look up a payment</div>
+  <div class="panel">
+    <div class="pi-hint" style="margin-bottom:12px;">
+      Paste a payment ID from ServiceTitan. We'll pull the payment, find the invoices it was applied to,
+      and let you <strong style="color:var(--text);">download each invoice as its own full-detail PDF</strong> — or grab them all in one zip.
+    </div>
+    <div class="search-row">
+      <input class="search-input" id="pi-input" inputmode="numeric" autocomplete="off"
+             placeholder="Payment ID (e.g. 123456)" />
+      <button class="btn" id="pi-lookup-btn" onclick="lookupPayment()">Look up</button>
+    </div>
+    <div id="pi-status" style="margin-top:8px;font-family:'JetBrains Mono','DM Mono',monospace;font-size:12px;color:var(--muted);min-height:18px;"></div>
+  </div>
+
+  <!-- ── Result ───────────────────────────────────────────────────── -->
+  <div id="pi-result" style="display:none;">
+    <div class="section-label" style="margin-top:28px;">Payment</div>
+    <div class="panel">
+      <div class="pi-summary" id="pi-payment-summary"></div>
+    </div>
+
+    <div class="section-label" style="margin-top:24px;display:flex;justify-content:space-between;align-items:center;">
+      <span>Invoices <span id="pi-inv-count" style="color:var(--muted);font-weight:400;"></span></span>
+    </div>
+    <div class="panel">
+      <div style="overflow-x:auto;">
+        <table class="pi-table" id="pi-inv-table">
+          <thead>
+            <tr>
+              <th>Invoice #</th>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Job</th>
+              <th class="num">Applied</th>
+              <th class="num">Invoice Total</th>
+              <th class="num">Balance</th>
+              <th class="num"></th>
+            </tr>
+          </thead>
+          <tbody id="pi-inv-body"></tbody>
+        </table>
+      </div>
+      <div id="pi-missing" class="pi-warn" style="display:none;"></div>
+      <div class="pi-actions">
+        <button class="btn" id="pi-zip-btn" onclick="downloadZip()">⬇ Download all invoices (ZIP)</button>
+        <button class="btn ghost" id="pi-combined-btn" onclick="downloadCombined()">Combined single PDF</button>
+        <span class="pi-hint" id="pi-download-hint"></span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let currentPaymentId = null;
+
+  function money(n) {
+    const num = Number(n);
+    if (!isFinite(num)) return '$0.00';
+    return num.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  }
+  function fmtDate(raw) {
+    if (!raw) return '—';
+    const d = new Date(raw);
+    if (isNaN(d)) return String(raw);
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+  function cleanId(v) {
+    const s = (v || '').toString().trim().replace(/^#/, '');
+    return /^\d+$/.test(s) ? s : null;
+  }
+
+  async function lookupPayment() {
+    const id = cleanId($('pi-input').value);
+    if (!id) {
+      setStatus('pi-status', 'Enter a numeric payment ID.', 'error');
+      return;
+    }
+    currentPaymentId = id;
+    const btn = $('pi-lookup-btn');
+    btn.disabled = true;
+    setStatus('pi-status', 'Looking up payment ' + id + '…');
+    $('pi-result').style.display = 'none';
+
+    try {
+      const r = await fetch('/api/payment-invoices/lookup?paymentId=' + encodeURIComponent(id));
+      const d = await r.json();
+      if (!r.ok || d.ok === false) throw new Error(d.error || ('HTTP ' + r.status));
+      renderResult(d);
+      setStatus('pi-status', '');
+    } catch (e) {
+      setStatus('pi-status', '✗ ' + e.message, 'error');
+      showToast('Lookup failed: ' + e.message, { type: 'error' });
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function renderResult(d) {
+    const p = d.payment || {};
+    const summary = [
+      ['Payment ID', p.id != null ? '#' + p.id : '—'],
+      ['Date', fmtDate(p.date)],
+      ['Customer', p.customerName || '—'],
+      ['Payment Total', money(p.total)],
+      ['Type', p.typeName || '—'],
+    ];
+    $('pi-payment-summary').innerHTML = summary.map(([k, v]) =>
+      `<div class="pi-kv"><div class="pi-k">${escHtml(k)}</div><div class="pi-v">${escHtml(v)}</div></div>`
+    ).join('');
+
+    const invs = d.invoices || [];
+    $('pi-inv-count').textContent = '(' + invs.length + ')';
+    $('pi-inv-body').innerHTML = invs.length ? invs.map((inv) => `
+      <tr>
+        <td class="pi-mono">#${escHtml(inv.number)}</td>
+        <td>${escHtml(fmtDate(inv.date))}</td>
+        <td>${escHtml(inv.customerName || '—')}</td>
+        <td class="pi-mono">${inv.jobNumber ? escHtml(inv.jobNumber) : '—'}</td>
+        <td class="num">${escHtml(money(inv.appliedAmount))}</td>
+        <td class="num">${escHtml(money(inv.total))}</td>
+        <td class="num">${escHtml(money(inv.balance))}</td>
+        <td class="num"><button class="btn ghost pi-row-btn" data-inv="${escHtml(inv.id)}" data-num="${escHtml(inv.number)}"
+             style="padding:5px 10px;font-size:12px;" onclick="downloadOne(this)">PDF</button></td>
+      </tr>`).join('')
+      : `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:22px;">No invoices are applied to this payment.</td></tr>`;
+
+    const missing = d.missingInvoiceIds || [];
+    const missEl = $('pi-missing');
+    if (missing.length) {
+      missEl.style.display = 'block';
+      missEl.textContent = `Heads up: ${missing.length} applied item(s) (${missing.join(', ')}) didn't come back as invoices — they may be adjustments or credits and will be skipped in the PDF.`;
+    } else {
+      missEl.style.display = 'none';
+    }
+
+    const hasInv = invs.length > 0;
+    $('pi-zip-btn').disabled = !hasInv;
+    $('pi-combined-btn').disabled = !hasInv;
+    $('pi-download-hint').textContent = hasInv
+      ? `${invs.length} invoice${invs.length === 1 ? '' : 's'} · full detail`
+      : '';
+
+    $('pi-result').style.display = 'block';
+  }
+
+  // Fetch a download endpoint as a blob and save it. Handles JSON error bodies.
+  async function downloadFile(url, fallbackName) {
+    const r = await fetch(url);
+    const ct = r.headers.get('content-type') || '';
+    if (!r.ok || ct.includes('application/json')) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.error || ('HTTP ' + r.status));
+    }
+    // Prefer the server-provided filename if present.
+    let name = fallbackName;
+    const cd = r.headers.get('content-disposition') || '';
+    const m = cd.match(/filename="?([^"]+)"?/i);
+    if (m) name = m[1];
+    const blob = await r.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objUrl), 4000);
+  }
+
+  async function withBusy(btn, busyLabel, fn) {
+    if (!btn) return fn();
+    const original = btn.textContent;
+    const wasDisabled = btn.disabled;
+    btn.disabled = true;
+    btn.textContent = busyLabel;
+    try { await fn(); }
+    finally { btn.disabled = wasDisabled; btn.textContent = original; }
+  }
+
+  async function downloadZip() {
+    if (!currentPaymentId) return;
+    await withBusy($('pi-zip-btn'), 'Building…', async () => {
+      try {
+        await downloadFile(
+          '/api/payment-invoices/download-zip?paymentId=' + encodeURIComponent(currentPaymentId),
+          'payment-' + currentPaymentId + '-invoices.zip'
+        );
+        showToast('⬇ Downloaded all invoices for payment ' + currentPaymentId);
+      } catch (e) {
+        showToast('Download failed: ' + e.message, { type: 'error' });
+      }
+    });
+  }
+
+  async function downloadCombined() {
+    if (!currentPaymentId) return;
+    await withBusy($('pi-combined-btn'), 'Building…', async () => {
+      try {
+        await downloadFile(
+          '/api/payment-invoices/download?paymentId=' + encodeURIComponent(currentPaymentId),
+          'payment-' + currentPaymentId + '-invoices.pdf'
+        );
+        showToast('⬇ Downloaded combined PDF for payment ' + currentPaymentId);
+      } catch (e) {
+        showToast('Download failed: ' + e.message, { type: 'error' });
+      }
+    });
+  }
+
+  async function downloadOne(btn) {
+    if (!currentPaymentId || !btn) return;
+    const invoiceId = btn.getAttribute('data-inv');
+    const num = btn.getAttribute('data-num');
+    await withBusy(btn, '…', async () => {
+      try {
+        await downloadFile(
+          '/api/payment-invoices/download-one?paymentId=' + encodeURIComponent(currentPaymentId) +
+            '&invoiceId=' + encodeURIComponent(invoiceId),
+          'invoice-' + num + '.pdf'
+        );
+      } catch (e) {
+        showToast('Download failed: ' + e.message, { type: 'error' });
+      }
+    });
+  }
+
+  // Enter key triggers lookup.
+  $('pi-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); lookupPayment(); }
+  });
+</script>
+
+</body>
+</html>

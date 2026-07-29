@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Address Audit — ServiceOps Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/styles.css" />
+<style>
+  /* ── KPI strip — 7 statuses, so let them wrap to two rows on tight viewports ── */
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:18px; }
+  .kpi-card { background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg); padding: 12px 14px; }
+  .kpi-card .label { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 5px; font-weight: 600; }
+  .kpi-card .value { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--text); }
+  .kpi-card .value.ok    { color: var(--ok); }
+  .kpi-card .value.std   { color: var(--accent3); }
+  .kpi-card .value.warn  { color: var(--accent2); }
+  .kpi-card .value.bad   { color: var(--accent); }
+  .kpi-card .sub { font-size: 10.5px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Controls bar — wraps cleanly to a second line on narrow viewports ── */
+  .ctl-bar {
+    display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;
+    background: var(--surface); border:1px solid var(--border);
+    border-radius: var(--r-lg); padding: 12px 16px; margin-bottom: 18px;
+  }
+  /* min-width so groups break onto a new line as a whole, instead of
+     stretching individual labels/inputs uncomfortably. */
+  .ctl-bar .group { display:flex; flex-direction:column; gap:4px; min-width: 130px; }
+  .ctl-bar label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); font-weight: 600;
+  }
+  .ctl-bar select, .ctl-bar input {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 8px 12px; font-size: 13px;
+    font-family: inherit;
+  }
+  .ctl-bar .run-btn {
+    background: var(--accent); color: #fff; border:none;
+    border-radius: var(--r-md); padding: 9px 18px; font-size: 13px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .ctl-bar .run-btn:hover { filter: brightness(1.08); }
+  .ctl-bar .run-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .ctl-bar .secondary-btn {
+    background: var(--surface2); color: var(--text); border:1px solid var(--border-strong);
+    border-radius: var(--r-md); padding: 8px 14px; font-size: 12px; cursor: pointer; font-family: inherit;
+  }
+  .ctl-bar .secondary-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .ctl-bar .spacer { flex: 1; }
+
+  /* ── Single-lookup card ───────────────────────────────────────────── */
+  .single-card {
+    background: var(--surface); border:1px solid var(--border);
+    border-radius: var(--r-lg); padding: 14px 18px; margin-bottom: 18px;
+  }
+  .single-card h3 { margin: 0 0 10px; font-size: 13px; color: var(--muted); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em; }
+  /* Auto-fit columns so inputs reflow to a second row on narrow screens
+     instead of getting squeezed. Span overrides (street, city) widen those
+     inputs since they need more room than state/zip. */
+  .single-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 10px;
+    align-items: end;
+  }
+  .single-row .group { display:flex; flex-direction:column; gap:4px; }
+  .single-row label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); font-weight: 600;
+  }
+  .single-row input {
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 7px 10px; font-size: 13px; font-family: inherit;
+  }
+  .single-row button {
+    background: var(--accent3); color: #fff; border:none;
+    border-radius: var(--r-md); padding: 8px 16px; font-size: 12px;
+    font-weight: 600; cursor: pointer; font-family: inherit; height: 34px;
+  }
+  .single-result {
+    margin-top: 12px; padding: 12px; border-radius: var(--r-md);
+    background: var(--surface2); border: 1px solid var(--border);
+    font-size: 13px; display: none;
+  }
+  .single-result.show { display: block; }
+
+  /* ── Table ───────────────────────────────────────────────────────── */
+  table.aa-table { width:100%; border-collapse: collapse; background: var(--surface);
+    border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--border); }
+  table.aa-table th { text-align: left; padding: 10px 14px; background: var(--surface2);
+    border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+  table.aa-table td { padding: 11px 14px; border-bottom: 1px solid var(--border);
+    font-size: 13px; color: var(--text); vertical-align: top; }
+  table.aa-table tr:last-child td { border-bottom: 0; }
+  table.aa-table tr:hover td { background: var(--surface2); }
+  table.aa-table td.muted { color: var(--muted); }
+  .addr-original, .addr-verified {
+    font-family: var(--font-mono); font-size: 12px; line-height: 1.45;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .addr-verified.changed { color: var(--accent3); }
+
+  /* Status pills */
+  .pill {
+    display: inline-block; padding: 3px 10px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid currentColor;
+  }
+  .pill-ok           { color: var(--ok); }
+  .pill-standardized { color: var(--accent3); }
+  .pill-partial      { color: var(--accent2); }
+  .pill-undeliverable{ color: var(--accent); }
+  .pill-no-match     { color: var(--accent); }
+  .pill-incomplete   { color: var(--muted); }
+  .pill-error        { color: var(--accent); }
+
+  /* Per-row action */
+  .row-actions { display:flex; gap:6px; flex-wrap:wrap; }
+  .row-actions button {
+    background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md); padding: 6px 11px;
+    font-size: 11.5px; cursor: pointer; font-family: inherit;
+    font-weight: 500;
+  }
+  .row-actions button.approve { border-color: var(--ok); color: var(--ok); }
+  .row-actions button.approve:hover { background: var(--ok); color: #0c1810; }
+  .row-actions button.adjust { border-color: var(--accent2); color: var(--accent2); }
+  .row-actions button.adjust:hover { background: var(--accent2); color: #1a120a; }
+  .row-actions button.skip { border-color: var(--border); color: var(--muted); }
+  .row-actions button.skip:hover { border-color: var(--border-strong); color: var(--text); }
+  .row-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Verified-column status tags (replaces the separate Status pill column) */
+  .ver-tag {
+    display: inline-block;
+    padding: 3px 9px; border-radius: 6px;
+    font-size: 10.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    border: 1px solid currentColor;
+  }
+  .ver-tag-ok      { color: var(--ok);      background: rgba(40,180,120,0.08); }
+  .ver-tag-suggest { color: var(--accent3); background: rgba(96,165,250,0.08); }
+  .ver-tag-warn    { color: var(--accent2); background: rgba(232,168,56,0.10); }
+  .ver-tag-bad     { color: var(--accent);  background: rgba(232,80,90,0.08); }
+
+  /* Customer-type chip (residential vs commercial) */
+  .type-chip {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 2px 8px; border-radius: 10px;
+    font-size: 10.5px; font-weight: 600;
+    border: 1px solid currentColor;
+  }
+  .type-chip.residential { color: var(--accent3); background: rgba(96,165,250,0.06); }
+  .type-chip.commercial  { color: var(--accent2); background: rgba(232,168,56,0.08); }
+
+  /* Type toggle in the Adjust sub-row */
+  .type-toggle {
+    display: flex; gap: 0; margin-bottom: 10px;
+    border: 1px solid var(--border-strong); border-radius: var(--r-md);
+    overflow: hidden; width: max-content;
+  }
+  .type-toggle label {
+    padding: 6px 14px; font-size: 12px; cursor: pointer;
+    background: var(--surface); color: var(--muted);
+    border-right: 1px solid var(--border);
+    user-select: none;
+  }
+  .type-toggle label:last-child { border-right: 0; }
+  .type-toggle input { display: none; }
+  .type-toggle input:checked + label.residential {
+    background: var(--accent3); color: #fff;
+  }
+  .type-toggle input:checked + label.commercial {
+    background: var(--accent2); color: #1a120a;
+  }
+  .type-toggle-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); font-weight: 600;
+    display: block; margin-bottom: 5px;
+  }
+
+  /* Multi-unit / data-quality hint badge — sits under the ORIGINAL column */
+  .hint-badge {
+    display: inline-block; margin-top: 6px;
+    padding: 4px 9px; border-radius: 6px;
+    background: rgba(232,168,56,0.10); border: 1px solid rgba(232,168,56,0.35);
+    color: #f6d28b; font-size: 10.5px; line-height: 1.35;
+  }
+
+  /* ── Inline manual-edit sub-row ───────────────────────────────────
+     Expanded under a row when the CSR clicks "Manually set". Editable
+     inputs pre-filled with Google's best guess (or the original ST
+     address if Google had nothing), plus a "Re-verify" button to run
+     the typed values through Google again. The verification result
+     appears inline, and when it's clean enough the user can apply it
+     directly to ST. */
+  table.aa-table tr.manual-row td {
+    background: var(--surface2);
+    padding: 14px 18px;
+    border-top: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .manual-edit {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 10px;
+    align-items: end;
+    margin-bottom: 10px;
+  }
+  .manual-edit .group { display:flex; flex-direction:column; gap:4px; }
+  .manual-edit label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); font-weight: 600;
+  }
+  .manual-edit input {
+    background: var(--surface); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 7px 10px; font-size: 13px; font-family: inherit;
+  }
+  .manual-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .manual-actions .verify {
+    background: var(--accent3); color: #fff; border:none;
+    border-radius: var(--r-md); padding: 7px 14px; font-size: 12px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .manual-actions .verify:hover { filter: brightness(1.08); }
+  .manual-actions .verify:disabled { opacity: 0.5; cursor: not-allowed; }
+  .manual-actions .apply-manual {
+    background: transparent; color: var(--accent3); border:1px solid var(--accent3);
+    border-radius: var(--r-md); padding: 7px 14px; font-size: 12px;
+    font-weight: 600; cursor: pointer; font-family: inherit; display:none;
+  }
+  .manual-actions .apply-manual.ready { display:inline-block; }
+  .manual-actions .apply-manual:hover { background: var(--accent3); color: #fff; }
+  .manual-actions .cancel {
+    background: transparent; color: var(--muted); border:1px solid var(--border-strong);
+    border-radius: var(--r-md); padding: 7px 12px; font-size: 12px;
+    cursor: pointer; font-family: inherit;
+  }
+  .manual-result {
+    margin-top: 10px; padding: 10px 12px; border-radius: var(--r-md);
+    background: var(--surface); border:1px solid var(--border);
+    font-size: 12.5px; display: none;
+  }
+  .manual-result.show { display: block; }
+
+  .empty { text-align:center; padding: 40px; color: var(--muted);
+    background: var(--surface); border:1px dashed var(--border); border-radius: var(--r-lg); }
+  .loading { text-align:center; padding: 40px; color: var(--muted); }
+  .loading::before { content:'⏳'; display:block; font-size:22px; margin-bottom:8px; }
+
+  /* Banner for missing API key */
+  .banner-warn {
+    background: rgba(232,168,56,0.12);
+    border: 1px solid rgba(232,168,56,0.45);
+    color: #f6d28b;
+    font-size: 12.5px; padding: 10px 14px; border-radius: var(--r-md);
+    margin-bottom: 14px;
+  }
+
+  /* Pagination footer */
+  .pager { display:flex; gap:10px; align-items:center; justify-content: space-between;
+    margin-top: 14px; padding: 10px 14px; background: var(--surface); border:1px solid var(--border);
+    border-radius: var(--r-md); font-size: 12px; color: var(--muted); }
+  .pager .nav-btns { display:flex; gap:8px; }
+  .pager button {
+    background: var(--surface2); color: var(--text); border:1px solid var(--border-strong);
+    border-radius: var(--r-md); padding: 6px 12px; font-size: 12px; cursor: pointer; font-family: inherit;
+  }
+  .pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<!-- Nav is built dynamically by /js/shared.js (Investigate dropdown). -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+  <div class="page-header">
+    <div>
+      <h1>Address <span class="accent">Audit</span></h1>
+      <p>Find ServiceTitan customer addresses that are misspelled, undeliverable, or non-standard — and push the corrected version back to ST with one click.</p>
+    </div>
+    <div class="status-bar"><span class="status-dot"></span> <span id="aa-source">Idle</span></div>
+  </div>
+
+  <div id="aa-banner"></div>
+
+  <!-- ── Cache stats strip (rendered after /cache-stats resolves) ──── -->
+  <div id="aa-cache-stats" style="font-size:11.5px; color:var(--muted); margin-bottom:14px; display:none;
+                                   display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+    <span id="aa-cache-text" style="flex:1; min-width:240px;"></span>
+    <button id="aa-reclassify" class="secondary-btn"
+            title="Re-run the classifier against cached rows without calling Google. Useful after the classifier logic has been improved."
+            style="background:var(--surface2); color:var(--text); border:1px solid var(--border-strong);
+                   border-radius:var(--r-md); padding:5px 11px; font-size:11px; cursor:pointer; font-family:inherit;">
+      ↻ Re-classify cache
+    </button>
+    <button id="aa-clear-cache"
+            title="Delete every cache row. The next scan will re-pay Google on every location."
+            style="background:transparent; color:var(--muted); border:1px solid var(--border);
+                   border-radius:var(--r-md); padding:5px 11px; font-size:11px; cursor:pointer; font-family:inherit;">
+      Clear cache
+    </button>
+  </div>
+
+  <!-- ── KPI strip — counts of each status in the current page ─────── -->
+  <div id="aa-kpi-row" style="display:none;">
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="label">Clean</div><div class="value ok"        id="kpi-ok">—</div><div class="sub">already standardized</div></div>
+      <div class="kpi-card"><div class="label">Fixable</div><div class="value std"     id="kpi-std">—</div><div class="sub">Google has a cleaner version</div></div>
+      <div class="kpi-card"><div class="label">Partial Match</div><div class="value warn"  id="kpi-partial">—</div><div class="sub">geocoder had to guess</div></div>
+      <div class="kpi-card"><div class="label">Low Precision</div><div class="value bad"   id="kpi-undel">—</div><div class="sub">not rooftop — likely bad</div></div>
+      <div class="kpi-card"><div class="label">No Match</div><div class="value bad"        id="kpi-nomatch">—</div><div class="sub">Google found nothing</div></div>
+      <div class="kpi-card"><div class="label">Incomplete</div><div class="value muted"    id="kpi-incomplete">—</div><div class="sub">missing st/city/state/zip</div></div>
+      <div class="kpi-card"><div class="label">Errored</div><div class="value bad"         id="kpi-error">—</div><div class="sub">provider call failed</div></div>
+    </div>
+  </div>
+
+  <!-- ── Bulk audit controls ─────────────────────────────────────────── -->
+  <!-- Compact layout — controls wrap onto a second row on narrow viewports.
+       Dropdown labels are kept short; the cost helper sits on its own dim
+       line below the bar so the controls themselves stay tight. -->
+  <div class="ctl-bar">
+    <div class="group">
+      <label for="aa-target">Find</label>
+      <select id="aa-target">
+        <option value="5">5 issues</option>
+        <option value="10" selected>10 issues</option>
+        <option value="25">25 issues</option>
+        <option value="50">50 issues</option>
+      </select>
+    </div>
+    <div class="group">
+      <label for="aa-maxscan">Max scan</label>
+      <select id="aa-maxscan">
+        <option value="100">100</option>
+        <option value="250" selected>250</option>
+        <option value="500">500</option>
+        <option value="1000">1,000</option>
+        <option value="2500">2,500</option>
+        <option value="5000">5,000</option>
+        <option value="10000">10,000 — full sweep</option>
+      </select>
+    </div>
+    <div class="group">
+      <label for="aa-since">Modified after</label>
+      <input id="aa-since" type="date" />
+    </div>
+    <button class="run-btn" id="aa-run">Find issues</button>
+  </div>
+  <div style="font-size:11px;color:var(--muted);margin:-8px 4px 18px;">
+    Google free tier = 40,000 lookups/month. Beyond that, each lookup is $0.005
+    (e.g. a 1,000-scan = ~$5).
+  </div>
+
+  <!-- ── Status filter (applied to results already on screen) ────────── -->
+  <div class="ctl-bar" id="aa-filter-bar" style="display:none; padding: 10px 18px;">
+    <div class="group">
+      <label for="aa-filter">Show</label>
+      <select id="aa-filter">
+        <option value="all" selected>All found</option>
+        <option value="standardized">Standardized</option>
+        <option value="partial">Partial match</option>
+        <option value="undeliverable">Low precision</option>
+        <option value="no-match">No match</option>
+        <option value="error">Errors</option>
+      </select>
+    </div>
+    <span class="spacer"></span>
+    <span style="font-size:11px;color:var(--muted);" id="aa-page-label"></span>
+    <button class="secondary-btn" id="aa-continue" style="display:none;">Find next batch →</button>
+  </div>
+
+  <!-- ── Single-lookup card (no ST involvement) ──────────────────────── -->
+  <!-- Inputs auto-fit to viewport via grid + minmax — they stack to two rows
+       on narrower screens instead of getting squished onto one. -->
+  <div class="single-card">
+    <h3>Quick lookup — verify a single address</h3>
+    <div class="single-row">
+      <div class="group" style="grid-column: span 2;"><label>Street</label><input id="sl-street" placeholder="123 Main St" /></div>
+      <div class="group"><label>Unit</label><input id="sl-unit" placeholder="Apt 2" /></div>
+      <div class="group" style="grid-column: span 2;"><label>City</label><input id="sl-city" placeholder="Ridgemont" /></div>
+      <div class="group"><label>State</label><input id="sl-state" placeholder="OH" maxlength="2" /></div>
+      <div class="group"><label>Zip</label><input id="sl-zip" placeholder="43064" /></div>
+      <button id="sl-go">Verify</button>
+    </div>
+    <div id="sl-result" class="single-result"></div>
+  </div>
+
+  <div id="aa-table-wrap"></div>
+  <div id="aa-pager"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+// ── State ─────────────────────────────────────────────────────────────
+// startPage carries forward between "Find next batch" clicks so we resume
+// where the prior scan stopped instead of re-scanning the same locations.
+let state = {
+  data: null,
+  loading: false,
+  startPage: 1,
+};
+
+const $ = (id) => document.getElementById(id);
+
+// ── On-load: warn if GOOGLE_MAPS_API_KEY missing + show cache stats ───
+(async function checkHealth() {
+  try {
+    const r = await fetch('/api/address/health');
+    const d = await r.json();
+    if (!d.providerConfigured) {
+      $('aa-banner').innerHTML =
+        '<div class="banner-warn">Heads up — <strong>GOOGLE_MAPS_API_KEY</strong> isn\'t set on the server, ' +
+        'so verification will fail until you add it as a Railway env var. ' +
+        'Enable the <em>Geocoding API</em> on your Google Cloud project and paste the key in.</div>';
+    }
+  } catch (_) { /* non-fatal */ }
+  refreshCacheStats();
+})();
+
+// Re-classify: re-runs the smarter classifier against existing cache rows,
+// no Google calls. Cheap and idempotent.
+document.getElementById('aa-reclassify')?.addEventListener('click', async () => {
+  const btn = document.getElementById('aa-reclassify');
+  btn.disabled = true; btn.textContent = 'Re-classifying…';
+  try {
+    const r = await fetch('/api/address/reclassify', { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    const legacyNote = d.legacyCount
+      ? ` (${d.legacyCount} legacy rows need a fresh scan to upgrade)`
+      : '';
+    showToast(`Re-classified ${d.total} cached rows · ${d.changed} updated${legacyNote}`, { type: 'info' });
+    refreshCacheStats();
+    if (state.data) {
+      // The on-screen rows are still the old classifications — easiest is to
+      // trigger a fresh "Find issues" from the top so the user sees the new
+      // story, but only if they want. Otherwise leave the table alone.
+    }
+  } catch (err) {
+    showToast('Re-classify failed: ' + err.message, { type: 'error' });
+  } finally {
+    btn.disabled = false; btn.textContent = '↻ Re-classify cache';
+  }
+});
+
+document.getElementById('aa-clear-cache')?.addEventListener('click', async () => {
+  if (!confirm(
+    'Delete every cache row?\n\n' +
+    'The next scan will re-pay Google on every location it visits. ' +
+    'Only do this if you suspect the cached verifications themselves are wrong.'
+  )) return;
+  const btn = document.getElementById('aa-clear-cache');
+  btn.disabled = true; btn.textContent = 'Clearing…';
+  try {
+    const r = await fetch('/api/address/clear-cache', { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    showToast(`Cache cleared (${d.deleted} rows deleted)`, { type: 'info' });
+    refreshCacheStats();
+  } catch (err) {
+    showToast('Clear cache failed: ' + err.message, { type: 'error' });
+  } finally {
+    btn.disabled = false; btn.textContent = 'Clear cache';
+  }
+});
+
+async function refreshCacheStats() {
+  try {
+    const r = await fetch('/api/address/cache-stats');
+    const d = await r.json();
+    if (!d.ok) return;
+    if (d.total === 0) {
+      $('aa-cache-stats').style.display = 'none';
+      return;
+    }
+    const when = d.lastCheckedAt
+      ? new Date(d.lastCheckedAt.replace(' ', 'T') + 'Z').toLocaleString(undefined, {
+          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+        })
+      : '—';
+    $('aa-cache-text').innerHTML =
+      `Cache: <strong>${d.total.toLocaleString()}</strong> locations verified · ` +
+      `${(d.applied || 0).toLocaleString()} corrections applied · last touched ${escHtml(when)}. ` +
+      `<em>Re-running won\'t re-charge Google for addresses that haven\'t changed in ST.</em>`;
+    $('aa-cache-stats').style.display = 'block';
+  } catch (_) { /* non-fatal */ }
+}
+
+// ── Find issues ────────────────────────────────────────────────────────
+$('aa-run').addEventListener('click', () => { state.startPage = 1; state.data = null; runFind(); });
+$('aa-filter').addEventListener('change', () => { if (state.data) renderTable(); });
+$('aa-continue').addEventListener('click', () => runFind());
+
+async function runFind() {
+  if (state.loading) return;
+  const target  = parseInt($('aa-target').value, 10);
+  const maxScan = parseInt($('aa-maxscan').value, 10);
+  const since   = $('aa-since').value;
+
+  if (!confirm(
+    `About to scan up to ${maxScan} ServiceTitan locations looking for ` +
+    `${target} that need fixing.\n\n` +
+    `That's at most ${maxScan} Google geocoding lookups. ` +
+    `Google's free tier is 40,000 lookups/month, so this is free unless ` +
+    `you've already used most of the month's quota.\n\nProceed?`
+  )) return;
+
+  state.loading = true;
+  const btn = $('aa-run');
+  btn.disabled = true;
+  btn.textContent = 'Scanning…';
+  $('aa-continue').disabled = true;
+  $('aa-source').textContent = `Scanning ST locations (up to ${maxScan})…`;
+  $('aa-table-wrap').innerHTML =
+    `<div class="loading">Walking ServiceTitan locations + checking each via Google Geocoding…<br>` +
+    `<span style="font-size:11px;">Stops as soon as ${target} issues are found, or after ${maxScan} addresses are checked.</span></div>`;
+  $('aa-pager').innerHTML = '';
+
+  try {
+    const qs = new URLSearchParams({
+      count: target,
+      maxScan,
+      startPage: state.startPage,
+    });
+    if (since) qs.set('modifiedOnOrAfter', since);
+    const r = await fetch('/api/address/find-issues?' + qs.toString());
+    const data = await r.json();
+    if (!r.ok || !data.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    state.data = data;
+    state.startPage = data.nextStartPage; // resume from here on "Find next batch"
+
+    const stoppedBecause = data.hitTarget
+      ? `found ${data.issues.length} issues`
+      : data.hitMaxScan
+        ? `hit the ${maxScan}-address scan cap`
+        : `reached end of ST locations`;
+    const cacheNote = data.geocodeCalls != null
+      ? ` · ${data.cacheHits} from cache, ${data.geocodeCalls} new Google lookups`
+      : '';
+    $('aa-source').textContent =
+      `Scanned ${data.scanned} addresses · ${stoppedBecause}${cacheNote} · ${(data.elapsedMs / 1000).toFixed(1)}s`;
+    refreshCacheStats();
+    $('aa-page-label').textContent = `${data.issues.length} issues / ${data.scanned} scanned`;
+    $('aa-filter-bar').style.display = 'flex';
+    $('aa-continue').style.display = data.scanned > 0 ? 'inline-block' : 'none';
+    $('aa-continue').disabled = false;
+    $('aa-continue').textContent =
+      data.hitTarget || data.hitMaxScan
+        ? `Find next ${target} issues →`
+        : 'Done — no more locations';
+    if (!data.hitTarget && !data.hitMaxScan) {
+      $('aa-continue').disabled = true;
+    }
+
+    renderKpis();
+    renderTable();
+  } catch (err) {
+    $('aa-table-wrap').innerHTML = `<div class="empty">Failed to load: ${escHtml(err.message)}</div>`;
+    $('aa-source').textContent = 'Error';
+    showToast('Address audit failed: ' + err.message, { type: 'error' });
+  } finally {
+    state.loading = false;
+    btn.disabled = false;
+    btn.textContent = 'Find issues';
+  }
+}
+
+// ── KPIs ───────────────────────────────────────────────────────────────
+function renderKpis() {
+  const s = state.data.summary || {};
+  $('aa-kpi-row').style.display = 'block';
+  $('kpi-ok').textContent         = s['ok'] || 0;
+  $('kpi-std').textContent        = s['standardized'] || 0;
+  $('kpi-partial').textContent    = s['partial'] || 0;
+  $('kpi-undel').textContent      = s['undeliverable'] || 0;
+  $('kpi-nomatch').textContent    = s['no-match'] || 0;
+  $('kpi-incomplete').textContent = s['incomplete'] || 0;
+  $('kpi-error').textContent      = s['error'] || 0;
+}
+
+// ── Table ──────────────────────────────────────────────────────────────
+function rowsForFilter() {
+  const f = $('aa-filter').value;
+  const all = state.data?.issues || [];
+  if (f === 'all') return all;
+  return all.filter(r => r.status === f);
+}
+
+function renderTable() {
+  const rows = rowsForFilter();
+  if (rows.length === 0) {
+    const total = state.data?.issues?.length || 0;
+    const msg = total === 0
+      ? `Scanned ${state.data?.scanned || 0} addresses and didn't find any issues — clean batch! ` +
+        (state.data?.hitMaxScan ? 'Hit the scan cap, so there could be more deeper in.' : '')
+      : `No rows match this filter. ${total} issue${total === 1 ? '' : 's'} total — try "All found".`;
+    $('aa-table-wrap').innerHTML = `<div class="empty">${escHtml(msg)}</div>`;
+    return;
+  }
+
+  const trs = rows.map((r, idx) => {
+    const orig = r.originalFormatted || '(empty)';
+    // Approve = push the suggested correction straight to ST. We allow this
+    // on standardized rows (clean Google match that differs from ST) and on
+    // 'ok' rows that surfaced solely because of a streetIssue (the repair
+    // pass already cleaned up the structure, CSR can just bless it).
+    const canApprove = (r.status === 'standardized' || (r.status === 'ok' && r.streetIssue))
+      && (r.verified || r.suggestedAddr);
+    // Adjust opens the manual sub-row — available whenever the row isn't
+    // already perfectly clean.
+    const canAdjust = r.status !== 'ok' || r.streetIssue || r.nameSuggestion;
+    // The Approve button needs a payload — prefer Google's verified, fall
+    // back to the suggestedAddr (which may be the auto-repaired version).
+    const approveAddr = r.verified || r.suggestedAddr;
+    const approveDataAttr = canApprove
+      ? `data-loc="${r.locationId}" data-row-idx="${idx}" data-addr='${escHtml(JSON.stringify(approveAddr))}'${r.nameSuggestion ? ` data-name='${escHtml(r.nameSuggestion)}'` : ''}`
+      : '';
+
+    // Pre-fill the manual-edit inputs with the strongest candidate available.
+    const prefill = r.verified || r.suggestedAddr || r.repaired || r.original || {};
+    const manualDataAttr =
+      `data-row="aa-row-${idx}" data-loc="${r.locationId}"`;
+
+    // ── Verified column content ───────────────────────────────────────
+    // What we show depends on the status:
+    //  - 'ok' (and no streetIssue)  → "✓ Google Verified" green badge
+    //  - 'standardized'             → "Suggested correction:" + the verified
+    //                                 address (clean Google form differs from ST)
+    //  - 'partial' / 'undeliverable' → orange label + verified address
+    //  - 'no-match'                  → "No match found"
+    //  - 'incomplete'                → "Cannot verify — fields missing"
+    //  - 'error'                     → red error message
+    let verBlock = '';
+    // suggestedFormatted is always populated server-side, so this falls through cleanly.
+    const verAddrText = r.verifiedFormatted || r.suggestedFormatted || '';
+    if (r.status === 'ok' && !r.streetIssue) {
+      verBlock = `<div class="ver-tag ver-tag-ok">✓ Google Verified</div>
+        <div class="addr-verified" style="margin-top:6px;">${escHtml(verAddrText || orig)}</div>`;
+    } else if (r.status === 'standardized') {
+      verBlock = `<div class="ver-tag ver-tag-suggest">Suggested correction</div>
+        <div class="addr-verified changed" style="margin-top:6px;">${escHtml(verAddrText)}</div>`;
+    } else if (r.status === 'partial') {
+      verBlock = `<div class="ver-tag ver-tag-warn">Partial match — review before applying</div>
+        <div class="addr-verified changed" style="margin-top:6px;">${escHtml(verAddrText)}</div>`;
+    } else if (r.status === 'undeliverable') {
+      verBlock = `<div class="ver-tag ver-tag-warn">Low precision — Google couldn't pin a rooftop</div>
+        <div class="addr-verified" style="margin-top:6px;">${escHtml(verAddrText)}</div>`;
+    } else if (r.status === 'no-match') {
+      verBlock = `<div class="ver-tag ver-tag-bad">No match found</div>
+        <div class="addr-verified muted" style="margin-top:6px;">Try Adjust to fix the fields and re-verify</div>`;
+    } else if (r.status === 'incomplete') {
+      verBlock = `<div class="ver-tag ver-tag-bad">Incomplete — missing fields</div>
+        <div class="addr-verified muted" style="margin-top:6px;">Try Adjust to fill in the gaps and verify</div>`;
+    } else if (r.status === 'error') {
+      verBlock = `<div class="ver-tag ver-tag-bad">Provider error</div>
+        <div class="addr-verified muted" style="margin-top:6px;">${escHtml(r.error || 'unknown')}</div>`;
+    } else if (r.streetIssue) {
+      // 'ok' status but flagged for structural cleanup — show the suggestion.
+      verBlock = `<div class="ver-tag ver-tag-suggest">Suggested correction</div>
+        <div class="addr-verified changed" style="margin-top:6px;">${escHtml(verAddrText)}</div>`;
+    } else {
+      verBlock = `<div class="addr-verified muted">—</div>`;
+    }
+
+    // Sub-line: location type, partial flag, cache/checked timestamp
+    const subHint = [];
+    if (r.locationType) subHint.push(r.locationType.toLowerCase().replace(/_/g, ' '));
+    if (r.partialMatch) subHint.push('partial match');
+    if (r.cached) subHint.push('from cache');
+    if (r.checkedAt) {
+      const dt = new Date(r.checkedAt.replace(' ', 'T') + 'Z');
+      if (!isNaN(dt)) {
+        subHint.push('checked ' + dt.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }));
+      }
+    }
+    const sub = subHint.length
+      ? `<div class="muted" style="font-size:10.5px; margin-top:6px;">${escHtml(subHint.join(' · '))}</div>`
+      : '';
+
+    return `
+      <tr id="aa-row-${idx}">
+        <td>
+          <div style="font-weight:600;">${escHtml(r.name || '(no location name)')}</div>
+          <div class="muted" style="font-size:11px;">loc ${r.locationId} · cust ${r.customerId}</div>
+          ${r.detectedType
+            ? `<span class="type-chip ${r.detectedType.toLowerCase()}" title="Auto-detected from the name. Open Adjust to change it.">${r.detectedType === 'Commercial' ? '🏢' : '🏠'} ${escHtml(r.detectedType)}</span>`
+            : ''}
+          ${r.nameSuggestion
+            ? `<div class="hint-badge" style="margin-top:6px;" title="Suggested rewrite of the Location Name">name: ${escHtml(r.nameSuggestion)}</div>`
+            : ''}
+        </td>
+        <td>
+          <div class="addr-original">${escHtml(orig)}</div>
+          ${r.streetIssue ? `<div class="hint-badge">⚠ ${escHtml(r.streetIssue)}</div>` : ''}
+          ${r.repairs && r.repairs.length
+            ? `<div class="hint-badge" title="Address fields were auto-cleaned before sending to Google">⚙ auto-cleaned: ${escHtml(r.repairs.join('; '))}</div>`
+            : ''}
+        </td>
+        <td>
+          ${verBlock}
+          ${sub}
+        </td>
+        <td>
+          <div class="row-actions">
+            ${canApprove
+              ? `<button class="approve" ${approveDataAttr}>✓ Approve</button>`
+              : ''}
+            ${canAdjust
+              ? `<button class="adjust" ${manualDataAttr}>✏ Adjust</button>`
+              : ''}
+            <button class="skip" data-loc="${r.locationId}" data-row-idx="${idx}" title="Hide this row from future scans — nothing changes in ST.">Skip</button>
+          </div>
+        </td>
+      </tr>
+      <tr id="aa-manual-${idx}" class="manual-row" style="display:none;">
+        <td colspan="5">
+          <div class="muted" style="font-size:11px; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.06em; font-weight:600;">
+            Manual override — edit, re-verify, then apply to ServiceTitan
+          </div>
+          <!-- Location Name lives above the address row since it's a separate
+               ST field. Pre-filled with the suggested rewrite when one exists,
+               else the current name. Leave blank to skip updating the name. -->
+          <div class="manual-edit" style="margin-bottom:6px;">
+            <div class="group" style="grid-column: 1 / -1;">
+              <label>Location name${r.nameSuggestion ? ' (suggested rewrite pre-filled)' : ''}</label>
+              <input class="m-name" value="${escHtml(r.nameSuggestion || r.name || '')}"
+                     placeholder="${escHtml(r.name || 'leave blank to keep existing')}" />
+            </div>
+          </div>
+
+          <!-- Customer type toggle. Pre-selected to the auto-detected value
+               based on the location name. The CSR can flip it; we only push
+               a customer.type change to ST if the chosen value differs from
+               the pre-selected detected value. data-detected captures the
+               initial state so manualApply can do that diff. -->
+          <div style="margin-bottom:10px;" data-detected="${escHtml(r.detectedType || 'Residential')}">
+            <span class="type-toggle-label">Customer type</span>
+            <div class="type-toggle">
+              <input type="radio" name="m-type-${idx}" id="m-type-res-${idx}" value="Residential"
+                     ${(r.detectedType || 'Residential') === 'Residential' ? 'checked' : ''} />
+              <label for="m-type-res-${idx}" class="residential">🏠 Residential</label>
+              <input type="radio" name="m-type-${idx}" id="m-type-com-${idx}" value="Commercial"
+                     ${r.detectedType === 'Commercial' ? 'checked' : ''} />
+              <label for="m-type-com-${idx}" class="commercial">🏢 Commercial</label>
+            </div>
+          </div>
+          <div class="manual-edit">
+            <div class="group" style="grid-column: span 2;">
+              <label>Street</label>
+              <input class="m-street" value="${escHtml(prefill.street || '')}" />
+            </div>
+            <div class="group">
+              <label>Unit</label>
+              <input class="m-unit" value="${escHtml(prefill.unit || '')}" />
+            </div>
+            <div class="group" style="grid-column: span 2;">
+              <label>City</label>
+              <input class="m-city" value="${escHtml(prefill.city || '')}" />
+            </div>
+            <div class="group">
+              <label>State</label>
+              <input class="m-state" maxlength="2" value="${escHtml(prefill.state || '')}" />
+            </div>
+            <div class="group">
+              <label>Zip</label>
+              <input class="m-zip" value="${escHtml(prefill.zip || '')}" />
+            </div>
+          </div>
+          <div class="manual-actions">
+            <button class="verify" data-loc="${r.locationId}" data-row-idx="${idx}">Re-verify</button>
+            <button class="apply-manual" data-loc="${r.locationId}" data-row-idx="${idx}">Apply this version to ST</button>
+            <button class="cancel" data-row-idx="${idx}">Cancel</button>
+          </div>
+          <div class="manual-result" id="aa-manual-result-${idx}"></div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  $('aa-table-wrap').innerHTML = `
+    <table class="aa-table">
+      <thead><tr>
+        <th style="width:20%;">Location</th>
+        <th style="width:28%;">ST address (original)</th>
+        <th style="width:32%;">Verified (Google)</th>
+        <th style="width:20%;">Action</th>
+      </tr></thead>
+      <tbody>${trs}</tbody>
+    </table>
+  `;
+
+  // Approve = push the suggested correction straight to ST (Google's verified
+  // version, plus the name suggestion if there is one).
+  document.querySelectorAll('.row-actions button.approve').forEach((btn) => {
+    btn.addEventListener('click', () => applyCorrection(btn));
+  });
+
+  // Adjust → open the manual sub-row
+  document.querySelectorAll('.row-actions button.adjust').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const rowId = btn.dataset.row;
+      const idx = rowId.replace('aa-row-', '');
+      const sub = document.getElementById('aa-manual-' + idx);
+      if (!sub) return;
+      const opening = sub.style.display === 'none' || !sub.style.display;
+      sub.style.display = opening ? 'table-row' : 'none';
+      if (opening) {
+        // Reset the prior result panel when re-opening
+        const result = document.getElementById('aa-manual-result-' + idx);
+        if (result) { result.className = 'manual-result'; result.innerHTML = ''; }
+        const apply = sub.querySelector('.apply-manual');
+        if (apply) apply.classList.remove('ready');
+      }
+    });
+  });
+
+  // Re-verify the typed address (runs through /api/address/verify)
+  document.querySelectorAll('.manual-actions .verify').forEach((btn) => {
+    btn.addEventListener('click', () => manualReverify(btn));
+  });
+
+  // Apply the manually edited address straight to ST
+  document.querySelectorAll('.manual-actions .apply-manual').forEach((btn) => {
+    btn.addEventListener('click', () => manualApply(btn));
+  });
+
+  // Cancel = close the sub-row
+  document.querySelectorAll('.manual-actions .cancel').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = btn.dataset.rowIdx;
+      const sub = document.getElementById('aa-manual-' + idx);
+      if (sub) sub.style.display = 'none';
+    });
+  });
+
+  // Skip = mark row as dismissed so it stops surfacing in future scans
+  document.querySelectorAll('.row-actions button.skip').forEach((btn) => {
+    btn.addEventListener('click', () => skipRow(btn));
+  });
+}
+
+async function skipRow(btn) {
+  const locationId = btn.dataset.loc;
+  const idx = btn.dataset.rowIdx;
+  if (!confirm(
+    'Skip this row?\n\nIt will be hidden from future scans, but nothing in ServiceTitan changes. ' +
+    'Use this for rows the CSR has manually confirmed are fine as-is, or that genuinely can\'t be cleaned up.'
+  )) return;
+  btn.disabled = true; btn.textContent = 'Skipping…';
+  try {
+    const r = await fetch('/api/address/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    // Visually fade the row out so the CSR knows it's gone.
+    const topRow = document.getElementById('aa-row-' + idx);
+    const sub    = document.getElementById('aa-manual-' + idx);
+    if (topRow) { topRow.style.opacity = '0.35'; topRow.querySelectorAll('button').forEach(b => b.disabled = true); }
+    if (sub)    { sub.style.display = 'none'; }
+    showToast(`Skipped location ${locationId} — won't show up in future scans`, { type: 'info' });
+  } catch (err) {
+    btn.disabled = false; btn.textContent = 'Skip';
+    showToast('Skip failed: ' + err.message, { type: 'error' });
+  }
+}
+
+// ── Manual override helpers ───────────────────────────────────────────
+// Read the four+1 input values inside a given manual-row.
+function readManualInputs(idx) {
+  const sub = document.getElementById('aa-manual-' + idx);
+  if (!sub) return null;
+  return {
+    street: sub.querySelector('.m-street').value.trim(),
+    unit:   sub.querySelector('.m-unit').value.trim(),
+    city:   sub.querySelector('.m-city').value.trim(),
+    state:  sub.querySelector('.m-state').value.trim(),
+    zip:    sub.querySelector('.m-zip').value.trim(),
+  };
+}
+
+// Run the typed address through Google, render the result inline, and reveal
+// the "Apply this version" button if the result is acceptable.
+async function manualReverify(btn) {
+  const idx = btn.dataset.rowIdx;
+  const sub = document.getElementById('aa-manual-' + idx);
+  const result = document.getElementById('aa-manual-result-' + idx);
+  const applyBtn = sub.querySelector('.apply-manual');
+  const body = readManualInputs(idx);
+  if (!body) return;
+  if (!body.street || !body.city || !body.state || !body.zip) {
+    result.className = 'manual-result show';
+    result.innerHTML = '<span style="color:var(--accent);">Street, city, state, and zip are all required to verify.</span>';
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Verifying…';
+  applyBtn.classList.remove('ready');
+  result.className = 'manual-result show';
+  result.innerHTML = 'Looking up…';
+
+  try {
+    const r = await fetch('/api/address/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    const res = d.result;
+
+    // Stash the verified payload on the apply button so a click goes straight
+    // through without a second round-trip.
+    applyBtn.dataset.addr = JSON.stringify(res.verified || body);
+
+    // We accept ok/standardized/partial for apply — anything precise enough
+    // to put in ST. undeliverable / no-match still rendered, but apply stays
+    // hidden so the CSR has to try a different spelling.
+    const acceptable = ['ok', 'standardized', 'partial'].includes(res.status) && res.verified;
+
+    const hints = [];
+    if (res.locationType) hints.push(res.locationType.toLowerCase().replace(/_/g, ' '));
+    if (res.partialMatch) hints.push('partial match');
+
+    result.innerHTML = `
+      <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start;">
+        <div style="flex:1; min-width:220px;">
+          <div class="muted" style="font-size:10px; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">Google says</div>
+          <div class="addr-verified">${escHtml(res.verifiedFormatted || '(no match)')}</div>
+          ${hints.length ? `<div class="muted" style="font-size:10.5px; margin-top:4px;">${escHtml(hints.join(' · '))}</div>` : ''}
+        </div>
+        <div><span class="pill pill-${res.status}">${res.status}</span></div>
+      </div>
+      ${acceptable
+        ? '<div class="muted" style="font-size:11px; margin-top:8px;">Looks good — click <strong>Apply this version to ST</strong> to push it.</div>'
+        : '<div class="muted" style="font-size:11px; margin-top:8px;">Not precise enough to apply. Try tweaking the address (a typo somewhere?) and re-verify.</div>'}
+    `;
+    applyBtn.classList.toggle('ready', acceptable);
+  } catch (err) {
+    result.innerHTML = `<span style="color:var(--accent);">${escHtml(err.message)}</span>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Re-verify';
+  }
+}
+
+// Push the verified-or-typed address straight to ST. Uses the same /apply
+// endpoint as the "Apply correction" button on top-level rows, so the cache
+// gets updated and applied_at gets stamped via the existing service code.
+async function manualApply(btn) {
+  const idx = btn.dataset.rowIdx;
+  const locationId = btn.dataset.loc;
+  // Prefer the verified version stashed by manualReverify; fall back to the
+  // raw inputs if for some reason the verify step didn't populate it.
+  let addr;
+  try { addr = JSON.parse(btn.dataset.addr || 'null'); } catch (_) { addr = null; }
+  if (!addr) addr = readManualInputs(idx);
+  if (!addr || !addr.street || !addr.city || !addr.state || !addr.zip) {
+    showToast('Need street, city, state, and zip to apply.', { type: 'warn' });
+    return;
+  }
+  // Optional location-name update. The input is pre-filled with either the
+  // suggested rewrite or the current name; we only push it through if the
+  // CSR actually changed it from what ST already has on file.
+  const sub = document.getElementById('aa-manual-' + idx);
+  const nameInput = sub?.querySelector('.m-name');
+  const placeholderName = nameInput?.getAttribute('placeholder') || '';
+  const typedName = (nameInput?.value || '').trim();
+  const nameToSend = typedName && typedName !== placeholderName ? typedName : null;
+
+  // Optional customer-type update. The toggle is pre-selected to the
+  // auto-detected value; we only push a type change to ST if the CSR
+  // flipped it to the other option.
+  const typeContainer = sub?.querySelector('[data-detected]');
+  const detectedType = typeContainer?.getAttribute('data-detected') || 'Residential';
+  const checkedType = sub?.querySelector(`input[name="m-type-${idx}"]:checked`)?.value;
+  const typeToSend = checkedType && checkedType !== detectedType ? checkedType : null;
+  // customerId is needed alongside customerType for the customer PATCH.
+  // Pulled off the same dataset the Skip/Apply buttons already use.
+  const customerId = btn.closest('tr.manual-row')
+    ?.previousElementSibling?.querySelector('.muted')
+    ?.textContent.match(/cust\s+(\d+)/)?.[1] || null;
+
+  if (!confirm(
+    'Push this manually edited record to ST location ' + locationId + '?\n\n' +
+    [addr.street, addr.unit, [addr.city, addr.state, addr.zip].filter(Boolean).join(' ')]
+      .filter(Boolean).join('\n') +
+    (nameToSend ? `\n\nAlso renaming the Location to:\n${nameToSend}` : '') +
+    (typeToSend ? `\n\nAlso changing customer type to:\n${typeToSend}` : '')
+  )) return;
+
+  btn.disabled = true; btn.textContent = 'Applying…';
+  try {
+    const r = await fetch('/api/address/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locationId,
+        address: addr,
+        ...(nameToSend ? { name: nameToSend } : {}),
+        ...(typeToSend && customerId ? { customerType: typeToSend, customerId } : {}),
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    showToast(`Updated ST location ${locationId} with manually-set address`, { type: 'info' });
+    refreshCacheStats();
+    // Collapse the manual sub-row + update the top row to "Applied" state.
+    markRowApplied(idx, addr, nameToSend);
+  } catch (err) {
+    btn.disabled = false; btn.textContent = 'Apply this version to ST';
+    showToast('Apply failed: ' + err.message, { type: 'error' });
+  }
+}
+
+// ── Mark row as applied (shared by Approve + manualApply) ──────────────
+// Runs after a successful ST write so the row visually moves from "needs
+// attention" to "done":
+//   - Close any open manual sub-row.
+//   - Replace the verified-column block with a green "✓ Applied to ST" tag
+//     plus the address that was just pushed.
+//   - Collapse the row's actions down to a single disabled "✓ Applied" pill.
+//   - Dim the whole row so a CSR scrolling past sees at a glance that this
+//     one's resolved and doesn't need another look.
+// idx     — the row index used in aa-row-<idx> / aa-manual-<idx> IDs
+// addr    — the address object that was applied (used to render the line)
+// newName — optional, the location name that was applied
+function markRowApplied(idx, addr, newName) {
+  const topRow = document.getElementById('aa-row-' + idx);
+  const sub    = document.getElementById('aa-manual-' + idx);
+  if (sub) sub.style.display = 'none';
+  if (!topRow) return;
+
+  // Update the Location column — drop the name-suggestion badge if a name
+  // was pushed, and reflect the new name in the bold header.
+  if (newName) {
+    const nameCell = topRow.children[0];
+    if (nameCell) {
+      const nameDiv = nameCell.querySelector('div[style*="font-weight"]');
+      if (nameDiv) nameDiv.textContent = newName;
+      nameCell.querySelectorAll('.hint-badge').forEach(b => b.remove());
+    }
+  }
+
+  // Verified column → "✓ Applied to ST" tag + the address that was applied.
+  const verCell = topRow.children[2];
+  if (verCell) {
+    const formatted = [
+      [addr.street, addr.unit].filter(Boolean).join(' '),
+      addr.city,
+      [addr.state, addr.zip].filter(Boolean).join(' '),
+    ].filter(Boolean).join(', ');
+    verCell.innerHTML =
+      '<div class="ver-tag ver-tag-ok">✓ Applied to ST</div>' +
+      '<div class="addr-verified" style="margin-top:6px;">' + escHtml(formatted) + '</div>';
+  }
+
+  // Action column → single disabled "✓ Applied" pill.
+  const actionCell = topRow.children[3];
+  if (actionCell) {
+    actionCell.innerHTML =
+      '<div class="row-actions"><button class="approve" disabled>✓ Applied</button></div>';
+  }
+
+  // Soft dim so the row reads as resolved.
+  topRow.style.opacity = '0.6';
+  topRow.style.transition = 'opacity 0.4s';
+}
+
+// ── Approve (writeback) ────────────────────────────────────────────────
+// Pushes Google's verified address (and the suggested location-name rewrite
+// if there is one) straight to ST. Called from the green ✓ Approve button.
+async function applyCorrection(btn) {
+  const locationId = btn.dataset.loc;
+  let addr;
+  try { addr = JSON.parse(btn.dataset.addr); } catch (e) {
+    showToast('Bad address payload', { type: 'error' }); return;
+  }
+  const suggestedName = btn.dataset.name || null;
+
+  const ok = confirm(
+    'Approve this correction for ServiceTitan location ' + locationId + '?\n\n' +
+    [addr.street, addr.unit, [addr.city, addr.state, addr.zip].filter(Boolean).join(' ')]
+      .filter(Boolean).join('\n') +
+    (suggestedName ? `\n\nAlso renaming the Location to:\n${suggestedName}` : '')
+  );
+  if (!ok) return;
+  btn.disabled = true;
+  btn.textContent = 'Applying…';
+  try {
+    const r = await fetch('/api/address/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locationId,
+        address: addr,
+        ...(suggestedName ? { name: suggestedName } : {}),
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    showToast(`Updated ST location ${locationId}`, { type: 'info' });
+    refreshCacheStats();
+    const idx = btn.dataset.rowIdx;
+    if (idx != null) markRowApplied(idx, addr, suggestedName);
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = '✓ Approve';
+    showToast('Apply failed: ' + err.message, { type: 'error' });
+  }
+}
+
+// ── Single-lookup card ─────────────────────────────────────────────────
+$('sl-go').addEventListener('click', async () => {
+  const body = {
+    street: $('sl-street').value.trim(),
+    unit:   $('sl-unit').value.trim(),
+    city:   $('sl-city').value.trim(),
+    state:  $('sl-state').value.trim(),
+    zip:    $('sl-zip').value.trim(),
+  };
+  const out = $('sl-result');
+  out.className = 'single-result show';
+  out.innerHTML = 'Looking up…';
+  try {
+    const r = await fetch('/api/address/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    const res = d.result;
+    const v = res.verified || {};
+    out.innerHTML = `
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;">
+        <div style="flex:1; min-width:220px;">
+          <div class="muted" style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">You entered</div>
+          <div class="addr-original">${escHtml([res.original.street, res.original.unit].filter(Boolean).join(' '))}
+${escHtml([res.original.city, res.original.state, res.original.zip].filter(Boolean).join(' '))}</div>
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <div class="muted" style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Google says</div>
+          <div class="addr-verified ${res.status === 'standardized' || res.status === 'partial' ? 'changed' : ''}">${escHtml(res.verifiedFormatted || '(no match)')}</div>
+          <div class="muted" style="font-size:10.5px;margin-top:4px;">
+            ${escHtml((res.locationType || '').toLowerCase().replace(/_/g,' '))}${res.partialMatch ? ' · partial match' : ''}
+            ${res.lat != null ? ` · ${res.lat.toFixed(5)}, ${res.lng.toFixed(5)}` : ''}
+          </div>
+        </div>
+        <div><span class="pill pill-${res.status}">${res.status}</span></div>
+      </div>
+    `;
+  } catch (err) {
+    out.innerHTML = `<span style="color:var(--accent);">${escHtml(err.message)}</span>`;
+  }
+});
+</script>
+
+</body>
+</html>

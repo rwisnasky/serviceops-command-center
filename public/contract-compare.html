@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Contract Compare — ServiceOps Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/styles.css" />
+<style>
+  /* ── KPI strip (matches other tools) ─────────────────────────────── */
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:20px; }
+  .kpi-card { background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg); padding: 16px 18px; }
+  .kpi-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+  .kpi-card .value { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--text); }
+  .kpi-card .value.added    { color: var(--ok); }
+  .kpi-card .value.removed  { color: var(--accent2, #ef4455); }
+  .kpi-card .value.modified { color: var(--accent3, var(--accent)); }
+  .kpi-card .value.total    { color: var(--accent); }
+  .kpi-card .sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* ── Upload / paste cards ────────────────────────────────────────── */
+  .upload-row {
+    display:grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px;
+  }
+  @media (max-width: 860px) { .upload-row { grid-template-columns: 1fr; } }
+
+  .upload-card {
+    background: var(--surface); border:1px solid var(--border);
+    border-radius: var(--r-lg); padding: 18px; display:flex; flex-direction:column; gap:12px;
+  }
+  .upload-card h3 {
+    margin:0; font-family: var(--font-display); font-size: 15px; font-weight: 600;
+    color: var(--text); display:flex; align-items:center; gap:10px;
+  }
+  .upload-card h3 .pill {
+    font-family: inherit; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    background: var(--surface2); border:1px solid var(--border);
+    border-radius: 999px; padding: 2px 9px; color: var(--muted);
+  }
+  .upload-card h3.original .pill { color: var(--accent3, var(--accent)); border-color: rgba(80,130,255,0.35); }
+  .upload-card h3.new .pill      { color: var(--ok); border-color: rgba(80,200,120,0.35); }
+
+  .dropzone {
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--r-md); padding: 22px; text-align:center;
+    color: var(--muted); cursor: pointer; transition: all .12s;
+    background: var(--surface2);
+  }
+  .dropzone:hover { border-color: var(--accent); color: var(--text); }
+  .dropzone.drag  { border-color: var(--accent); background: rgba(80,130,255,0.07); color: var(--text); }
+  .dropzone .big { font-size: 22px; margin-bottom: 6px; }
+  .dropzone .sub { font-size: 11px; }
+  .dropzone input[type="file"] { display:none; }
+
+  .file-chip {
+    display:flex; align-items:center; gap:10px;
+    background: var(--surface2); border:1px solid var(--border);
+    border-radius: var(--r-md); padding: 9px 12px; font-size: 12px;
+  }
+  .file-chip .name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .file-chip .size { color: var(--muted); font-size: 11px; }
+  .file-chip .x {
+    cursor:pointer; color: var(--muted); padding:0 4px; font-size: 14px;
+    border:none; background:transparent;
+  }
+  .file-chip .x:hover { color: var(--accent2, #ef4455); }
+
+  .upload-card .or {
+    text-align:center; color: var(--muted); font-size: 10px; letter-spacing: 0.16em;
+    text-transform: uppercase; position:relative; margin: 2px 0;
+  }
+  .upload-card .or::before,
+  .upload-card .or::after {
+    content:''; position:absolute; top:50%; width: calc(50% - 22px);
+    height: 1px; background: var(--border);
+  }
+  .upload-card .or::before { left: 0; }
+  .upload-card .or::after  { right: 0; }
+
+  .upload-card textarea {
+    width:100%; min-height: 140px; resize: vertical;
+    background: var(--surface2); border:1px solid var(--border); color: var(--text);
+    border-radius: var(--r-md); padding: 10px 12px; font-size: 12px;
+    font-family: var(--font-mono, ui-monospace, 'JetBrains Mono', monospace);
+    line-height: 1.5; box-sizing: border-box;
+  }
+  .upload-card textarea:focus { outline:none; border-color: var(--accent); }
+
+  /* ── Action bar ──────────────────────────────────────────────────── */
+  .action-bar {
+    display:flex; gap: 12px; align-items:center; flex-wrap: wrap;
+    background: var(--surface); border:1px solid var(--border);
+    border-radius: var(--r-lg); padding: 14px 18px; margin-bottom: 18px;
+  }
+  .action-bar .run-btn {
+    background: var(--accent); color:#fff; border:none;
+    border-radius: var(--r-md); padding: 10px 22px; font-size: 13px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .action-bar .run-btn:hover { filter: brightness(1.08); }
+  .action-bar .run-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .action-bar .reset-btn {
+    background: transparent; color: var(--text); border:1px solid var(--border-strong);
+    border-radius: var(--r-md); padding: 10px 14px; font-size: 12px;
+    cursor: pointer; font-family: inherit;
+  }
+  .action-bar .reset-btn:hover { border-color: var(--accent2, #ef4455); color: var(--accent2, #ef4455); }
+  .action-bar .filter-group { display:flex; gap: 6px; margin-left:auto; }
+  .action-bar .filter-chip {
+    background: var(--surface2); border:1px solid var(--border); color: var(--muted);
+    border-radius: 999px; padding: 6px 12px; font-size: 11px; cursor:pointer;
+    font-family: inherit; letter-spacing: 0.04em;
+  }
+  .action-bar .filter-chip.active {
+    color: var(--text); border-color: var(--accent); background: rgba(80,130,255,0.08);
+  }
+
+  /* ── Results / accordion ─────────────────────────────────────────── */
+  .empty, .loading {
+    text-align:center; padding: 50px; color: var(--muted);
+    background: var(--surface); border:1px dashed var(--border); border-radius: var(--r-lg);
+  }
+  .loading::before { content:'⏳'; display:block; font-size:24px; margin-bottom:10px; }
+
+  .section-block {
+    background: var(--surface); border:1px solid var(--border);
+    border-radius: var(--r-lg); margin-bottom: 14px; overflow: hidden;
+  }
+  .section-head {
+    padding: 11px 16px; background: var(--surface2); border-bottom: 1px solid var(--border);
+    font-family: var(--font-display); font-size: 13px; font-weight: 600; color: var(--text);
+    display:flex; align-items:center; gap: 10px;
+  }
+  .section-head .count {
+    font-family: inherit; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    background: rgba(80,130,255,0.1); border:1px solid rgba(80,130,255,0.3);
+    color: var(--accent); border-radius: 999px; padding: 2px 9px;
+  }
+
+  details.change {
+    border-top: 1px solid var(--border);
+  }
+  details.change:first-of-type { border-top: 0; }
+  details.change > summary {
+    list-style: none; cursor: pointer; user-select: none;
+    padding: 12px 16px; display:flex; align-items:flex-start; gap: 12px;
+    font-size: 13px; color: var(--text);
+  }
+  details.change > summary::-webkit-details-marker { display: none; }
+  details.change > summary:hover { background: var(--surface2); }
+  details.change[open] > summary { background: var(--surface2); }
+
+  .chev {
+    display:inline-block; width: 10px; flex-shrink: 0; color: var(--muted);
+    transition: transform .12s; margin-top: 3px;
+  }
+  details.change[open] .chev { transform: rotate(90deg); color: var(--accent); }
+
+  .type-badge {
+    display:inline-block; flex-shrink: 0;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 3px 8px; border-radius: 4px;
+    min-width: 78px; text-align: center;
+  }
+  .type-badge.added    { background: rgba(80,200,120,0.13); color: var(--ok); border:1px solid rgba(80,200,120,0.35); }
+  .type-badge.removed  { background: rgba(239,68,85,0.13);  color: var(--accent2, #ef4455); border:1px solid rgba(239,68,85,0.35); }
+  .type-badge.modified { background: rgba(255,170,40,0.13); color: #f6a93b; border:1px solid rgba(255,170,40,0.4); }
+
+  .summary-preview {
+    flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    color: var(--muted); font-size: 12.5px;
+  }
+  details.change[open] .summary-preview { color: var(--text); white-space: normal; }
+
+  .change-body {
+    padding: 6px 16px 16px 16px;
+    display:grid; grid-template-columns: 1fr; gap: 12px;
+  }
+  .change-body.split { grid-template-columns: 1fr 1fr; }
+  @media (max-width: 860px) { .change-body.split { grid-template-columns: 1fr; } }
+
+  .text-block {
+    background: var(--surface2); border:1px solid var(--border);
+    border-radius: var(--r-md); padding: 12px 14px;
+    font-size: 13px; line-height: 1.55; color: var(--text);
+    white-space: pre-wrap; word-break: break-word;
+    max-height: 380px; overflow-y: auto;
+  }
+  .text-block .label {
+    display:block; font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+  }
+  .text-block.old .label { color: var(--accent2, #ef4455); }
+  .text-block.new .label { color: var(--ok); }
+
+  /* Inline word-level diff highlight (for "modified") */
+  .text-block .ins { background: rgba(80,200,120,0.18); color: var(--text); border-radius: 2px; padding: 1px 2px; }
+  .text-block .del { background: rgba(239,68,85,0.18);  color: var(--text); border-radius: 2px; padding: 1px 2px; text-decoration: line-through; text-decoration-color: rgba(239,68,85,0.7); }
+
+  .meta-line { font-size:11px; color:var(--muted); margin-top: 10px; }
+  .meta-line code { font-family: var(--font-mono, monospace); background: var(--surface2); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<!-- Nav is built dynamically by /js/shared.js -->
+<nav class="nav-bar">
+  <div class="nav-container"></div>
+</nav>
+
+<div class="app">
+  <div class="page-header">
+    <div>
+      <h1>Contract <span class="accent">Compare</span></h1>
+      <p>Upload or paste two versions of a contract. We'll surface every added, removed, and modified clause — grouped by section, expandable for review.</p>
+    </div>
+    <div class="status-bar"><span class="status-dot"></span> <span id="cc-source">Drop two files (or paste two passages) to compare</span></div>
+  </div>
+
+  <!-- ── Upload row ─────────────────────────────────────────────── -->
+  <div class="upload-row">
+    <!-- Original / left side -->
+    <div class="upload-card">
+      <h3 class="original">Original <span class="pill">v1 — the existing contract</span></h3>
+      <label class="dropzone" id="cc-drop-old" for="cc-file-old">
+        <div class="big">↓</div>
+        <div class="sub">Drop a PDF, DOCX, or text file here — or click to choose</div>
+        <input type="file" id="cc-file-old" accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" />
+      </label>
+      <div id="cc-chip-old" style="display:none;"></div>
+      <div class="or">or paste text</div>
+      <textarea id="cc-text-old" placeholder="Paste the original contract text here…"></textarea>
+    </div>
+
+    <!-- New / right side -->
+    <div class="upload-card">
+      <h3 class="new">New <span class="pill">v2 — the proposed revision</span></h3>
+      <label class="dropzone" id="cc-drop-new" for="cc-file-new">
+        <div class="big">↓</div>
+        <div class="sub">Drop a PDF, DOCX, or text file here — or click to choose</div>
+        <input type="file" id="cc-file-new" accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" />
+      </label>
+      <div id="cc-chip-new" style="display:none;"></div>
+      <div class="or">or paste text</div>
+      <textarea id="cc-text-new" placeholder="Paste the new contract text here…"></textarea>
+    </div>
+  </div>
+
+  <!-- ── Action bar ─────────────────────────────────────────────── -->
+  <div class="action-bar">
+    <button class="run-btn" id="cc-run">Compare contracts</button>
+    <button class="reset-btn" id="cc-reset">Clear</button>
+    <div class="filter-group" id="cc-filters" style="display:none;">
+      <button class="filter-chip active" data-filter="all">All</button>
+      <button class="filter-chip" data-filter="added">Added</button>
+      <button class="filter-chip" data-filter="removed">Removed</button>
+      <button class="filter-chip" data-filter="modified">Modified</button>
+    </div>
+  </div>
+
+  <div id="cc-kpi-row"></div>
+  <div id="cc-results"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/shared.js"></script>
+<script>
+// ── State ───────────────────────────────────────────────────────────────────
+const state = {
+  oldFile: null,
+  newFile: null,
+  loading: false,
+  result: null,        // server response
+  filter: "all",       // "all" | "added" | "removed" | "modified"
+};
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function fmtBytes(n) {
+  if (!n) return "0 B";
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+  return (n / (1024 * 1024)).toFixed(1) + " MB";
+}
+function fileChipHtml(file) {
+  return `
+    <div class="file-chip">
+      <span class="name">${escHtml(file.name)}</span>
+      <span class="size">${fmtBytes(file.size)}</span>
+      <button class="x" type="button" aria-label="Remove file">✕</button>
+    </div>`;
+}
+
+// ── File-pick + drag-drop wiring ───────────────────────────────────────────
+function wireDropzone(zoneId, inputId, chipId, side) {
+  const zone  = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  const chipWrap = document.getElementById(chipId);
+  const textarea = document.getElementById(side === "old" ? "cc-text-old" : "cc-text-new");
+
+  function setFile(file) {
+    if (side === "old") state.oldFile = file; else state.newFile = file;
+    if (file) {
+      chipWrap.innerHTML = fileChipHtml(file);
+      chipWrap.style.display = "";
+      zone.style.display = "none";
+      textarea.value = ""; // clear paste so the file wins unambiguously
+      chipWrap.querySelector(".x").addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation(); setFile(null); input.value = "";
+      });
+    } else {
+      chipWrap.innerHTML = "";
+      chipWrap.style.display = "none";
+      zone.style.display = "";
+    }
+  }
+
+  input.addEventListener("change", () => {
+    const f = input.files?.[0];
+    if (f) setFile(f);
+  });
+
+  ["dragenter", "dragover"].forEach((evt) =>
+    zone.addEventListener(evt, (e) => { e.preventDefault(); zone.classList.add("drag"); })
+  );
+  ["dragleave", "drop"].forEach((evt) =>
+    zone.addEventListener(evt, (e) => { e.preventDefault(); zone.classList.remove("drag"); })
+  );
+  zone.addEventListener("drop", (e) => {
+    const f = e.dataTransfer?.files?.[0];
+    if (f) setFile(f);
+  });
+}
+wireDropzone("cc-drop-old", "cc-file-old", "cc-chip-old", "old");
+wireDropzone("cc-drop-new", "cc-file-new", "cc-chip-new", "new");
+
+// ── Compare action ─────────────────────────────────────────────────────────
+async function runCompare() {
+  const oldText = document.getElementById("cc-text-old").value.trim();
+  const newText = document.getElementById("cc-text-new").value.trim();
+
+  if (!state.oldFile && !oldText) {
+    showToast("Add the original contract — upload a file or paste the text.", { type: "warn" });
+    return;
+  }
+  if (!state.newFile && !newText) {
+    showToast("Add the new contract — upload a file or paste the text.", { type: "warn" });
+    return;
+  }
+
+  const fd = new FormData();
+  if (state.oldFile) fd.append("oldFile", state.oldFile); else fd.append("oldText", oldText);
+  if (state.newFile) fd.append("newFile", state.newFile); else fd.append("newText", newText);
+
+  state.loading = true;
+  const runBtn = document.getElementById("cc-run");
+  runBtn.disabled = true;
+  runBtn.textContent = "Comparing…";
+  document.getElementById("cc-results").innerHTML = `<div class="loading">Extracting text and diffing — this can take a few seconds for long PDFs…</div>`;
+  document.getElementById("cc-source").textContent = "Comparing…";
+
+  try {
+    const r = await fetch("/api/contracts/compare", { method: "POST", body: fd });
+    const data = await r.json();
+    if (!r.ok || !data.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    state.result = data;
+    state.filter = "all";
+    document.querySelectorAll("#cc-filters .filter-chip").forEach((c) =>
+      c.classList.toggle("active", c.getAttribute("data-filter") === "all")
+    );
+    document.getElementById("cc-filters").style.display = "";
+    document.getElementById("cc-source").textContent =
+      `Compared ${escHtml(data.meta.oldName)}${data.summary.oldKind !== "text" ? " (" + data.summary.oldKind.toUpperCase() + ")" : ""}` +
+      ` ↔ ${escHtml(data.meta.newName)}${data.summary.newKind !== "text" ? " (" + data.summary.newKind.toUpperCase() + ")" : ""}` +
+      ` — ${data.summary.totalChanges} changes across ${data.bySection.length} section${data.bySection.length === 1 ? "" : "s"}`;
+    renderKpis();
+    renderResults();
+  } catch (err) {
+    document.getElementById("cc-results").innerHTML =
+      `<div class="empty">Compare failed: ${escHtml(err.message)}</div>`;
+    document.getElementById("cc-source").textContent = "Error";
+    showToast("Compare failed: " + err.message, { type: "error" });
+  } finally {
+    state.loading = false;
+    runBtn.disabled = false;
+    runBtn.textContent = "Compare contracts";
+  }
+}
+
+// ── KPIs ───────────────────────────────────────────────────────────────────
+function renderKpis() {
+  const s = state.result.summary;
+  document.getElementById("cc-kpi-row").innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="label">Total Changes</div>
+        <div class="value total">${s.totalChanges}</div>
+        <div class="sub">across ${state.result.bySection.length} section${state.result.bySection.length === 1 ? "" : "s"}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Added</div>
+        <div class="value added">${s.added}</div>
+        <div class="sub">new clauses in v2</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Removed</div>
+        <div class="value removed">${s.removed}</div>
+        <div class="sub">dropped from v1</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Modified</div>
+        <div class="value modified">${s.modified}</div>
+        <div class="sub">reworded clauses</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Paragraphs</div>
+        <div class="value">${s.oldParagraphs} → ${s.newParagraphs}</div>
+        <div class="sub">v1 vs v2 block count</div>
+      </div>
+    </div>`;
+}
+
+// ── Inline word-diff rendering ─────────────────────────────────────────────
+function renderInline(parts, mode) {
+  // mode = "old" | "new"
+  // For old block, show same + del. For new block, show same + ins.
+  return parts.map((p) => {
+    if (p.kind === "same") return escHtml(p.value);
+    if (p.kind === "added" && mode === "new") return `<span class="ins">${escHtml(p.value)}</span>`;
+    if (p.kind === "removed" && mode === "old") return `<span class="del">${escHtml(p.value)}</span>`;
+    return "";
+  }).join("");
+}
+
+// ── Results accordion ──────────────────────────────────────────────────────
+function previewText(c) {
+  const src = c.type === "added"   ? c.newText
+            : c.type === "removed" ? c.oldText
+            : (c.newText || c.oldText);
+  return src ? src.slice(0, 140) + (src.length > 140 ? "…" : "") : "";
+}
+
+function renderResults() {
+  const wrap = document.getElementById("cc-results");
+  if (!state.result) { wrap.innerHTML = ""; return; }
+
+  // Filter
+  const groups = state.result.bySection
+    .map((g) => ({
+      section: g.section,
+      items: state.filter === "all" ? g.items : g.items.filter((i) => i.type === state.filter),
+    }))
+    .filter((g) => g.items.length > 0);
+
+  if (!groups.length) {
+    wrap.innerHTML = `<div class="empty">No ${state.filter === "all" ? "" : state.filter + " "}changes between the two contracts.</div>`;
+    return;
+  }
+
+  let html = "";
+  for (const g of groups) {
+    html += `<div class="section-block">
+      <div class="section-head">
+        <span>${escHtml(g.section || "(unsectioned)")}</span>
+        <span class="count">${g.items.length} change${g.items.length === 1 ? "" : "s"}</span>
+      </div>`;
+    for (const c of g.items) {
+      const badge = c.type;
+      const preview = previewText(c);
+      let body;
+      if (c.type === "added") {
+        body = `<div class="change-body">
+          <div class="text-block new"><span class="label">Added in v2</span>${escHtml(c.newText || "")}</div>
+        </div>`;
+      } else if (c.type === "removed") {
+        body = `<div class="change-body">
+          <div class="text-block old"><span class="label">Removed from v1</span>${escHtml(c.oldText || "")}</div>
+        </div>`;
+      } else {
+        // modified — show side-by-side with inline word diff if we have it.
+        const oldHtml = c.inline ? renderInline(c.inline, "old") : escHtml(c.oldText || "");
+        const newHtml = c.inline ? renderInline(c.inline, "new") : escHtml(c.newText || "");
+        body = `<div class="change-body split">
+          <div class="text-block old"><span class="label">v1 — original</span>${oldHtml}</div>
+          <div class="text-block new"><span class="label">v2 — new</span>${newHtml}</div>
+        </div>`;
+      }
+      html += `<details class="change" data-id="${escHtml(c.id)}">
+        <summary>
+          <span class="chev">▸</span>
+          <span class="type-badge ${badge}">${badge}</span>
+          <span class="summary-preview">${escHtml(preview)}</span>
+        </summary>
+        ${body}
+      </details>`;
+    }
+    html += `</div>`;
+  }
+  wrap.innerHTML = html;
+}
+
+// ── Filter chips ──────────────────────────────────────────────────────────
+document.querySelectorAll("#cc-filters .filter-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll("#cc-filters .filter-chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    state.filter = chip.getAttribute("data-filter");
+    renderResults();
+  });
+});
+
+// ── Reset ─────────────────────────────────────────────────────────────────
+document.getElementById("cc-reset").addEventListener("click", () => {
+  state.oldFile = null; state.newFile = null; state.result = null; state.filter = "all";
+  document.getElementById("cc-file-old").value = "";
+  document.getElementById("cc-file-new").value = "";
+  document.getElementById("cc-text-old").value = "";
+  document.getElementById("cc-text-new").value = "";
+  document.getElementById("cc-chip-old").innerHTML = "";
+  document.getElementById("cc-chip-old").style.display = "none";
+  document.getElementById("cc-chip-new").innerHTML = "";
+  document.getElementById("cc-chip-new").style.display = "none";
+  document.getElementById("cc-drop-old").style.display = "";
+  document.getElementById("cc-drop-new").style.display = "";
+  document.getElementById("cc-kpi-row").innerHTML = "";
+  document.getElementById("cc-results").innerHTML = "";
+  document.getElementById("cc-filters").style.display = "none";
+  document.getElementById("cc-source").textContent = "Drop two files (or paste two passages) to compare";
+});
+
+document.getElementById("cc-run").addEventListener("click", runCompare);
+</script>
+</body>
+</html>
