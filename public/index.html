@@ -601,8 +601,17 @@
 
       $('mrw-billed').textContent     = '$' + Math.round(h.billing || 0).toLocaleString();
       $('mrw-billed-sub').textContent = `${h.completedJobs || 0} completed jobs`;
-      $('mrw-gm').textContent         = '$' + Math.round(h.grossProfit || 0).toLocaleString();
-      $('mrw-gm-sub').textContent     = `${(h.grossMarginPct || 0).toFixed(1)}% margin`;
+      // Mid-month, ServiceTitan gives us revenue but no cost — material and
+      // labor only land when the month-end workbook is imported. Reporting the
+      // resulting 100% margin would be worse than reporting nothing, so hold
+      // the number until there's real cost behind it.
+      if (h.hasCostData === false) {
+        $('mrw-gm').textContent     = '—';
+        $('mrw-gm-sub').textContent = 'costs post at month close';
+      } else {
+        $('mrw-gm').textContent     = '$' + Math.round(h.grossProfit || 0).toLocaleString();
+        $('mrw-gm-sub').textContent = `${(h.grossMarginPct || 0).toFixed(1)}% margin`;
+      }
       $('mrw-completed').textContent  = h.completedJobs || 0;
       $('mrw-wip-sub').textContent    = `${h.inProgressJobs || 0} in progress`;
 

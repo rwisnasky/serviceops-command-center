@@ -1210,7 +1210,13 @@ function seedInstallTracker(db, world, rng, now) {
     const completedOn = ymd(job.completedOn);
     const equipmentListed = job._equipmentInSt ? 1 : 0;
     const warrantyRegistered = job._warrantyRegistered ? 1 : 0;
-    const touchedAt = addDays(job.completedOn, rng.int(1, 9));
+
+    // The office confirms an install a few days after it completes — but a job
+    // finished last week can't have been confirmed next Tuesday. Since the
+    // table sorts newest-first, future-dated rows land at the very top where
+    // they're most visible. Clamp to now.
+    const notFuture = (d) => (d > new Date() ? new Date() : d);
+    const touchedAt = notFuture(addDays(job.completedOn, rng.int(1, 9)));
     const by = rng.pick(office);
 
     stmt.run({
@@ -1227,11 +1233,11 @@ function seedInstallTracker(db, world, rng, now) {
       equipment_listed_at: equipmentListed ? sqlTs(touchedAt) : null,
       equipment_listed_by: equipmentListed ? by : null,
       warranty_registered: warrantyRegistered,
-      warranty_registered_at: warrantyRegistered ? sqlTs(addDays(touchedAt, rng.int(0, 6))) : null,
+      warranty_registered_at: warrantyRegistered ? sqlTs(notFuture(addDays(touchedAt, rng.int(0, 6)))) : null,
       warranty_registered_by: warrantyRegistered ? by : null,
       notes: rng.chance(0.22) ? rng.pick(NOTES) : null,
       created_at: sqlTs(touchedAt),
-      updated_at: sqlTs(addDays(touchedAt, rng.int(0, 6))),
+      updated_at: sqlTs(notFuture(addDays(touchedAt, rng.int(0, 6)))),
     });
     n++;
   }

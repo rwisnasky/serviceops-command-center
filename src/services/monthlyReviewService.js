@@ -649,10 +649,20 @@ function buildReview({ year, month, jobs, timesheets, appointments = [], options
   // Headline KPIs (service-only basis)
   const op = jobAgg.operational || { count: 0, billed: 0, gm: 0 };
   const carryoverRevenue = (completed.billed || 0) - (op.billed || 0);
+  // Has any cost actually landed for this period? The current month is served
+  // live from ServiceTitan, which carries revenue but no material or labor
+  // cost — those only arrive when the month-end job-costing workbook is
+  // imported. With zero cost, gross margin computes to a triumphant 100%,
+  // which is worse than showing nothing: it's a number a reader will believe.
+  // Consumers use this flag to render "—" until real cost exists.
+  const hasCostData =
+    (completed.materials || 0) > 0 || (completed.labor || 0) > 0;
+
   const headline = {
     billing:        round0(completed.billed),
     grossProfit:    round0(completed.gm),
     grossMarginPct: round1(safeDiv(completed.gm, completed.billed) * 100),
+    hasCostData,
     // ── Two-track GM split ─────────────────────────────────────────────
     // Operational: matched-cost jobs only (true profitability of work done
     // this period). Reported: all completed jobs incl. carry-overs (what

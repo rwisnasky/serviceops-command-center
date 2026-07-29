@@ -258,7 +258,16 @@ function writeMonthlyCache({ dir, force = false, quiet = false } = {}) {
   let written = 0;
   let skipped = 0;
 
+  // The world schedules work three weeks ahead, which spills into next month.
+  // Those jobs are Scheduled, not Completed, so a future month's file would be
+  // all zeros — and the Monthly Review page defaults to the newest month in the
+  // cache, landing the reader on an empty report. Month-end workbooks don't
+  // exist for months that haven't happened; don't invent them.
+  const now = new Date();
+  const currentKey = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+
   for (const [key, payload] of months) {
+    if (key > currentKey) continue;
     const monthDir = path.join(baseDir, key);
     const stampPath = path.join(monthDir, "imported-at.json");
 
